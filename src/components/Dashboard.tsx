@@ -669,16 +669,28 @@ export default function Dashboard({
           columnStyles: { 0: { fontStyle: 'bold', textColor: [0, 0, 0], cellWidth: 50 }, 1: { textColor: [80, 80, 80] } }
         });
 
-        let currentY = (doc as any).lastAutoTable.finalY + 15;
+        let currentY = (doc as any).lastAutoTable.finalY + 10; // Espaçamento de 1cm após a tabela ou info
+
+        const pageHeight = doc.internal.pageSize.height;
+        const marginBottom = 20; // 2cm de margem inferior
 
         const addPDFSection = (title: string, content: string) => {
           if (!content) return;
-          if (currentY > 250) { doc.addPage(); currentY = 20; }
+          
+          const splitText = doc.splitTextToSize(content, pageWidth - 28);
+          const sectionHeight = (splitText.length * 5) + 15; // Estimativa de altura da seção
+
+          // Verifica se cabe na página atual (considerando margem de 2cm)
+          if (currentY + sectionHeight > pageHeight - marginBottom) {
+            doc.addPage();
+            currentY = 20; // Margem superior na nova página
+          }
+
           doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 168, 89);
           doc.text(title, 14, currentY); currentY += 8;
           doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
-          const splitText = doc.splitTextToSize(content, pageWidth - 28);
-          doc.text(splitText, 14, currentY); currentY += (splitText.length * 5) + 12;
+          doc.text(splitText, 14, currentY);
+          currentY += (splitText.length * 5) + 10; // Espaçamento após o bloco
         };
 
         if (isWeekly && targetData.weeklyData) {
@@ -686,59 +698,41 @@ export default function Dashboard({
           const tableBody = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'].map(day => {
             const dayData = targetData.weeklyData?.[day] || {};
             const campoComp = targetData.etapa === 'EF' ? (dayData.componenteCurricular || targetData.componenteCurricular || '-') : (dayData.campoExperiencia || '-');
-
             return [
-              day,
-              dayData.turno || '-',
-              dayData.horario || '-',
-              campoComp,
+              day, dayData.turno || '-', dayData.horario || '-', campoComp,
               (dayData.bnccCodes || []).join(', ') || '-',
-              dayData.atividade || '-',
-              dayData.objetivo_aprendizagem || '-',
-              dayData.acompanhamento || '-',
-              dayData.observacoes || '-'
+              dayData.atividade || '-', dayData.objetivo_aprendizagem || '-',
+              dayData.acompanhamento || '-', dayData.observacoes || '-'
             ];
           });
 
           autoTable(doc, {
-            startY: currentY,
-            head: tableHeaders,
-            body: tableBody,
-            theme: 'grid',
-            headStyles: { fillColor: [0, 168, 89], textColor: [255, 255, 255], fontSize: 8 },
+            startY: currentY, head: tableHeaders, body: tableBody,
+            margin: { bottom: marginBottom },
+            theme: 'grid', headStyles: { fillColor: [0, 168, 89], textColor: [255, 255, 255], fontSize: 8 },
             styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
-            columnStyles: {
-              0: { fontStyle: 'bold', cellWidth: 20 },
-              1: { cellWidth: 15 },
-              2: { cellWidth: 20 },
-              3: { cellWidth: 25 },
-              4: { cellWidth: 25 },
-              5: { cellWidth: 25 },
-              6: { cellWidth: 35 },
-              7: { cellWidth: 35 },
-              8: { cellWidth: 25 },
-              9: { cellWidth: 25 }
+            columnStyles: { 
+              0: { fontStyle: 'bold', cellWidth: 18 }, 1: { cellWidth: 15 }, 2: { cellWidth: 18 },
+              3: { cellWidth: 25 }, 4: { cellWidth: 25 }, 5: { cellWidth: 25 }, 
+              6: { cellWidth: 40 }, 7: { cellWidth: 40 }, 8: { cellWidth: 25 }, 9: { cellWidth: 25 }
             }
           });
 
-          currentY = (doc as any).lastAutoTable.finalY + 15;
+          currentY = (doc as any).lastAutoTable.finalY + 10; // 1cm após a tabela semanal
 
-          // Seções pedagógicas abaixo da tabela semanal conforme solicitado
+          // Ordem solicitada no JSON: Objetivos, Recursos, Avaliação, Observações
           addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
-          addPDFSection("Atividades Planejadas", targetData.atividades || '');
           addPDFSection("Recursos Didáticos", targetData.resources || '');
           addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
           addPDFSection("Observações Adicionais", targetData.description || '');
 
         } else if (activeTab === 'planejamento-mensal') {
           addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
-          addPDFSection("Atividades Planejadas", targetData.atividades || '');
           addPDFSection("Recursos Didáticos", targetData.resources || '');
           addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
           addPDFSection("Observações Adicionais", targetData.description || '');
         } else if (activeTab === 'planejamento-diario') {
           addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
-          addPDFSection("Atividades Planejadas", targetData.content || '');
           addPDFSection("Recursos Didáticos", targetData.resources || '');
           addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
           addPDFSection("Observações Adicionais", targetData.description || '');
