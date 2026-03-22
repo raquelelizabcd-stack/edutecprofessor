@@ -105,6 +105,7 @@ export default function Dashboard({
   const [activePickerContext, setActivePickerContext] = useState<'global' | string>('global');
   const [professorNome, setProfessorNome] = useState<string>('');
   const [robotName, setRobotName] = useState<string>('EduBot');
+  const [userPassword, setUserPassword] = useState<string>('');
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -131,11 +132,12 @@ export default function Dashboard({
       try {
         const { data } = await supabase
           .from('users')
-          .select('nome, nome_robo')
+          .select('nome, nome_robo, password_hash')
           .eq('id', userId)
           .single();
         if (data?.nome) setProfessorNome(data.nome);
         if (data?.nome_robo) setRobotName(data.nome_robo);
+        if (data?.password_hash) setUserPassword(data.password_hash);
       } catch (err) {
         console.error('Erro ao buscar nome do professor:', err);
       }
@@ -631,6 +633,25 @@ export default function Dashboard({
 
         if (mainError) throw mainError;
 
+        // Automação: Gerar relatório automático para o aluno se aplicável
+        if (formData.alunoId) {
+          try {
+            await supabase.from('relatorios_alunos').insert({
+              aluno_id: formData.alunoId,
+              professor_id: userId,
+              tipo_registro: 'planejamento',
+              conteudo: {
+                modulo: activeTab,
+                titulo: formData.title,
+                data: formData.date,
+                descricao: formData.description
+              }
+            });
+          } catch (autoErr) {
+            console.error("Erro na automação do relatório:", autoErr);
+          }
+        }
+
         if (formData.bnccCodes.length > 0) {
           const selectedBnccIds = dbBnccCodes
             .filter(b => formData.bnccCodes.includes(b.codigo))
@@ -1040,6 +1061,8 @@ export default function Dashboard({
       robotName={robotName}
       onSaveRobotName={handleSaveRobotName}
       subtitle={headerSubtitle}
+      userEmail={userEmail}
+      userPassword={userPassword}
     >
       <motion.div
         key={activeTab + (isFormOpen ? '-form' : '-list')}

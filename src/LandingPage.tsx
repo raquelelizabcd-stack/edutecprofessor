@@ -36,10 +36,10 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
   const [selectedPlanView, setSelectedPlanView] = useState<'none' | 'free' | 'pro'>('none');
 
   const features = [
-    { title: 'Relatórios Ilimitados', desc: 'Produza quantos relatórios precisar sem restrições.', icon: FileText },
-    { title: 'BNCC Automática', desc: 'Gere planos e pareceres alinhados à BNCC com Análise.', icon: Zap },
-    { title: 'Exportação PDF', desc: 'Baixe seus documentos prontos para impressão.', icon: BookOpen },
-    { title: 'Parecer PCD', desc: 'Crie pareceres acessíveis e inclusivos para alunos PCD.', icon: Accessibility },
+    { title: 'Planejamentos Prontos', desc: 'Planejamentos semanais, mensais e diários prontos em minutos.', icon: Calendar },
+    { title: 'Relatórios Automáticos', desc: 'Relatórios ilimitados e automáticos, sem retrabalho, exportáveis em PDF e CSV.', icon: FileText },
+    { title: 'BNCC Integrada', desc: 'Atividades alinhadas à BNCC sem esforço e com precisão.', icon: Zap },
+    { title: 'Portfólio Digital', desc: 'Portfólio digital completo para acompanhar sua evolução pedagógica.', icon: LayoutDashboard },
   ];
 
   const handleStartProTrial = async () => {
@@ -204,11 +204,11 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
               Para Professores Individuais
             </div>
             <h1 className="text-5xl md:text-7xl font-bold leading-[1.1] md:leading-[0.9] tracking-tighter mb-8">
-              EduTecProfessor — A revolução na <br className="hidden md:block" />
-              <span className="text-[#00A859]">gestão pedagógica</span>.
+              EduTecProfessor — A revolução definitiva na <span className="text-[#00A859]">gestão pedagógica</span>.
             </h1>
             <p className="text-lg md:text-xl text-black/60 max-w-lg mx-auto md:mx-0 mb-6 leading-relaxed">
-              Soluções inteligentes para professores individuais. Organize sua rotina, produza relatórios e tenha mais tempo para focar nos seus alunos.
+              Chega de perder noites preparando relatórios e planejamentos. Nosso sistema automatiza tarefas, organiza sua rotina e gera relatórios alinhados à BNCC em segundos. Você ganha tempo, reduz estresse e foca no que realmente importa: ensinar com qualidade. <br /><br />
+              <span className="font-bold text-black/80 italic">Todos os arquivos podem ser baixados e salvos em PDF e CSV.</span>
             </p>
             <div className="bg-[#00A859]/5 border border-[#00A859]/20 p-4 rounded-2xl mb-8 flex items-center gap-3">
               <Sparkles size={20} className="text-[#00A859] shrink-0" />
@@ -297,8 +297,8 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
       <section id="funcionalidades" className="py-16 md:py-24 bg-white border-y border-black/5">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16 md:mb-20">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Poder total para o professor</h2>
-            <p className="text-black/60">Ferramentas desenhadas para simplificar sua vida acadêmica.</p>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Poder total para o professor — menos burocracia, mais tempo para ensinar.</h2>
+            <p className="text-black/60">Ferramentas desenhadas para simplificar sua vida acadêmica. Todos os documentos podem ser exportados em PDF e CSV.</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             {features.map((f, i) => (

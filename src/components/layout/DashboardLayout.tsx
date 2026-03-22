@@ -14,6 +14,8 @@ interface DashboardLayoutProps {
     robotName?: string;
     onSaveRobotName?: (name: string) => Promise<void>;
     subtitle?: string;
+    userEmail?: string;
+    userPassword?: string;
     children: React.ReactNode;
 }
 
@@ -28,6 +30,8 @@ export default function DashboardLayout({
     robotName,
     onSaveRobotName,
     subtitle,
+    userEmail,
+    userPassword,
     children
 }: DashboardLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -56,6 +60,8 @@ export default function DashboardLayout({
                     statusPagamento={statusPagamento}
                     robotName={robotName}
                     onSaveRobotName={onSaveRobotName}
+                    userEmail={userEmail}
+                    userPassword={userPassword}
                 />
                 <div className="flex-1 overflow-y-scroll p-4 md:p-8 custom-scrollbar">
                     {children}

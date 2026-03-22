@@ -66,6 +66,8 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                 professor_id: professorId,
             };
 
+            let savedStudentId = editingStudent?.id;
+
             if (editingStudent) {
                 const { error } = await supabase
                     .from('alunos')
@@ -73,10 +75,34 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                     .eq('id', editingStudent.id);
                 if (error) throw error;
             } else {
-                const { error } = await supabase
+                const { data: newData, error } = await supabase
                     .from('alunos')
-                    .insert([dataToSave]);
+                    .insert([dataToSave])
+                    .select();
                 if (error) throw error;
+                if (newData && newData.length > 0) savedStudentId = newData[0].id;
+            }
+
+            // Automação: Gerar relatório automático de Nota/Observação
+            if (savedStudentId) {
+                try {
+                    await supabase.from('relatorios_alunos').insert({
+                        aluno_id: savedStudentId,
+                        professor_id: professorId,
+                        tipo_registro: 'nota',
+                        conteudo: {
+                            observacao: dataToSave.nota,
+                            bimestres: {
+                                b1: dataToSave.nota_bimestre1,
+                                b2: dataToSave.nota_bimestre2,
+                                b3: dataToSave.nota_bimestre3,
+                                b4: dataToSave.nota_bimestre4
+                            }
+                        }
+                    });
+                } catch (autoErr) {
+                    console.error("Erro na automação do relatório:", autoErr);
+                }
             }
 
             setIsModalOpen(false);

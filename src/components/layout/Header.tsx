@@ -15,9 +15,11 @@ interface HeaderProps {
     statusPagamento?: string | null;
     robotName?: string;
     onSaveRobotName?: (name: string) => Promise<void>;
+    userEmail?: string;
+    userPassword?: string;
 }
 
-export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, userDataExpiracao, statusPagamento, robotName, onSaveRobotName }: HeaderProps) {
+export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword }: HeaderProps) {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false);
@@ -202,11 +204,15 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-black/40 uppercase tracking-wider">E-mail</label>
-                        <input type="email" defaultValue="contato@raquelduarte.com" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                        <input type="email" defaultValue={userEmail || "contato@raquelduarte.com"} className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">WhatsApp</label>
+                        <input type="text" placeholder="Ex: (21) 99999-9999" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nova Senha</label>
-                        <input type="password" placeholder="••••••••" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                        <input type="password" defaultValue={userPassword || ""} placeholder="••••••••" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
                     </div>
                     <button type="submit" className="w-full py-4 bg-[#00A859] text-white rounded-xl font-bold mt-4 hover:bg-[#008F4C] transition-all shadow-lg shadow-[#00A859]/20">
                         Salvar Alterações
@@ -308,15 +314,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                     <div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm" />
                                 </button>
                             </div>
-                            <div className="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
-                                <div className="flex items-center gap-3 text-black/60">
-                                    <Icons.Lock size={18} />
-                                    <span className="text-sm font-medium">Autenticação em Duas Etapas</span>
-                                </div>
-                                <button className="w-10 h-5 bg-black/10 rounded-full relative transition-all">
-                                    <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm" />
-                                </button>
-                            </div>
+
                         </div>
                     </div>
                 </div>
