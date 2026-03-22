@@ -181,7 +181,7 @@ export default function Dashboard({
         ...(diario || []).map(r => ({
           id: r.id,
           moduleId: 'planejamento-diario',
-          title: `Plano Diário - ${formatDateDisplay(r.data)}`,
+          title: r.titulo || `Plano Diário - ${formatDateDisplay(r.data)}`,
           date: r.data,
           description: r.conteudo || '',
           objectives: r.objetivos,
@@ -197,7 +197,7 @@ export default function Dashboard({
         ...(semanal || []).map(r => ({
           id: r.id,
           moduleId: 'planejamento-semanal',
-          title: `${r.dia_semana || 'Semana'} - ${formatDateDisplay(r.data_ref || r.created_at)}`,
+          title: r.titulo_registro || `${r.dia_semana || 'Semana'} - ${formatDateDisplay(r.data_ref || r.created_at)}`,
           date: r.data_ref || r.created_at?.split('T')[0],
           description: r.observacoes_adicionais || r.observacoes || '',
           objectives: r.objetivo_aprendizagem,
@@ -216,7 +216,7 @@ export default function Dashboard({
         ...(mensal || []).map(r => ({
           id: r.id,
           moduleId: 'planejamento-mensal',
-          title: `Plano Mensal - ${r.mes}/${r.ano}`,
+          title: r.titulo_registro || `Plano Mensal - ${r.mes}/${r.ano}`,
           date: r.data_ref || r.created_at?.split('T')[0],
           description: r.observacoes || '',
           objectives: r.objetivos,
@@ -522,6 +522,7 @@ export default function Dashboard({
             // Novos campos globais mapeados
             professor_name: formData.professorName || professorNome,
             data_ref: formData.date,
+            titulo_registro: formData.title,
             componentes_curriculares: formData.curricularComponent,
             preset_default_ref: formData.period,
             recursos_didaticos: formData.resources,
@@ -576,6 +577,7 @@ export default function Dashboard({
           mes: formData.mesPlanejamento || '',
           ano: parseInt(formData.anoPlanejamento || new Date().getFullYear().toString()),
           data_ref: formData.date,
+          titulo_registro: formData.title,
           componente_curricular: formData.curricularComponent || '',
           objetivos: formData.objectives || '',
           atividades: formData.atividades || '',
