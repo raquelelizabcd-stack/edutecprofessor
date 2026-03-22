@@ -512,7 +512,8 @@ export default function Dashboard({
             recursos_didaticos: formData.resources,
             avaliacao_acompanhamento: formData.evaluation,
             observacoes_adicionais: formData.description,
-            bncc_codes: formData.bnccCodes || []
+            bncc_codes: formData.bnccCodes || [],
+            bncc_code_text: dayData.bncc_code_text || ''
           };
 
           const { error: dayError } = await supabase.from('planejamento_semanal').upsert(recordDataDay);
@@ -765,9 +766,13 @@ export default function Dashboard({
           const tableBody = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'].map(day => {
             const dayData = targetData.weeklyData?.[day] || {};
             const campoComp = targetData.etapa === 'EF' ? (dayData.componenteCurricular || targetData.componenteCurricular || '-') : (dayData.campoExperiencia || '-');
+            const bnccSelected = (dayData.bnccCodes || []).join(', ');
+            const bnccTyped = dayData.bncc_code_text || '';
+            const bnccFull = [bnccSelected, bnccTyped].filter(Boolean).join(' / ') || '-';
+
             return [
               day, dayData.turno || '-', dayData.horario || '-', campoComp,
-              (dayData.bnccCodes || []).join(', ') || '-',
+              bnccFull,
               dayData.atividade || '-', dayData.objetivo_aprendizagem || '-',
               dayData.acompanhamento || '-', dayData.observacoes || '-'
             ];
@@ -1817,6 +1822,19 @@ export default function Dashboard({
                                   </td>
                                   <td className="p-5 align-top relative">
                                     <div className="space-y-3">
+                                      <input
+                                        type="text"
+                                        placeholder="Digite ou selecione códigos BNCC"
+                                        value={formData.weeklyData?.[day]?.bncc_code_text || ''}
+                                        onChange={(e) => setFormData({
+                                          ...formData,
+                                          weeklyData: {
+                                            ...formData.weeklyData,
+                                            [day]: { ...(formData.weeklyData?.[day] || {}), bncc_code_text: e.target.value }
+                                          }
+                                        })}
+                                        className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-[9px] focus:border-[#008f4c] outline-none font-medium text-slate-600 mb-1 shadow-sm"
+                                      />
                                       <div className="flex gap-2">
                                         <button
                                           type="button"
