@@ -36,6 +36,16 @@ const CAMPOS_EXPLICACAO: Record<string, string> = {
   "Espaços, tempos, quantidades, relações e transformações": "ET: Espaços, tempos, quantidades, relações e transformações – Matemática inicial e noções de tempo/espaço."
 };
 
+const formatDateDisplay = (dateStr: string | undefined) => {
+  if (!dateStr) return '';
+  if (dateStr.includes('T')) {
+    return new Date(dateStr).toLocaleDateString('pt-BR');
+  }
+  const [year, month, day] = dateStr.split('-');
+  if (!year || !month || !day) return dateStr;
+  return `${day}/${month}/${year}`;
+};
+
 export default function Dashboard({ 
   userId, 
   userEmail, 
@@ -159,21 +169,21 @@ export default function Dashboard({
     if (!userId) return;
     try {
       // 1. Buscar Diários
-      const { data: diario } = await supabase.from('planejamento_diario').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('created_at', { ascending: false });
+      const { data: diario } = await supabase.from('planejamento_diario').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
       // 2. Buscar Semanais (agrupando por dia conforme modelo atual ou listando os registros globais)
-      const { data: semanal } = await supabase.from('planejamento_semanal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('created_at', { ascending: false });
+      const { data: semanal } = await supabase.from('planejamento_semanal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: true });
       // 3. Buscar Mensais
-      const { data: mensal } = await supabase.from('planejamento_mensal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('created_at', { ascending: false });
+      const { data: mensal } = await supabase.from('planejamento_mensal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: true });
       // 4. Buscar Reflexões
-      const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('created_at', { ascending: false });
+      const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
 
       const allRecords: PedagogicalRecord[] = [
         ...(diario || []).map(r => ({
           id: r.id,
           moduleId: 'planejamento-diario',
-          title: r.titulo,
+          title: `Plano Diário - ${formatDateDisplay(r.data)}`,
           date: r.data,
-          description: r.conteudo,
+          description: r.conteudo || '',
           objectives: r.objetivos,
           resources: r.recursos,
           evaluation: r.avaliacao,
@@ -181,14 +191,15 @@ export default function Dashboard({
           alunoId: r.aluno_id,
           alunoNome: r.aluno?.nome || '',
           professorName: r.professor_nome || professorNome,
+          bnccCodes: [],
           createdAt: r.created_at
-        } as PedagogicalRecord)),
+        })),
         ...(semanal || []).map(r => ({
           id: r.id,
           moduleId: 'planejamento-semanal',
-          title: r.dia_semana ? `${r.dia_semana} - ${new Date(r.data_ref || r.created_at).toLocaleDateString('pt-BR')}` : 'Semanal',
+          title: `${r.dia_semana || 'Semana'} - ${formatDateDisplay(r.data_ref || r.created_at)}`,
           date: r.data_ref || r.created_at?.split('T')[0],
-          description: r.observacoes_adicionais || r.observacoes,
+          description: r.observacoes_adicionais || r.observacoes || '',
           objectives: r.objetivo_aprendizagem,
           resources: r.recursos_didaticos,
           evaluation: r.avaliacao_acompanhamento || r.acompanhamento,
@@ -197,15 +208,17 @@ export default function Dashboard({
           alunoNome: r.aluno?.nome || '',
           professorName: r.professor_nome || r.professor_name || professorNome,
           period: r.preset_default_ref || r.turno,
-          weeklyData: r.weeklyData, // manter dados complexos se existirem
+          bnccCodes: r.bncc_codes || [],
+          bnccCodeText: r.bncc_code_text || '',
+          weeklyData: r.weeklyData,
           createdAt: r.created_at
-        } as PedagogicalRecord)),
+        })),
         ...(mensal || []).map(r => ({
           id: r.id,
           moduleId: 'planejamento-mensal',
           title: `Plano Mensal - ${r.mes}/${r.ano}`,
-          date: r.created_at?.split('T')[0],
-          description: r.observacoes,
+          date: r.data_ref || r.created_at?.split('T')[0],
+          description: r.observacoes || '',
           objectives: r.objetivos,
           resources: r.recursos,
           evaluation: r.avaliacao,
@@ -213,18 +226,20 @@ export default function Dashboard({
           alunoId: r.aluno_id,
           alunoNome: r.aluno?.nome || '',
           professorName: r.professor_nome || professorNome,
+          bnccCodes: [],
           createdAt: r.created_at
-        } as PedagogicalRecord)),
+        })),
         ...(reflexoes || []).map(r => ({
           id: r.id,
           moduleId: 'reflexoes',
           title: r.titulo,
           date: r.data?.split('T')[0],
-          description: r.percepcoes,
+          description: r.percepcoes || '',
           alunoId: r.aluno_id,
           alunoNome: r.aluno?.nome || '',
+          bnccCodes: [],
           createdAt: r.created_at
-        } as PedagogicalRecord))
+        }))
       ];
 
       setRecords(allRecords);
@@ -560,6 +575,7 @@ export default function Dashboard({
           aluno_id: formData.alunoId || null,
           mes: formData.mesPlanejamento || '',
           ano: parseInt(formData.anoPlanejamento || new Date().getFullYear().toString()),
+          data_ref: formData.date,
           componente_curricular: formData.curricularComponent || '',
           objetivos: formData.objectives || '',
           atividades: formData.atividades || '',
@@ -1140,20 +1156,6 @@ export default function Dashboard({
                         )}
                       </div>
                       <div className="flex flex-wrap gap-3">
-                        <a 
-                          href="/docs/BNCC_EI_EF_110518_versaofinal_site.pdf" 
-                          target="_blank"
-                          className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-red-100 transition-all border border-red-100 shadow-sm"
-                        >
-                          <Icons.FileText size={14} /> Abrir PDF BNCC
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => { setShowBnccPicker(!showBnccPicker || activePickerContext !== 'global'); setActivePickerContext('global'); }}
-                          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm"
-                        >
-                          <Icons.Search size={14} /> Códigos BNCC
-                        </button>
                       </div>
 
                       {showBnccPicker && activePickerContext === 'global' && (
@@ -1835,103 +1837,6 @@ export default function Dashboard({
                                         })}
                                         className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-[9px] focus:border-[#008f4c] outline-none font-medium text-slate-600 mb-1 shadow-sm"
                                       />
-                                      <div className="flex gap-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setActivePickerContext(day);
-                                            setShowBnccPicker(activePickerContext === day ? !showBnccPicker : true);
-                                          }}
-                                          className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm flex items-center justify-center gap-2"
-                                          title="Códigos BNCC"
-                                        >
-                                          <Icons.Search size={14} />
-                                          <span className="text-[9px] font-black uppercase tracking-widest">Códigos</span>
-                                        </button>
-                                        <a 
-                                          href="/docs/BNCC_EI_EF_110518_versaofinal_site.pdf" 
-                                          target="_blank"
-                                          className="p-2.5 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-all border border-red-100 shadow-sm flex items-center justify-center"
-                                          title="Abrir PDF BNCC"
-                                        >
-                                          <Icons.FileText size={14} />
-                                        </a>
-                                      </div>
-
-                                      {showBnccPicker && activePickerContext === day && (
-                                        <div className="absolute z-[95] p-4 bg-white border border-slate-200 shadow-2xl rounded-2xl w-[280px] mt-2 animate-in fade-in slide-in-from-top-2">
-                                           <div className="flex items-center justify-between mb-3">
-                                              <span className="text-[10px] font-black text-slate-400 uppercase">Seleção ({formData.weeklyData?.[day]?.bnccCodes?.length || 0}/2)</span>
-                                              <button type="button" onClick={() => setShowBnccPicker(false)} className="text-slate-400 hover:text-slate-600">
-                                                <Icons.X size={14} />
-                                              </button>
-                                           </div>
-                                           <div className="grid gap-2 max-h-[200px] overflow-y-auto custom-scrollbar">
-                                              {(() => {
-                                                  const dayData = formData.weeklyData?.[day] || {};
-                                                  let codesToShow: any[] = [];
-                                                  if (bnccStructure) {
-                                                    if (formData.etapa === 'EI' && formData.faixaEtaria && dayData.campoExperiencia) {
-                                                      codesToShow = bnccStructure.BNCC.EI[formData.faixaEtaria].campos[dayData.campoExperiencia] || [];
-                                                    } else if (formData.etapa === 'EF' && formData.blocoAnos && dayData.componenteCurricular) {
-                                                      codesToShow = bnccStructure.BNCC.EF[formData.blocoAnos].componentes[dayData.componenteCurricular] || [];
-                                                    }
-                                                  }
-                                                  if (codesToShow.length === 0) return <p className="text-[9px] text-slate-400 italic p-4 text-center">Inicie com os passos 1, 2 e 3 ou selecione Campo/Comp na linha.</p>;
-                                                  
-                                                  return codesToShow.map(bncc => {
-                                                    const isSelected = (formData.weeklyData?.[day]?.bnccCodes || []).includes(bncc.codigo);
-                                                    return (
-                                                      <button
-                                                        key={bncc.codigo}
-                                                        type="button"
-                                                        onClick={() => {
-                                                           const currentCodes = formData.weeklyData?.[day]?.bnccCodes || [];
-                                                           let nextCodes = [];
-                                                           if (isSelected) {
-                                                              nextCodes = currentCodes.filter((c: string) => c !== bncc.codigo);
-                                                           } else if (currentCodes.length < 2) {
-                                                              nextCodes = [...currentCodes, bncc.codigo];
-                                                           } else {
-                                                              alert("O máximo é de 2 códigos por dia.");
-                                                              return;
-                                                           }
-
-                                                           // Update objectives
-                                                           const objectives = nextCodes.map((code: string) => codesToShow.find(b => b.codigo === code)?.objetivo || '').filter(Boolean).join('; ');
-
-                                                           setFormData({
-                                                            ...formData,
-                                                            weeklyData: {
-                                                              ...formData.weeklyData,
-                                                              [day]: { 
-                                                                ...dayData, 
-                                                                bnccCodes: nextCodes,
-                                                                objetivo_aprendizagem: objectives
-                                                              }
-                                                            }
-                                                          });
-                                                        }}
-                                                        className={cn(
-                                                          "p-2.5 rounded-xl border text-left flex items-start gap-2.5 transition-all",
-                                                          isSelected ? "bg-[#00A859]/10 border-[#00A859]" : "bg-white border-slate-100 hover:border-slate-300"
-                                                        )}
-                                                      >
-                                                        <div className={cn("w-3.5 h-3.5 rounded-full border shrink-0 mt-0.5 flex items-center justify-center", isSelected ? "bg-[#00A859] border-[#00A859]" : "border-slate-200")}>
-                                                           {isSelected && <Icons.Check size={10} className="text-white" />}
-                                                        </div>
-                                                        <div className="space-y-0.5">
-                                                           <span className="text-[9px] font-black text-slate-700">{bncc.codigo}</span>
-                                                           <p className="text-[8px] text-slate-500 leading-tight line-clamp-2">{bncc.objetivo}</p>
-                                                        </div>
-                                                      </button>
-                                                    );
-                                                  });
-                                              })()}
-                                           </div>
-                                        </div>
-                                      )}
-
                                       <div className="flex flex-wrap gap-1">
                                         {(formData.weeklyData?.[day]?.bnccCodes || []).map((code: string) => (
                                           <span key={code} className="px-1.5 py-0.5 bg-slate-800 text-white rounded text-[8px] font-black">{code}</span>
@@ -2004,9 +1909,8 @@ export default function Dashboard({
                         </div>
                       </motion.div>
                     )}
-                     </div>
-                 ) : activeTab === 'registro-mensal' ? (
-                  /* Registro Mensal Specific Fields - 6 Sections */
+                  </div>
+                ) : activeTab === 'registro-mensal' ? (
                   <div className="space-y-8">
                     {/* Section 1: Identificação e Carga Horária */}
                     <div className="bg-black/5 p-6 rounded-2xl space-y-6">
@@ -2486,7 +2390,7 @@ export default function Dashboard({
                       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
                         <p className="text-xs text-black/40 flex items-center gap-1">
                           <Icons.Calendar size={12} />
-                          {new Date(record.date).toLocaleDateString('pt-BR')}
+                          {formatDateDisplay(record.date)}
                         </p>
                         {record.turma && (
                           <p className="text-xs text-black/40 flex items-center gap-1">

@@ -41,7 +41,8 @@ export interface PedagogicalRecord {
   curricularComponent?: string;
   period?: string;
   tone?: string;
-  bnccCodes: string[];
+  bnccCodes?: string[];
+  bnccCodeText?: string;
   objectives?: string;
   content?: string;
   resources?: string;
