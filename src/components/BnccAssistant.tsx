@@ -27,6 +27,7 @@ interface BnccAssistantProps {
   onInsertCode: (code: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  robotName?: string;
 }
 
 // ─── Mapeamentos e Constantes ───────────────────────────────────────────────────
@@ -86,7 +87,7 @@ const CAMPO_EXPERIENCIA_LABELS: Record<string, string> = {
 
 // ─── Componente Principal ────────────────────────────────────────────────────────
 
-export default function BnccAssistant({ onInsertCode, isOpen, onClose }: BnccAssistantProps) {
+export default function BnccAssistant({ onInsertCode, isOpen, onClose, robotName = 'EduBot' }: BnccAssistantProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -113,7 +114,7 @@ export default function BnccAssistant({ onInsertCode, isOpen, onClose }: BnccAss
       {
         id: 'welcome',
         type: 'text',
-        text: '👋 Olá, Professor(a)! Sou seu **Assistente BNCC**.\n\nComo posso ajudar no seu planejamento hoje? Escolha uma opção ou digite sua dúvida.',
+        text: `👋 Olá, Professor(a)! Sou o **${robotName}**, seu Consultor de Planejamento.\n\nComo posso ajudar hoje? Escolha uma opção ou digite sua dúvida.`,
         sender: 'bot',
         timestamp: new Date(),
       },
@@ -350,7 +351,7 @@ export default function BnccAssistant({ onInsertCode, isOpen, onClose }: BnccAss
                  <Icons.Bot size={28} className="text-white animate-pulse" />
                </div>
                <div>
-                 <h2 className="font-black text-lg tracking-tight leading-tight">Mestre BNCC</h2>
+                 <h2 className="font-black text-lg tracking-tight leading-tight">{robotName}</h2>
                  <p className="text-[9px] font-bold text-white/80 uppercase tracking-[0.2em] mt-0.5">Consultoria Inteligente EduTecProfessor</p>
                </div>
              </div>

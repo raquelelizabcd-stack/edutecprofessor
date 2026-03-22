@@ -87,6 +87,7 @@ export default function Dashboard({
   const [showBnccPicker, setShowBnccPicker] = useState(false);
   const [activePickerContext, setActivePickerContext] = useState<'global' | string>('global');
   const [professorNome, setProfessorNome] = useState<string>('');
+  const [robotName, setRobotName] = useState<string>('EduBot');
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -113,10 +114,11 @@ export default function Dashboard({
       try {
         const { data } = await supabase
           .from('users')
-          .select('nome')
+          .select('nome, nome_robo')
           .eq('id', userId)
           .single();
         if (data?.nome) setProfessorNome(data.nome);
+        if (data?.nome_robo) setRobotName(data.nome_robo);
       } catch (err) {
         console.error('Erro ao buscar nome do professor:', err);
       }
@@ -2562,6 +2564,7 @@ export default function Dashboard({
       <BnccAssistant 
         isOpen={isAssistantOpen}
         onClose={() => setIsAssistantOpen(false)}
+        robotName={robotName}
         onInsertCode={(code) => {
           if (!formData.bnccCodes.includes(code)) {
             if (formData.bnccCodes.length < 2) {
