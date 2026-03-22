@@ -56,7 +56,7 @@ export default function Sidebar({
                             <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-[#4682B4] font-bold text-lg">
                                 E
                             </div>
-                            <span className="text-xl font-bold tracking-tight text-white">EduTec<span className="text-white/80">Pro</span></span>
+                            <span className="text-xl font-bold tracking-tight text-white">EduTec<span className="text-white/80">Professor</span></span>
                         </div>
                         <button
                             onClick={() => setIsSidebarOpen(false)}

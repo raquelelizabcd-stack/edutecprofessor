@@ -351,7 +351,7 @@ export default function BnccAssistant({ onInsertCode, isOpen, onClose }: BnccAss
                </div>
                <div>
                  <h2 className="font-black text-lg tracking-tight leading-tight">Mestre BNCC</h2>
-                 <p className="text-[9px] font-bold text-white/80 uppercase tracking-[0.2em] mt-0.5">Consultoria Inteligente EduTecPro</p>
+                 <p className="text-[9px] font-bold text-white/80 uppercase tracking-[0.2em] mt-0.5">Consultoria Inteligente EduTecProfessor</p>
                </div>
              </div>
              <button onClick={onClose} className="p-2.5 hover:bg-white/20 rounded-xl transition-all relative z-10 group">

@@ -594,7 +594,7 @@ export default function Dashboard({
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `EduTecPro_${activeItem?.label.replace(/ /g, '_')}_${new Date().getTime()}.csv`;
+        link.download = `EduTecProfessor_${activeItem?.label.replace(/ /g, '_')}_${new Date().getTime()}.csv`;
         link.click();
 
         // Send Email
@@ -616,7 +616,7 @@ export default function Dashboard({
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(24);
         doc.setFont("helvetica", "bold");
-        doc.text("EduTecPro", 14, 25);
+        doc.text("EduTecProfessor", 14, 25);
         doc.setFontSize(12);
         doc.setFont("helvetica", "normal");
         doc.text(activeItem?.label || 'Documento Pedagógico', pageWidth - 14, 25, { align: 'right' });
@@ -741,11 +741,11 @@ export default function Dashboard({
         const pageCount = doc.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
           doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-          doc.text(`EduTecPro - Gerador de Relatórios Pedagógicos • Página ${i} de ${pageCount}`, pageWidth / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+          doc.text(`EduTecProfessor - Gerador de Relatórios Pedagógicos • Página ${i} de ${pageCount}`, pageWidth / 2, doc.internal.pageSize.height - 10, { align: 'center' });
         }
 
         const pdfBase64 = doc.output('datauristring').split(',')[1];
-        doc.save(`EduTecPro_${activeItem?.label.replace(/ /g, '_')}_${new Date().getTime()}.pdf`);
+        doc.save(`EduTecProfessor_${activeItem?.label.replace(/ /g, '_')}_${new Date().getTime()}.pdf`);
 
         // Send Email
         await supabase.functions.invoke('sendExportEmail', {

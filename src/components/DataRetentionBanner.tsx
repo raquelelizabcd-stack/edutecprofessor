@@ -177,7 +177,7 @@ export default function DataRetentionBanner({
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
-                link.download = `EduTecPro_Registros_${new Date().getTime()}.csv`;
+                link.download = `EduTecProfessor_Registros_${new Date().getTime()}.csv`;
                 link.click();
 
                 if (sendEmail) {
@@ -195,7 +195,7 @@ export default function DataRetentionBanner({
                 doc.setTextColor(255, 255, 255);
                 doc.setFontSize(24);
                 doc.setFont("helvetica", "bold");
-                doc.text("EduTecPro", 14, 25);
+                doc.text("EduTecProfessor", 14, 25);
                 doc.setFontSize(12);
                 doc.setFont("helvetica", "normal");
                 doc.text("Exportação de Registros Pedagógicos", pageWidth - 14, 25, { align: 'right' });
@@ -234,11 +234,11 @@ export default function DataRetentionBanner({
                 const pageCount = doc.getNumberOfPages();
                 for (let i = 1; i <= pageCount; i++) {
                     doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-                    doc.text(`EduTecPro • Página ${i} de ${pageCount}`, pageWidth / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+                    doc.text(`EduTecProfessor • Página ${i} de ${pageCount}`, pageWidth / 2, doc.internal.pageSize.height - 10, { align: 'center' });
                 }
 
                 const pdfBase64 = doc.output('datauristring').split(',')[1];
-                doc.save(`EduTecPro_Registros_${new Date().getTime()}.pdf`);
+                doc.save(`EduTecProfessor_Registros_${new Date().getTime()}.pdf`);
 
                 if (sendEmail) {
                     await supabase.functions.invoke('sendExportEmail', {

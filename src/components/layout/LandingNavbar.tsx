@@ -16,7 +16,7 @@ export default function LandingNavbar({ onGoToLogin }: LandingNavbarProps) {
                     <div className="w-10 h-10 bg-[#00A859] rounded-xl flex items-center justify-center text-white font-bold text-xl">
                         E
                     </div>
-                    <span className="text-2xl font-bold tracking-tight">EduTec<span className="text-[#00A859]">Pro</span></span>
+                    <span className="text-2xl font-bold tracking-tight">EduTec<span className="text-[#00A859]">Professor</span></span>
                 </div>
 
                 <nav className="hidden md:flex items-center gap-8 text-sm font-medium">

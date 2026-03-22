@@ -204,7 +204,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
               Para Professores Individuais
             </div>
             <h1 className="text-5xl md:text-7xl font-bold leading-[1.1] md:leading-[0.9] tracking-tighter mb-8">
-              EduTecPro — A revolução na <br className="hidden md:block" />
+              EduTecProfessor — A revolução na <br className="hidden md:block" />
               <span className="text-[#00A859]">gestão pedagógica</span>.
             </h1>
             <p className="text-lg md:text-xl text-black/60 max-w-lg mx-auto md:mx-0 mb-6 leading-relaxed">
@@ -253,7 +253,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
               <div className="bg-white/40 backdrop-blur-xl border border-white/60 rounded-[32px] shadow-2xl overflow-hidden p-2">
                 <img 
                   src="/assets/dashboard-pro.png" 
-                  alt="Dashboard EduTecPro" 
+                  alt="Dashboard EduTecProfessor" 
                   className="w-full h-auto rounded-[24px] shadow-lg"
                 />
               </div>
@@ -401,7 +401,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
       <section className="py-24 px-6">
         <div className="max-w-5xl mx-auto bg-[#1A1A1A] rounded-[40px] p-12 md:p-20 text-white relative overflow-hidden">
           <div className="relative z-10 max-w-2xl">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">Teste o EduTecPro gratuitamente</h2>
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">Teste o EduTecProfessor gratuitamente</h2>
             <p className="text-white/60 text-lg mb-10">
               Ao se cadastrar, você recebe <span className="text-[#00A859] font-bold">7 dias de acesso completo</span> ao Plano Pro para experimentar todas as funcionalidades.
             </p>
@@ -427,7 +427,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
 
       {/* Footer */}
       <footer className="py-12 border-t border-black/5 text-center text-black/40 text-sm">
-        <p>© 2024 EduTecPro - Professores Avulsos. Todos os direitos reservados.</p>
+        <p>© 2024 EduTecProfessor - Professores Avulsos. Todos os direitos reservados.</p>
       </footer>
     </div>
   );
