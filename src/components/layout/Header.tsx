@@ -1,0 +1,448 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import * as Icons from 'lucide-react';
+import { cn } from '../../lib/utils';
+import { UserProfile, NavItem } from '../../types';
+
+interface HeaderProps {
+    role: UserProfile;
+    activeItem?: NavItem;
+    subtitle?: string;
+    setIsSidebarOpen: (isOpen: boolean) => void;
+    onLogout?: () => void;
+    onGoToPayment?: () => void;
+    userDataExpiracao?: string | null;
+    statusPagamento?: string | null;
+}
+
+export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, userDataExpiracao, statusPagamento }: HeaderProps) {
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+    const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const getDaysRemaining = () => {
+        if (!userDataExpiracao) return null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expDate = new Date(userDataExpiracao);
+        expDate.setHours(0, 0, 0, 0);
+        const diffTime = expDate.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays > 0 ? diffDays : 0;
+    };
+
+    const daysLeft = getDaysRemaining();
+
+    // Redirecionamento se expirar
+    useEffect(() => {
+        if (role === 'pro' && daysLeft !== null && daysLeft <= 0 && onGoToPayment) {
+            onGoToPayment();
+        }
+    }, [daysLeft, role, onGoToPayment]);
+
+    // Close dropdown on click outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsProfileOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    const profileMenuItems = [
+        { id: 'edit-profile', label: 'Editar Dados Pessoais', icon: Icons.User, onClick: () => setIsEditProfileOpen(true) },
+        { id: 'change-photo', label: 'Alterar Foto/Avatar', icon: Icons.Camera, onClick: () => setIsChangePhotoOpen(true) },
+        { id: 'account-settings', label: 'Configurações da Conta', icon: Icons.Settings, onClick: () => setIsSettingsOpen(true) },
+        { id: 'logout', label: 'Sair do Sistema', icon: Icons.LogOut, onClick: onLogout, className: 'text-red-500 hover:bg-red-50' },
+    ];
+
+    const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => (
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={onClose}
+                        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+                    />
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        className="bg-white rounded-[32px] w-full max-w-md p-8 shadow-2xl relative z-10 border border-black/5"
+                    >
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold">{title}</h3>
+                            <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full transition-colors">
+                                <Icons.X size={20} />
+                            </button>
+                        </div>
+                        {children}
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
+    );
+
+    return (
+        <header className="h-20 bg-white border-b border-black/5 px-4 md:px-8 flex items-center justify-between shrink-0 relative z-20">
+            <div className="flex items-center gap-4">
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="lg:hidden p-2 hover:bg-black/5 rounded-lg"
+                >
+                    <Icons.Menu size={24} />
+                </button>
+                <div className="min-w-0">
+                    <h2 className="text-lg md:text-xl font-bold tracking-tight truncate">
+                        {activeItem?.label}
+                        {subtitle && (
+                            <span className="text-black/40 font-normal"> – {subtitle}</span>
+                        )}
+                    </h2>
+                    <p className="text-[10px] md:text-xs text-black/40 font-medium">{activeItem?.category}</p>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-2 md:gap-4">
+                <button className="p-2 md:p-2.5 bg-black/5 rounded-full text-black/40 hover:text-black transition-colors relative">
+                    <Icons.Bell size={20} />
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+                </button>
+                <div className="h-8 w-[1px] bg-black/5 mx-1 md:mx-2" />
+                <div className="relative" ref={dropdownRef}>
+                    <button 
+                        onClick={() => setIsProfileOpen(!isProfileOpen)}
+                        className="flex items-center gap-2 md:gap-3 p-1.5 hover:bg-black/5 rounded-2xl transition-all"
+                    >
+                        <div className="text-right hidden sm:block">
+                            <p className="text-sm font-bold">Raquel Duarte</p>
+                            <p className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
+                                {role === 'diretor' || role === 'professor' ? 'Escola EduTec Matriz' : (
+                                    <span className="flex items-center gap-1">
+                                        <span className={cn(
+                                            "px-2 py-0.5 rounded text-[10px] font-black mt-1 flex items-center gap-1",
+                                            role === 'pro' ? (daysLeft !== null && daysLeft <= 0 ? "bg-red-500 text-white" : "bg-[#00A859] text-white") : "bg-black/10 text-black/60"
+                                        )}>
+                                            {role === 'pro' ? (
+                                                <>
+                                                    CONTA PRO
+                                                    {daysLeft !== null && statusPagamento === 'trial' && (
+                                                        <span className="opacity-80">
+                                                            — {daysLeft > 0 ? `${daysLeft} dias restantes do teste grátis` : 'Teste encerrado, faça o pagamento'}
+                                                        </span>
+                                                    )}
+                                                </>
+                                            ) : 'CONTA FREE'}
+                                        </span>
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+                        <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-[#00A859] to-[#008F4C] rounded-lg md:rounded-xl flex items-center justify-center text-white font-bold text-sm md:text-base shadow-sm group-hover:shadow-md transition-all">
+                            RD
+                        </div>
+                    </button>
+
+                    <AnimatePresence>
+                        {isProfileOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-black/5 shadow-xl p-2 z-50 overflow-hidden"
+                            >
+                                <div className="p-3 mb-2 border-b border-black/5 sm:hidden">
+                                    <p className="text-sm font-bold">Raquel Duarte</p>
+                                    <p className="text-[10px] text-black/40 font-bold uppercase tracking-wider">Perfil do Usuário</p>
+                                </div>
+                                <div className="space-y-1">
+                                    {profileMenuItems.map((item) => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => {
+                                                item.onClick?.();
+                                                setIsProfileOpen(false);
+                                            }}
+                                            className={cn(
+                                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-black/5 text-black/70 hover:text-black",
+                                                item.className
+                                            )}
+                                        >
+                                            <item.icon size={18} />
+                                            {item.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </div>
+
+            {/* Modals */}
+            <Modal
+                isOpen={isEditProfileOpen}
+                onClose={() => setIsEditProfileOpen(false)}
+                title="Editar Dados Pessoais"
+            >
+                <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); alert('Dados salvos com sucesso!'); setIsEditProfileOpen(false); }}>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nome Completo</label>
+                        <input type="text" defaultValue="Raquel Duarte" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">E-mail</label>
+                        <input type="email" defaultValue="contato@raquelduarte.com" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nova Senha</label>
+                        <input type="password" placeholder="••••••••" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                    </div>
+                    <button type="submit" className="w-full py-4 bg-[#00A859] text-white rounded-xl font-bold mt-4 hover:bg-[#008F4C] transition-all shadow-lg shadow-[#00A859]/20">
+                        Salvar Alterações
+                    </button>
+                </form>
+            </Modal>
+
+            <Modal
+                isOpen={isChangePhotoOpen}
+                onClose={() => setIsChangePhotoOpen(false)}
+                title="Alterar Foto de Perfil"
+            >
+                <div className="flex flex-col items-center gap-6 p-4">
+                    <div className="w-24 h-24 bg-gradient-to-br from-[#00A859] to-[#008F4C] rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg">
+                        RD
+                    </div>
+                    <div className="w-full space-y-3">
+                        <button className="w-full py-4 border-2 border-dashed border-[#00A859]/30 rounded-2xl text-black/60 font-medium hover:border-[#00A859] hover:bg-[#00A859]/5 transition-all flex flex-col items-center justify-center gap-2">
+                            <Icons.Upload size={24} className="text-[#00A859]" />
+                            <span>Clique para carregar nova foto</span>
+                            <span className="text-[10px] uppercase">JPG ou PNG, máx 2MB</span>
+                        </button>
+                        <button className="w-full py-3 text-red-500 font-bold text-sm hover:underline">
+                            Remover foto atual
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                title="Configurações da Conta"
+            >
+                <div className="space-y-6 pb-2 max-h-[70vh] overflow-y-auto px-1 custom-scrollbar">
+                    {/* Plano Atual Section */}
+                    <div className="p-4 bg-black/5 rounded-2xl flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-bold text-black/40 uppercase tracking-wider">Plano Atual</p>
+                            <p className="font-bold flex items-center gap-2">
+                                {role === 'pro' ? 'EduTec Pro Platinum' : 'EduTec Gratuito'}
+                                <span className="px-2 py-0.5 bg-[#00A859] text-white text-[10px] rounded animate-pulse">Ativo</span>
+                            </p>
+                        </div>
+                        {role === 'free' && (
+                            <button className="px-4 py-2 bg-[#00A859] text-white text-xs font-bold rounded-lg transition-all hover:bg-[#008F4C] shadow-sm">
+                                Fazer Upgrade
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Dados de Pagamento Section */}
+                    <div className="space-y-4">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Dados de Pagamento</h4>
+                        <PaymentSection />
+                    </div>
+
+                    {/* Segurança e Notificações Section */}
+                    <div className="space-y-4 pt-2">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Segurança e Notificações</h4>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
+                                <div className="flex items-center gap-3 text-black/60">
+                                    <Icons.Bell size={18} />
+                                    <span className="text-sm font-medium">Notificações por E-mail</span>
+                                </div>
+                                <button className="w-10 h-5 bg-[#00A859] rounded-full relative transition-all">
+                                    <div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm" />
+                                </button>
+                            </div>
+                            <div className="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
+                                <div className="flex items-center gap-3 text-black/60">
+                                    <Icons.Lock size={18} />
+                                    <span className="text-sm font-medium">Autenticação em Duas Etapas</span>
+                                </div>
+                                <button className="w-10 h-5 bg-black/10 rounded-full relative transition-all">
+                                    <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm" />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+        </header>
+    );
+}
+
+// Sub-componente para gerenciar a lógica de pagamento dentro do modal
+function PaymentSection() {
+    const [card, setCard] = useState<{ number: string, name: string, expiry: string } | null>({
+        number: '4532111122221234',
+        name: 'RAQUEL DUARTE',
+        expiry: '12/28'
+    });
+    const [isEditing, setIsEditing] = useState(false);
+    const [tempFormData, setTempFormData] = useState({ number: '', name: '', expiry: '', cvv: '' });
+
+    const maskCardNumber = (num: string) => `**** **** **** ${num.slice(-4)}`;
+
+    const handleSaveCard = (e: React.FormEvent) => {
+        e.preventDefault();
+        setCard({
+            number: tempFormData.number,
+            name: tempFormData.name.toUpperCase(),
+            expiry: tempFormData.expiry
+        });
+        setIsEditing(false);
+        alert('Dados de pagamento atualizados com sucesso!');
+    };
+
+    const handleRemoveCard = () => {
+        if (window.confirm('Tem certeza que deseja remover este cartão?')) {
+            setCard(null);
+            setIsEditing(false);
+        }
+    };
+
+    if (isEditing) {
+        return (
+            <motion.form 
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                onSubmit={handleSaveCard} 
+                className="p-5 bg-black/5 border border-[#00A859]/20 rounded-[24px] space-y-4 shadow-inner"
+            >
+                <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-black text-[#00A859] uppercase tracking-wider">Novo Cartão de Crédito</p>
+                    <button type="button" onClick={() => setIsEditing(false)} className="text-xs font-bold text-black/40 hover:text-black">Cancelar</button>
+                </div>
+                <div className="space-y-3">
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-black/40 uppercase px-1">Número do Cartão</label>
+                        <input 
+                            required
+                            placeholder="0000 0000 0000 0000"
+                            className="w-full px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#00A859] outline-none text-sm font-medium"
+                            value={tempFormData.number}
+                            onChange={(e) => setTempFormData({...tempFormData, number: e.target.value.replace(/\D/g, '')})}
+                            maxLength={16}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-black/40 uppercase px-1">Nome do Titular</label>
+                        <input 
+                            required
+                            placeholder="COMO IMPRESSO NO CARTÃO"
+                            className="w-full px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#00A859] outline-none text-sm font-medium"
+                            value={tempFormData.name}
+                            onChange={(e) => setTempFormData({...tempFormData, name: e.target.value})}
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-black/40 uppercase px-1">Validade (MM/AA)</label>
+                            <input 
+                                required
+                                placeholder="MM/AA"
+                                className="w-full px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#00A859] outline-none text-sm font-medium"
+                                value={tempFormData.expiry}
+                                onChange={(e) => setTempFormData({...tempFormData, expiry: e.target.value})}
+                                maxLength={5}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-black/40 uppercase px-1">CVV</label>
+                            <input 
+                                required
+                                placeholder="000"
+                                className="w-full px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#00A859] outline-none text-sm font-medium"
+                                value={tempFormData.cvv}
+                                onChange={(e) => setTempFormData({...tempFormData, cvv: e.target.value.replace(/\D/g, '')})}
+                                maxLength={4}
+                            />
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" className="w-full py-3.5 bg-[#00A859] text-white rounded-xl font-bold text-sm shadow-md shadow-[#00A859]/20 hover:bg-[#008F4C] transition-all">
+                    Confirmar e Salvar
+                </button>
+            </motion.form>
+        );
+    }
+
+    if (card) {
+        return (
+            <div className="relative overflow-hidden p-5 bg-gradient-to-br from-black to-zinc-800 rounded-[24px] shadow-lg border border-white/10 group">
+                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+                    <Icons.CreditCard size={120} className="text-white rotate-[-15deg] translate-x-12 translate-y-[-24px]" />
+                </div>
+                <div className="relative z-10 flex flex-col h-full justify-between gap-6">
+                    <div className="flex items-center justify-between">
+                        <div className="w-10 h-7 bg-amber-400/20 rounded border border-amber-400/30" /> {/* Chip mock */}
+                        <Icons.CreditCard size={24} className="text-white/60" />
+                    </div>
+                    <div className="space-y-4">
+                        <p className="text-lg font-mono text-white tracking-[0.2em]">{maskCardNumber(card.number)}</p>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-[9px] uppercase font-bold text-white/40 tracking-wider">Titular</p>
+                                <p className="text-sm font-bold text-white/90">{card.name}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[9px] uppercase font-bold text-white/40 tracking-wider">Validade</p>
+                                <p className="text-sm font-bold text-white/90">{card.expiry}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2 pt-4 border-t border-white/10">
+                        <button 
+                            onClick={() => {
+                                setTempFormData({ number: card.number, name: card.name, expiry: card.expiry, cvv: '' });
+                                setIsEditing(true);
+                            }}
+                            className="flex-1 py-2 bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold rounded-lg transition-all"
+                        >
+                            Editar Dados
+                        </button>
+                        <button 
+                            onClick={handleRemoveCard}
+                            className="p-2 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-all"
+                        >
+                            <Icons.Trash2 size={14} />
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <button 
+            onClick={() => setIsEditing(true)}
+            className="w-full p-8 border-2 border-dashed border-black/10 rounded-[24px] text-black/40 font-bold flex flex-col items-center justify-center gap-3 hover:border-[#00A859] hover:bg-[#00A859]/5 hover:text-[#00A859] transition-all group"
+        >
+            <div className="w-12 h-12 rounded-full bg-black/5 flex items-center justify-center group-hover:bg-[#00A859]/10 transition-colors">
+                <Icons.Plus size={24} />
+            </div>
+            <span>Adicionar Cartão de Crédito</span>
+        </button>
+    );
+}
