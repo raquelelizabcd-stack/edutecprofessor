@@ -138,6 +138,7 @@ export default function Dashboard({
     period: '',
     tone: 'Formal',
     bnccCodes: [] as string[],
+    bnccCodeText: '',
     objectives: '',
     content: '',
     resources: '',
@@ -193,7 +194,8 @@ export default function Dashboard({
           alunoId: r.aluno_id,
           alunoNome: r.aluno?.nome || '',
           professorName: r.professor_nome || professorNome,
-          bnccCodes: [],
+          bnccCodes: r.bncc_codes || [],
+          bnccCodeText: r.bncc_code_text || '',
           createdAt: r.created_at
         })),
         ...(semanal || []).map(r => ({
@@ -228,7 +230,8 @@ export default function Dashboard({
           alunoId: r.aluno_id,
           alunoNome: r.aluno?.nome || '',
           professorName: r.professor_nome || professorNome,
-          bnccCodes: [],
+          bnccCodes: r.bncc_codes || [],
+          bnccCodeText: r.bncc_code_text || '',
           createdAt: r.created_at
         })),
         ...(reflexoes || []).map(r => ({
@@ -492,6 +495,8 @@ export default function Dashboard({
           titulo: formData.title,
           data: formData.date,
           aluno_id: formData.alunoId || null,
+          bncc_code_text: formData.bnccCodeText || '',
+          bncc_codes: formData.bnccCodes || [],
           componente: formData.curricularComponent,
           objetivos: formData.objectives,
           conteudo: formData.content,
@@ -580,6 +585,8 @@ export default function Dashboard({
           ano: parseInt(formData.anoPlanejamento || new Date().getFullYear().toString()),
           data_ref: formData.date,
           titulo_registro: formData.title,
+          bncc_code_text: formData.bnccCodeText || '',
+          bncc_codes: formData.bnccCodes || [],
           componente_curricular: formData.curricularComponent || '',
           objetivos: formData.objectives || '',
           atividades: formData.atividades || '',
@@ -736,17 +743,28 @@ export default function Dashboard({
         if (targetData.curricularComponent) infoData.push(['Comp. Curricular (Geral)', targetData.curricularComponent]);
         if (targetData.period) infoData.push(['Período', targetData.period]);
         
-        if (!isWeekly && targetData.bnccCodes && targetData.bnccCodes.length > 0) {
-          const bnccInfoRows = targetData.bnccCodes.map(code => {
-            const dbRef = dbBnccCodes.find(b => b.codigo === code);
-            if (!dbRef) return code;
-            
-            let info = `Código: ${code}`;
-            if (dbRef.campo_experiencia) info += `\nCampo: ${dbRef.campo_experiencia}`;
-            info += `\nObjetivo: ${dbRef.objetivo_aprendizagem || dbRef.descricao}`;
-            return info;
-          });
-          infoData.push(['BNCC', bnccInfoRows.join('\n\n')]);
+        if (!isWeekly && ( (targetData.bnccCodes && targetData.bnccCodes.length > 0) || targetData.bnccCodeText )) {
+          let bnccContent = '';
+          
+          if (targetData.bnccCodes && targetData.bnccCodes.length > 0) {
+            bnccContent = targetData.bnccCodes.map(code => {
+              const dbRef = dbBnccCodes.find(b => b.codigo === code);
+              if (!dbRef) return `Código: ${code}`;
+              
+              let info = `Código: ${code}`;
+              if (dbRef.campo_experiencia) info += `\nCampo: ${dbRef.campo_experiencia}`;
+              info += `\nObjetivo: ${dbRef.objetivo_aprendizagem || dbRef.descricao}`;
+              return info;
+            }).join('\n\n');
+          }
+
+          if (targetData.bnccCodeText) {
+            bnccContent += (bnccContent ? '\n\n' : '') + `Escrita Livre/Manual: ${targetData.bnccCodeText}`;
+          }
+
+          if (bnccContent) {
+            infoData.push(['BNCC', bnccContent]);
+          }
         }
 
         autoTable(doc, {
@@ -1160,6 +1178,28 @@ export default function Dashboard({
                         )}
                       </div>
                       <div className="flex flex-wrap gap-3">
+                        <label className="text-sm font-bold text-black/60 uppercase tracking-wider pl-1 font-black w-full mb-1">Escrita Livre BNCC (Opcional)</label>
+                        <input 
+                          type="text"
+                          value={formData.bnccCodeText}
+                          onChange={(e) => setFormData({ ...formData, bnccCodeText: e.target.value })}
+                          placeholder="Digite ou valide o código BNCC..."
+                          className="w-full px-5 py-4 rounded-3xl border-2 border-slate-100 bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-bold text-slate-700"
+                        />
+                        <a 
+                          href="/docs/BNCC_EI_EF_110518_versaofinal_site.pdf" 
+                          target="_blank"
+                          className="flex items-center gap-2 px-4 py-2.5 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-red-100 transition-all border border-red-100 shadow-sm"
+                        >
+                          <Icons.FileText size={14} /> Abrir PDF BNCC
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => { setShowBnccPicker(!showBnccPicker || activePickerContext !== 'global'); setActivePickerContext('global'); }}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm"
+                        >
+                          <Icons.Search size={14} /> Pesquisar BNCC
+                        </button>
                       </div>
 
                       {showBnccPicker && activePickerContext === 'global' && (
@@ -1300,6 +1340,14 @@ export default function Dashboard({
                         )}
                       </div>
                       <div className="flex flex-wrap gap-3">
+                        <label className="text-sm font-bold text-black/60 uppercase tracking-wider pl-1 font-black w-full mb-1">Escrita Livre BNCC (Opcional)</label>
+                        <input 
+                          type="text"
+                          value={formData.bnccCodeText}
+                          onChange={(e) => setFormData({ ...formData, bnccCodeText: e.target.value })}
+                          placeholder="Digite ou valide o código BNCC..."
+                          className="w-full px-5 py-4 rounded-3xl border-2 border-slate-100 bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-bold text-slate-700 mb-2"
+                        />
                         <a 
                           href="/docs/BNCC_EI_EF_110518_versaofinal_site.pdf" 
                           target="_blank"
