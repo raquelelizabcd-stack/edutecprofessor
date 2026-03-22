@@ -154,27 +154,93 @@ export default function Dashboard({
     exportFormat: 'pdf' as 'pdf' | 'csv'
   });
 
-  // Load records from localStorage on mount
-  useEffect(() => {
+  // Função para buscar todos os registros do Supabase para o professor logado
+  const fetchRecords = async () => {
+    if (!userId) return;
     try {
-      const savedRecords = localStorage.getItem(`edutec_records_${role}`);
-      if (savedRecords) {
-        const parsed = JSON.parse(savedRecords);
-        if (Array.isArray(parsed)) {
-          setRecords(parsed);
-        } else {
-          setRecords([]);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load local records:', err);
-      setRecords([]);
-    }
-  }, [role]);
+      // 1. Buscar Diários
+      const { data: diario } = await supabase.from('planejamento_diario').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('created_at', { ascending: false });
+      // 2. Buscar Semanais (agrupando por dia conforme modelo atual ou listando os registros globais)
+      const { data: semanal } = await supabase.from('planejamento_semanal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('created_at', { ascending: false });
+      // 3. Buscar Mensais
+      const { data: mensal } = await supabase.from('planejamento_mensal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('created_at', { ascending: false });
+      // 4. Buscar Reflexões
+      const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('created_at', { ascending: false });
 
-  // Save records to localStorage whenever they change
+      const allRecords: PedagogicalRecord[] = [
+        ...(diario || []).map(r => ({
+          id: r.id,
+          moduleId: 'planejamento-diario',
+          title: r.titulo,
+          date: r.data,
+          description: r.conteudo,
+          objectives: r.objetivos,
+          resources: r.recursos,
+          evaluation: r.avaliacao,
+          curricularComponent: r.componente,
+          alunoId: r.aluno_id,
+          alunoNome: r.aluno?.nome || '',
+          professorName: r.professor_nome || professorNome,
+          createdAt: r.created_at
+        } as PedagogicalRecord)),
+        ...(semanal || []).map(r => ({
+          id: r.id,
+          moduleId: 'planejamento-semanal',
+          title: r.dia_semana ? `${r.dia_semana} - ${new Date(r.data_ref || r.created_at).toLocaleDateString('pt-BR')}` : 'Semanal',
+          date: r.data_ref || r.created_at?.split('T')[0],
+          description: r.observacoes_adicionais || r.observacoes,
+          objectives: r.objetivo_aprendizagem,
+          resources: r.recursos_didaticos,
+          evaluation: r.avaliacao_acompanhamento || r.acompanhamento,
+          curricularComponent: r.componente_curricular || r.componentes_curriculares,
+          alunoId: r.aluno_id,
+          alunoNome: r.aluno?.nome || '',
+          professorName: r.professor_nome || r.professor_name || professorNome,
+          period: r.preset_default_ref || r.turno,
+          weeklyData: r.weeklyData, // manter dados complexos se existirem
+          createdAt: r.created_at
+        } as PedagogicalRecord)),
+        ...(mensal || []).map(r => ({
+          id: r.id,
+          moduleId: 'planejamento-mensal',
+          title: `Plano Mensal - ${r.mes}/${r.ano}`,
+          date: r.created_at?.split('T')[0],
+          description: r.observacoes,
+          objectives: r.objetivos,
+          resources: r.recursos,
+          evaluation: r.avaliacao,
+          curricularComponent: r.componente_curricular,
+          alunoId: r.aluno_id,
+          alunoNome: r.aluno?.nome || '',
+          professorName: r.professor_nome || professorNome,
+          createdAt: r.created_at
+        } as PedagogicalRecord)),
+        ...(reflexoes || []).map(r => ({
+          id: r.id,
+          moduleId: 'reflexoes',
+          title: r.titulo,
+          date: r.data?.split('T')[0],
+          description: r.percepcoes,
+          alunoId: r.aluno_id,
+          alunoNome: r.aluno?.nome || '',
+          createdAt: r.created_at
+        } as PedagogicalRecord))
+      ];
+
+      setRecords(allRecords);
+    } catch (err) {
+      console.error('Erro ao sincronizar registros:', err);
+    }
+  };
+
+  // Carregar registros inicialmente e ao mudar o usuário
   useEffect(() => {
-    if (records && Array.isArray(records)) {
+    fetchRecords();
+  }, [userId, professorNome]);
+
+  // Persistência local (mantida como backup)
+  useEffect(() => {
+    if (records.length > 0) {
       localStorage.setItem(`edutec_records_${role}`, JSON.stringify(records));
     }
   }, [records, role]);
@@ -557,6 +623,7 @@ export default function Dashboard({
       }
 
       alert("Alterações salvas com sucesso!");
+      await fetchRecords(); // Recarrega do banco para garantir que a lista esteja espelhada
       setIsFormOpen(false);
       setEditingRecord(null);
       setWizardStep(1); // Reset wizard if applicable
@@ -2409,10 +2476,22 @@ export default function Dashboard({
                             {record.turma}
                           </p>
                         )}
-                        {record.studentName && (
+                        {record.alunoNome && (
                           <p className="text-xs text-black/40 flex items-center gap-1">
                             <Icons.User size={12} />
-                            {record.studentName}
+                            {record.alunoNome}
+                          </p>
+                        )}
+                        {record.professorName && (
+                          <p className="text-xs text-black/40 flex items-center gap-1">
+                            <Icons.Briefcase size={12} />
+                            {record.professorName}
+                          </p>
+                        )}
+                        {record.curricularComponent && (
+                          <p className="text-xs text-black/40 flex items-center gap-1">
+                            <Icons.BookOpen size={12} />
+                            {record.curricularComponent}
                           </p>
                         )}
                         {record.period && (
