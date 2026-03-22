@@ -662,11 +662,20 @@ export default function Dashboard({
 
         let currentY = (doc as any).lastAutoTable.finalY + 15;
 
+        const addPDFSection = (title: string, content: string) => {
+          if (!content) return;
+          if (currentY > 250) { doc.addPage(); currentY = 20; }
+          doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 168, 89);
+          doc.text(title, 14, currentY); currentY += 8;
+          doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
+          const splitText = doc.splitTextToSize(content, pageWidth - 28);
+          doc.text(splitText, 14, currentY); currentY += (splitText.length * 5) + 12;
+        };
+
         if (isWeekly && targetData.weeklyData) {
           const tableHeaders = [['Dia', 'Turno', 'Horário', 'Campo/Comp', 'BNCC', 'Atividade', 'Objetivo', 'Acomp.', 'Obs.']];
           const tableBody = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'].map(day => {
             const dayData = targetData.weeklyData?.[day] || {};
-            // Faixa/Bloco is already in PDF header infoData
             const campoComp = targetData.etapa === 'EF' ? (dayData.componenteCurricular || targetData.componenteCurricular || '-') : (dayData.campoExperiencia || '-');
 
             return [
@@ -702,39 +711,38 @@ export default function Dashboard({
               9: { cellWidth: 25 }
             }
           });
-        } else {
-          const addPDFSection = (title: string, content: string) => {
-            if (!content) return;
-            if (currentY > 250) { doc.addPage(); currentY = 20; }
-            doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 168, 89);
-            doc.text(title, 14, currentY); currentY += 8;
-            doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
-            const splitText = doc.splitTextToSize(content, pageWidth - 28);
-            doc.text(splitText, 14, currentY); currentY += (splitText.length * 5) + 10;
-          };
 
-          if (activeTab === 'planejamento-mensal') {
-            addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
-            addPDFSection("Atividades Planejadas", targetData.atividades || '');
-            addPDFSection("Recursos Didáticos", targetData.resources || '');
-            addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
-            addPDFSection("Observações Adicionais", targetData.description || '');
-          } else if (activeTab === 'planejamento-diario') {
-            addPDFSection("Objetivos da Aula", targetData.objectives);
-            addPDFSection("Conteúdo / Atividades Planejadas", targetData.content);
-            addPDFSection("Recursos Didáticos", targetData.resources);
-            addPDFSection("Avaliação / Observações", targetData.evaluation);
-          } else if (activeTab === 'registro-mensal') {
-            addPDFSection("1. Identificação e Carga Horária", `Professor: ${targetData.professorName}\nDisciplina: ${targetData.discipline}\nUnidade: ${targetData.schoolUnit}\nTotal Aulas Dadas: ${targetData.totalAulasDadas}\nAulas Previstas: ${targetData.aulasPrevistas}\nAulas Pendentes: ${targetData.aulasPendentes}\nHoras APD: ${targetData.apdHours}`);
-            addPDFSection("2. Conteúdos e Metodologias", `Conteúdos: ${targetData.content}\nMetodologias: ${targetData.metodologias}`);
-            addPDFSection("3. Avaliações e Materiais", `Avaliações: ${targetData.evaluation}\nMateriais: ${targetData.materiaisDidaticos}`);
-            addPDFSection("4. Frequência e Comportamento", `Frequência: ${targetData.frequenciaDiaria}\nJustificativas: ${targetData.justificativasFaltas}\nComportamento: ${targetData.obsComportamento}`);
-            addPDFSection("5. Relacionamento Escola-Comunidade", `Comunicação: ${targetData.comunicacaoResponsaveis}\nConselhos: ${targetData.participacaoConselhos}\nAtividades Coletivas: ${targetData.atividadesColetivas}`);
-            addPDFSection("6. Reflexão e Desenvolvimento", `Formação: ${targetData.formacaoContinuada}\nAutoavaliação: ${targetData.autoavaliacao}\nFeedback: ${targetData.feedbackCoordenacao}`);
-          } else {
-            addPDFSection("Observações do Professor", targetData.description);
-            addPDFSection("Tom do Texto", targetData.tone);
-          }
+          currentY = (doc as any).lastAutoTable.finalY + 15;
+
+          // Seções pedagógicas abaixo da tabela semanal conforme solicitado
+          addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
+          addPDFSection("Atividades Planejadas", targetData.atividades || '');
+          addPDFSection("Recursos Didáticos", targetData.resources || '');
+          addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
+          addPDFSection("Observações Adicionais", targetData.description || '');
+
+        } else if (activeTab === 'planejamento-mensal') {
+          addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
+          addPDFSection("Atividades Planejadas", targetData.atividades || '');
+          addPDFSection("Recursos Didáticos", targetData.resources || '');
+          addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
+          addPDFSection("Observações Adicionais", targetData.description || '');
+        } else if (activeTab === 'planejamento-diario') {
+          addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
+          addPDFSection("Atividades Planejadas", targetData.content || '');
+          addPDFSection("Recursos Didáticos", targetData.resources || '');
+          addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
+          addPDFSection("Observações Adicionais", targetData.description || '');
+        } else if (activeTab === 'registro-mensal') {
+          addPDFSection("1. Identificação e Carga Horária", `Professor: ${targetData.professorName}\nDisciplina: ${targetData.discipline}\nUnidade: ${targetData.schoolUnit}\nTotal Aulas Dadas: ${targetData.totalAulasDadas}\nAulas Previstas: ${targetData.aulasPrevistas}\nAulas Pendentes: ${targetData.aulasPendentes}\nHoras APD: ${targetData.apdHours}`);
+          addPDFSection("2. Conteúdos e Metodologias", `Conteúdos: ${targetData.content}\nMetodologias: ${targetData.metodologias}`);
+          addPDFSection("3. Avaliações e Materiais", `Avaliações: ${targetData.evaluation}\nMateriais: ${targetData.materiaisDidaticos}`);
+          addPDFSection("4. Frequência e Comportamento", `Frequência: ${targetData.frequenciaDiaria}\nJustificativas: ${targetData.justificativasFaltas}\nComportamento: ${targetData.obsComportamento}`);
+          addPDFSection("5. Relacionamento Escola-Comunidade", `Comunicação: ${targetData.comunicacaoResponsaveis}\nConselhos: ${targetData.participacaoConselhos}\nAtividades Coletivas: ${targetData.atividadesColetivas}`);
+          addPDFSection("6. Reflexão e Desenvolvimento", `Formação: ${targetData.formacaoContinuada}\nAutoavaliação: ${targetData.autoavaliacao}\nFeedback: ${targetData.feedbackCoordenacao}`);
+        } else {
+          addPDFSection("Observações do Professor", targetData.description);
+          addPDFSection("Tom do Texto", targetData.tone);
         }
 
         // Footer
@@ -747,18 +755,20 @@ export default function Dashboard({
         const pdfBase64 = doc.output('datauristring').split(',')[1];
         doc.save(`EduTecProfessor_${activeItem?.label.replace(/ /g, '_')}_${new Date().getTime()}.pdf`);
 
-        // Send Email
-        await supabase.functions.invoke('sendExportEmail', {
-          body: { pdfContent: pdfBase64, format: 'pdf' }
-        });
-      }
+        // Enviar por E-mail (Edge Function)
+        try {
+          await supabase.functions.invoke('sendExportEmail', {
+            body: { pdfContent: pdfBase64, format: 'pdf' }
+          });
+        } catch (emailErr) {
+          console.error("Erro ao enviar e-mail:", emailErr);
+        }
 
-      alert(`Documento gerado e enviado para ${userEmail} com sucesso!`);
-      setIsExportModalOpen(false);
-      setRecordForExport(null);
+        alert(`Documento gerado com sucesso!`);
+      } // Fim do else (PDF)
     } catch (err: any) {
       console.error("Erro na exportação:", err);
-      alert("O documento foi baixado, mas houve um erro ao enviar por e-mail: " + (err.message || "Verifique as configurações das Edge Functions."));
+      alert("Houve um erro geral na geração do documento: " + (err.message || "Verifique os dados."));
     }
   };
 
