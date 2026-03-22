@@ -374,8 +374,8 @@ export default function Dashboard({
         return;
       }
     } else if (activeTab === 'planejamento-semanal') {
-      if (!formData.title || !formData.date) {
-        alert("Por favor, preencha o título e a data da semana.");
+      if (!formData.title || !formData.date || !formData.objectives || !formData.atividades || !formData.resources || !formData.evaluation) {
+        alert("Por favor, preencha todos os campos obrigatórios da semana (Título, Data, Objetivos, Atividades, Recursos e Avaliação).");
         return;
       }
     } else if (activeTab === 'reflexoes') {
@@ -424,7 +424,7 @@ export default function Dashboard({
           const firstBnccCode = dayData.bnccCodes?.[0];
           const firstBnccId = firstBnccCode ? dbBnccCodes.find(b => b.codigo === firstBnccCode)?.id : null;
 
-          const recordDataDay = {
+           const recordDataDay = {
             id: dayId,
             professor_id: userId,
             aluno_id: formData.alunoId || null,
@@ -437,7 +437,16 @@ export default function Dashboard({
             objetivo_aprendizagem: dayData.objetivo_aprendizagem || '',
             acompanhamento: dayData.acompanhamento || '',
             observacoes: dayData.observacoes || '',
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            // Novos campos globais mapeados
+            professor_name: formData.professorName || professorNome,
+            data_ref: formData.date,
+            componentes_curriculares: formData.curricularComponent,
+            preset_default_ref: formData.period,
+            recursos_didaticos: formData.resources,
+            avaliacao_acompanhamento: formData.evaluation,
+            observacoes_adicionais: formData.description,
+            bncc_codes: formData.bnccCodes || []
           };
 
           const { error: dayError } = await supabase.from('planejamento_semanal').upsert(recordDataDay);
