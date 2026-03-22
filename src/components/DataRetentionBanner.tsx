@@ -52,11 +52,12 @@ export default function DataRetentionBanner({
         expirationDateStr = expDate.toLocaleDateString('pt-BR');
 
         title = 'Aviso de Retenção de Dados (Plano Free)';
-        message = `Os dados ficam armazenados por até 15 dias. Exportação disponível a partir do dia 10 e exclusão automática de todos os dados do professor no dia 15. Faltam ${daysLeft} dias para expirar.`;
+        const baseMsg = 'Aviso de Retenção de Dados (Plano Free): Os dados ficam armazenados por até 15 dias. Exportação disponível desde o primeiro dia. Exclusão automática de todos os dados do professor no dia 15.';
+        message = `${baseMsg} Faltam ${daysLeft} dias para expirar.`;
 
         if (daysLeft <= 1) { // day 14 and 15
             showWarningUI = true;
-            message = `ALERTA: Os dados ficam armazenados por até 15 dias. Exportação disponível a partir do dia 10 e exclusão automática de todos os dados do professor no dia 15. Faltam ${daysLeft} dias para expirar.`;
+            message = `ALERTA: ${baseMsg} Faltam ${daysLeft} dias para seus dados serem removidos permanentemente.`;
         }
 
         // Botão sempre disponível para o Plano Free conforme solicitado

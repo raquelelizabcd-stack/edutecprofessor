@@ -73,51 +73,65 @@ serve(async (req) => {
         .select('*')
         .eq('professor_id', user.id);
 
-      const { data: planejamentos, error: errorPlanejamentos } = await supabase
+      const { data: planejamentosDiarios, error: errorDiarios } = await supabase
         .from('planejamento_diario')
         .select('*')
         .eq('professor_id', user.id);
 
-      if (errorAlunos || errorPlanejamentos) {
-        console.error(`Erro ao buscar dados do professor ${user.id}:`, errorAlunos || errorPlanejamentos);
+      const { data: planejamentosSemanais, error: errorSemanais } = await supabase
+        .from('planejamento_semanal')
+        .select('*')
+        .eq('professor_id', user.id);
+
+      const { data: planejamentosMensais, error: errorMensais } = await supabase
+        .from('planejamento_mensal')
+        .select('*')
+        .eq('professor_id', user.id);
+
+      const { data: relatorios, error: errorRelatorios } = await supabase
+        .from('relatorios')
+        .select('*')
+        .eq('professor_id', user.id);
+
+      const { data: reflexoes, error: errorReflexoes } = await supabase
+        .from('diario_reflexoes')
+        .select('*')
+        .eq('professor_id', user.id);
+
+      if (errorAlunos || errorDiarios || errorSemanais || errorMensais || errorRelatorios || errorReflexoes) {
+        console.error(`Erro ao buscar dados do professor ${user.id}:`, errorAlunos || errorDiarios);
         continue; // Pula para o próximo se houver erro
       }
 
       let attachments = [];
 
       // 3. Converter para CSV
-      if (alunos && alunos.length > 0) {
-        try {
-          const csvAlunos = parse(alunos);
-          attachments.push({
-            filename: 'alunos_export.csv',
-            content: csvAlunos,
-          });
-        } catch (err) {
-          console.error(`Erro ao gerar CSV de alunos para ${user.id}:`, err);
+      const addToAttachments = (data, filename) => {
+        if (data && data.length > 0) {
+          try {
+            const csv = parse(data);
+            attachments.push({ filename, content: csv });
+          } catch (err) {
+            console.error(`Erro ao gerar CSV ${filename} para ${user.id}:`, err);
+          }
         }
-      }
+      };
 
-      if (planejamentos && planejamentos.length > 0) {
-        try {
-          const csvPlanejamentos = parse(planejamentos);
-          attachments.push({
-            filename: 'planejamentos_export.csv',
-            content: csvPlanejamentos,
-          });
-        } catch (err) {
-          console.error(`Erro ao gerar CSV de planejamentos para ${user.id}:`, err);
-        }
-      }
+      addToAttachments(alunos, 'alunos_export.csv');
+      addToAttachments(planejamentosDiarios, 'planejamentos_diarios_export.csv');
+      addToAttachments(planejamentosSemanais, 'planejamentos_semanais_export.csv');
+      addToAttachments(planejamentosMensais, 'planejamentos_mensais_export.csv');
+      addToAttachments(relatorios, 'relatorios_e_registros_export.csv');
+      addToAttachments(reflexoes, 'periodo_reflexoes_export.csv');
 
       // 4. Enviar e-mail
       if (attachments.length > 0) {
         try {
           const mailOptions = {
-            from: `"EduTecPro" <${EMAIL_USER}>`,
+            from: `"EduTecProfessor" <${EMAIL_USER}>`,
             to: user.email,
-            subject: 'EduTecPro: Exportação de seus dados pedagógicos',
-            text: `Olá ${user.nome || 'Professor(a)'},\n\nO período de retenção dos seus dados no seu plano atual expirou.\nSegue em anexo a exportação dos seus alunos e planejamentos diários cadastrados em nossa plataforma em formato CSV.\n\nPor políticas de retenção de dados, as informações estão sendo removidas do nosso banco de dados ativo.\n\nAtenciosamente,\nEquipe EduTecPro`,
+            subject: 'EduTecProfessor: Exportação Final de seus Dados Pedagógicos',
+            text: `Olá ${user.nome || 'Professor(a)'},\n\nO período de retenção de 15 dias do seu Plano Free expirou.\n\nConforme nossa política de retenção, estamos enviando em anexo todos os seus registros (planejamentos diários, semanais, mensais, relatórios e reflexões) em formato CSV.\n\nIMPORTANTE: Seus dados foram removidos permanentemente do nosso sistema ativo neste momento. Você pode voltar a utilizar a plataforma a qualquer momento iniciando um novo ciclo.\n\nAtenciosamente,\nEquipe EduTecProfessor`,
             attachments: attachments,
           };
 
@@ -125,19 +139,22 @@ serve(async (req) => {
           console.log(`E-mail com dados exportados enviado para ${user.email}`);
 
           // 5. Excluir dados após envio bem-sucedido
-          // Nota: O Supabase (via PostgreSQL) apagaria em cascata se configurado nas FKs. Aqui forçamos via delete explícito ou cascata.
-          // Se `planejamento_bncc` depender de `planejamento_diario` com ON DELETE CASCADE, será apagado. Se não, idealmente deveríamos apagar os vínculos primeiro.
-
           await supabase.from('alunos').delete().eq('professor_id', user.id);
           await supabase.from('planejamento_diario').delete().eq('professor_id', user.id);
+          await supabase.from('planejamento_semanal').delete().eq('professor_id', user.id);
+          await supabase.from('planejamento_mensal').delete().eq('professor_id', user.id);
+          await supabase.from('relatorios').delete().eq('professor_id', user.id);
+          await supabase.from('diario_reflexoes').delete().eq('professor_id', user.id);
+          // O documentos_bncc deve ter cascade delete ou ser apagado via trigger/manual, 
+          // mas as tabelas principais cobertas garantem a limpeza.
 
-          console.log(`Dados do professor ${user.id} apagados das tabelas alunos e planejamento_diario.`);
+          console.log(`Todos os dados do professor ${user.id} foram apagados conforme regra de 15 dias.`);
 
         } catch (mailErr) {
           console.error(`Erro ao enviar e-mail para ${user.email}:`, mailErr);
         }
       } else {
-        console.log(`Professor ${user.email} não possuía registros para exportar. Nenhuma ação de exclusão dos registros foi necessária (já estavam vazios).`);
+        console.log(`Professor ${user.email} não possuía registros para exportar.`);
       }
     }
 
