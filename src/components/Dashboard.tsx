@@ -38,12 +38,29 @@ const CAMPOS_EXPLICACAO: Record<string, string> = {
 
 const formatDateDisplay = (dateStr: string | undefined) => {
   if (!dateStr) return '';
-  if (dateStr.includes('T')) {
-    return new Date(dateStr).toLocaleDateString('pt-BR');
+  
+  // Captura o formato YYYY-MM-DD ignorando o fuso horário
+  const isoMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    const [_, year, month, day] = isoMatch;
+    return `${day}/${month}/${year}`;
   }
-  const [year, month, day] = dateStr.split('-');
-  if (!year || !month || !day) return dateStr;
-  return `${day}/${month}/${year}`;
+
+  // Fallback para datas com barras ou outros formatos
+  if (dateStr.includes('/')) return dateStr;
+
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      // Usa os métodos getUTC para maior consistência se houver T
+      if (dateStr.includes('T')) {
+         return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
+      }
+      return d.toLocaleDateString('pt-BR');
+    }
+  } catch (e) {}
+  
+  return dateStr;
 };
 
 export default function Dashboard({ 
@@ -125,6 +142,24 @@ export default function Dashboard({
     };
     fetchProfessorNome();
   }, [userId]);
+  
+  const handleSaveRobotName = async (newName: string) => {
+    if (!userId) return;
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ nome_robo: newName })
+        .eq('id', userId);
+      
+      if (error) throw error;
+      
+      setRobotName(newName);
+      alert("Nome do assistente virtual atualizado com sucesso!");
+    } catch (err: any) {
+      console.error("Erro ao salvar nome do robô:", err);
+      alert("Erro ao salvar nome do robô: " + (err.message || 'Erro desconhecido'));
+    }
+  };
 
   // Form state
   const [formData, setFormData] = useState({
@@ -179,12 +214,14 @@ export default function Dashboard({
       const { data: mensal } = await supabase.from('planejamento_mensal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: true });
       // 4. Buscar Reflexões
       const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
+      // 5. Buscar Relatórios Individuais (filtrando inativos como parecer-pcd e registro-mensal)
+      const { data: relatorios } = await supabase.from('relatorios').select('*, aluno:alunos(nome)').eq('professor_id', userId).eq('tipo', 'relatorio-individual').order('created_at', { ascending: false });
 
       const allRecords: PedagogicalRecord[] = [
         ...(diario || []).map(r => ({
           id: r.id,
           moduleId: 'planejamento-diario',
-          title: r.titulo || `Plano Diário - ${formatDateDisplay(r.data)}`,
+          title: r.titulo_registro || `Plano Diário - ${formatDateDisplay(r.data)}`,
           date: r.data,
           description: r.conteudo || '',
           objectives: r.objetivos,
@@ -192,7 +229,7 @@ export default function Dashboard({
           evaluation: r.avaliacao,
           curricularComponent: r.componente,
           alunoId: r.aluno_id,
-          alunoNome: r.aluno?.nome || '',
+          alunoNome: r.aluno_nome || r.aluno?.nome || '',
           professorName: r.professor_nome || professorNome,
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
@@ -201,20 +238,20 @@ export default function Dashboard({
         ...(semanal || []).map(r => ({
           id: r.id,
           moduleId: 'planejamento-semanal',
-          title: r.titulo_registro || `${r.dia_semana || 'Semana'} - ${formatDateDisplay(r.data_ref || r.created_at)}`,
+          title: r.titulo_registro || `Semana - ${formatDateDisplay(r.data_ref || r.created_at)}`,
           date: r.data_ref || r.created_at?.split('T')[0],
           description: r.observacoes_adicionais || r.observacoes || '',
-          objectives: r.objetivo_aprendizagem,
-          resources: r.recursos_didaticos,
+          objectives: r.objetivo_aprendizagem || r.objetivos,
+          resources: r.recursos_didaticos || r.recursos,
           evaluation: r.avaliacao_acompanhamento || r.acompanhamento,
-          curricularComponent: r.componente_curricular || r.componentes_curriculares,
+          curricularComponent: r.componentes_curriculares || r.componente_curricular,
           alunoId: r.aluno_id,
-          alunoNome: r.aluno?.nome || '',
-          professorName: r.professor_nome || r.professor_name || professorNome,
+          alunoNome: r.aluno_nome || r.aluno?.nome || '',
+          professorName: r.professor_name || r.professor_nome || professorNome,
           period: r.preset_default_ref || r.turno,
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
-          weeklyData: r.weeklyData,
+          weeklyData: r.grade_semanal_json || {},
           createdAt: r.created_at
         })),
         ...(mensal || []).map(r => ({
@@ -228,7 +265,7 @@ export default function Dashboard({
           evaluation: r.avaliacao,
           curricularComponent: r.componente_curricular,
           alunoId: r.aluno_id,
-          alunoNome: r.aluno?.nome || '',
+          alunoNome: r.aluno_nome || r.aluno?.nome || '',
           professorName: r.professor_nome || professorNome,
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
@@ -243,6 +280,16 @@ export default function Dashboard({
           alunoId: r.aluno_id,
           alunoNome: r.aluno?.nome || '',
           bnccCodes: [],
+          createdAt: r.created_at
+        })),
+        ...(relatorios || []).map(r => ({
+          id: r.id,
+          moduleId: r.tipo || 'relatorio-individual',
+          title: r.titulo || `Relatório Individual - ${r.aluno?.nome || ''}`,
+          date: r.data || r.created_at?.split('T')[0],
+          description: r.conteudo || '',
+          alunoId: r.aluno_id,
+          alunoNome: r.aluno?.nome || '',
           createdAt: r.created_at
         }))
       ];
@@ -492,9 +539,10 @@ export default function Dashboard({
         targetTable = 'planejamento_diario';
         recordData = {
           ...recordData,
-          titulo: formData.title,
+          titulo_registro: formData.title,
           data: formData.date,
           aluno_id: formData.alunoId || null,
+          aluno_nome: formData.alunoNome || '',
           bncc_code_text: formData.bnccCodeText || '',
           bncc_codes: formData.bnccCodes || [],
           componente: formData.curricularComponent,
@@ -504,70 +552,28 @@ export default function Dashboard({
           avaliacao: formData.evaluation
         };
       } else if (activeTab === 'planejamento-semanal') {
-        const days = Object.keys(formData.weeklyData || {});
-        for (const dia of days) {
-          const dayData = formData.weeklyData![dia];
-          const dayId = dayData.id || crypto.randomUUID();
-          
-          const firstBnccCode = dayData.bnccCodes?.[0];
-          const firstBnccId = firstBnccCode ? dbBnccCodes.find(b => b.codigo === firstBnccCode)?.id : null;
-
-           const recordDataDay = {
-            id: dayId,
-            professor_id: userId,
-            aluno_id: formData.alunoId || null,
-            dia_semana: dia,
-            turno: dayData.turno || '',
-            horario: dayData.horario || '',
-            componente_curricular: dayData.componenteCurricular || '',
-            bncc_code_id: firstBnccId,
-            atividade: dayData.atividade || '',
-            objetivo_aprendizagem: dayData.objetivo_aprendizagem || '',
-            acompanhamento: dayData.acompanhamento || '',
-            observacoes: dayData.observacoes || '',
-            created_at: new Date().toISOString(),
-            // Novos campos globais mapeados
-            professor_name: formData.professorName || professorNome,
-            data_ref: formData.date,
-            titulo_registro: formData.title,
-            componentes_curriculares: formData.curricularComponent,
-            preset_default_ref: formData.period,
-            recursos_didaticos: formData.resources,
-            avaliacao_acompanhamento: formData.evaluation,
-            observacoes_adicionais: formData.description,
-            bncc_codes: formData.bnccCodes || [],
-            bncc_code_text: dayData.bncc_code_text || ''
-          };
-
-          const { error: dayError } = await supabase.from('planejamento_semanal').upsert(recordDataDay);
-          if (dayError) throw dayError;
-
-          if (dayData.bnccCodes && dayData.bnccCodes.length > 0) {
-            const selectedBnccIds = dbBnccCodes
-              .filter(b => dayData.bnccCodes!.includes(b.codigo))
-              .map(b => b.id);
-
-            if (selectedBnccIds.length > 0) {
-              await supabase.from('documentos_bncc').delete().eq('documento_id', dayId);
-              const links = selectedBnccIds.map(bnccId => ({ documento_id: dayId, documento_tipo: 'planejamento_semanal', bncc_id: bnccId }));
-              await supabase.from('documentos_bncc').insert(links);
-            }
-          }
-        }
-        targetTable = ''; 
-      } else if (['relatorio-individual', 'parecer-pcd', 'registro-mensal'].includes(activeTab)) {
+        targetTable = 'planejamento_semanal';
+        recordData = {
+          id: recordIdToSave,
+          professor_id: userId,
+          professor_name: formData.professorName || professorNome,
+          data_ref: formData.date,
+          titulo_registro: formData.title,
+          aluno_id: formData.alunoId || null,
+          aluno_nome: formData.alunoNome || '',
+          componentes_curriculares: formData.curricularComponent,
+          preset_default_ref: formData.period,
+          recursos_didaticos: formData.resources,
+          avaliacao_acompanhamento: formData.evaluation,
+          observacoes_adicionais: formData.description,
+          bncc_codes: formData.bnccCodes || [],
+          grade_semanal_json: formData.weeklyData || {}
+        };
+      } else if (activeTab === 'relatorio-individual') {
         targetTable = 'relatorios';
         
         let bundledContent = formData.description || formData.content;
-        if (activeTab === 'registro-mensal') {
-          bundledContent = `
-            Metodologias: ${formData.metodologias || ''}
-            Materiais: ${formData.materiaisDidaticos || ''}
-            Obs Comportamento: ${formData.obsComportamento || ''}
-            Comunicação Responsaveis: ${formData.comunicacaoResponsaveis || ''}
-            Descrição Geral: ${formData.description || ''}
-          `.trim();
-        }
+
 
         recordData = {
           ...recordData,
@@ -585,6 +591,7 @@ export default function Dashboard({
           ano: parseInt(formData.anoPlanejamento || new Date().getFullYear().toString()),
           data_ref: formData.date,
           titulo_registro: formData.title,
+          aluno_nome: formData.alunoNome || '',
           bncc_code_text: formData.bnccCodeText || '',
           bncc_codes: formData.bnccCodes || [],
           componente_curricular: formData.curricularComponent || '',
@@ -597,12 +604,15 @@ export default function Dashboard({
         };
       } else if (activeTab === 'reflexoes') {
         targetTable = 'diario_reflexoes';
+        const autoDate = formData.date || new Date().toISOString().split('T')[0];
+        const autoTitle = formData.title || `Reflexão - ${new Date(autoDate).toLocaleDateString('pt-BR')}`;
+        
         recordData = {
           id: recordIdToSave,
           professor_id: userId,
           aluno_id: formData.alunoId || null,
-          titulo: formData.title || `Reflexão - ${new Date(formData.date).toLocaleDateString('pt-BR')}`,
-          data: formData.date,
+          titulo: autoTitle,
+          data: autoDate,
           percepcoes: `
             REFLEXÃO: ${formData.description || ''}
             FOCO/METAS: ${formData.objectives || ''}
@@ -615,7 +625,9 @@ export default function Dashboard({
       if (targetTable) {
         const { error: mainError } = await supabase
           .from(targetTable)
-          .upsert(recordData);
+          .upsert(recordData, targetTable === 'planejamento_semanal' ? { 
+            onConflict: 'titulo_registro,data_ref,professor_id' 
+          } : undefined);
 
         if (mainError) throw mainError;
 
@@ -663,11 +675,133 @@ export default function Dashboard({
   };
 
 
+  const handleExportAllPortfolio = async (format: 'pdf' | 'csv') => {
+    if (records.length === 0) {
+      alert("Nenhum registro encontrado para exportar.");
+      return;
+    }
+
+    try {
+      if (format === 'csv') {
+        const headers = ['Data', 'Módulo', 'Título', 'Aluno', 'Componente', 'Descrição'];
+        const csvRows = records.map(r => {
+          const navItem = NAV_ITEMS.find(item => item.id === r.moduleId);
+          return [
+            formatDateDisplay(r.date),
+            navItem?.label || r.moduleId,
+            r.title,
+            r.alunoNome || '',
+            r.curricularComponent || '',
+            r.description || r.content || ''
+          ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+        });
+
+        const csvContent = [headers.join(','), ...csvRows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Portfolio_Completo_${new Date().getTime()}.csv`;
+        link.click();
+      } else {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.width;
+        
+        // Capa do Portfólio
+        doc.setFillColor(0, 168, 89);
+        doc.rect(0, 0, pageWidth, 60, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(28); doc.setFont("helvetica", "bold");
+        doc.text("EduTecProfessor", 14, 30);
+        doc.setFontSize(14); doc.setFont("helvetica", "normal");
+        doc.text("Portfólio Pedagógico Consolidado", 14, 45);
+        
+        doc.setTextColor(50, 50, 50);
+        doc.setFontSize(12);
+        doc.text(`Docente: ${professorNome}`, 14, 75);
+        doc.text(`Total de Registros: ${records.length}`, 14, 82);
+        doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 14, 89);
+        
+        doc.setDrawColor(200, 200, 200);
+        doc.line(14, 95, pageWidth - 14, 95);
+
+        let currentY = 110;
+
+        // Itera sobre os registros (ordenados por data decrescente)
+        const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        for (const record of sorted) {
+          const navItem = NAV_ITEMS.find(item => item.id === record.moduleId);
+          
+          // Verifica quebra de página antes de iniciar o registro
+          if (currentY > 240) { doc.addPage(); currentY = 20; }
+
+          doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(0, 168, 89);
+          doc.text(`${navItem?.label || record.moduleId} - ${formatDateDisplay(record.date)}`, 14, currentY);
+          currentY += 8;
+          
+          doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(30, 30, 30);
+          doc.text(record.title, 14, currentY);
+          currentY += 6;
+
+          // Seções detalhadas
+          const addSection = (title: string, text: string) => {
+            if (!text) return;
+            if (currentY > 260) { doc.addPage(); currentY = 20; }
+            doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+            doc.text(title, 14, currentY); currentY += 5;
+            doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
+            const lines = doc.splitTextToSize(text, pageWidth - 28);
+            doc.text(lines, 14, currentY);
+            currentY += (lines.length * 5) + 5;
+          };
+
+          if (record.alunoNome) addSection("Aluno(a):", record.alunoNome);
+          if (record.curricularComponent) addSection("Componente Curricular:", record.curricularComponent);
+
+          // Renderização Especial da Grade Semanal
+          if (record.moduleId === 'planejamento-semanal' && record.weeklyData) {
+            const tableHeaders = [['Dia', 'Turno', 'Horário', 'Atividade', 'BNCC']];
+            const tableBody = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'].map(day => {
+              const dData = record.weeklyData?.[day] || {};
+              const bnccS = (dData.bnccCodes || []).join(', ');
+              const bnccT = dData.bncc_code_text || '';
+              return [day, dData.turno || '-', dData.horario || '-', dData.atividade || '-', [bnccS, bnccT].filter(Boolean).join(' / ') || '-'];
+            });
+
+            autoTable(doc, {
+              startY: currentY, head: tableHeaders, body: tableBody,
+              margin: { bottom: 20 },
+              theme: 'grid', headStyles: { fillColor: [0, 168, 89], fontSize: 7 },
+              styles: { fontSize: 7, cellPadding: 1 },
+              columnStyles: { 0: { fontStyle: 'bold', cellWidth: 20 } }
+            });
+            currentY = (doc as any).lastAutoTable.finalY + 10;
+          }
+
+          if (record.objectives) addSection("Objetivos:", record.objectives);
+          if (record.resources) addSection("Recursos:", record.resources);
+          if (record.evaluation) addSection("Avaliação/Acompanhamento:", record.evaluation);
+          if (record.description || record.content) addSection("Descrição/Observações:", record.description || record.content || '');
+
+          currentY += 10;
+          doc.setDrawColor(230, 230, 230);
+          doc.line(14, currentY - 5, pageWidth - 14, currentY - 5);
+        }
+
+        doc.save(`Portfolio_Digital_${new Date().getTime()}.pdf`);
+      }
+      alert("Portfólio exportado com sucesso!");
+    } catch (err: any) {
+      console.error("Erro na exportação do portfólio:", err);
+      alert("Erro ao exportar currículo pedagógico.");
+    }
+  };
+
   const handleExport = async (recordToExport: PedagogicalRecord | null = null) => {
     const targetData = recordToExport || formData;
     const format = targetData.exportFormat || 'pdf';
 
-    if (!targetData.title || !targetData.date) {
+    if (activeTab !== 'reflexoes' && (!targetData.title || !targetData.date)) {
       alert("Por favor, preencha os campos obrigatórios (Título e Data) antes de exportar.");
       return;
     }
@@ -686,11 +820,7 @@ export default function Dashboard({
           targetData.description || targetData.content || ''
         ];
 
-        // Add module-specific fields to CSV if needed
-        if (activeTab === 'registro-mensal') {
-          headers.push('Professor', 'Disciplina', 'Escola', 'Aulas Dadas', 'Aulas Previstas', 'Aulas Pendentes');
-          row.push(targetData.professorName || '', targetData.discipline || '', targetData.schoolUnit || '', targetData.totalAulasDadas || '', targetData.aulasPrevistas || '', targetData.aulasPendentes || '');
-        }
+
 
         const csvContent = [headers.join(','), row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')].join('\n');
 
@@ -728,12 +858,17 @@ export default function Dashboard({
         // Document Info
         doc.setTextColor(50, 50, 50);
         doc.setFontSize(16);
-        doc.setFont("helvetica", "bold");
-        doc.text(targetData.title, 14, 55);
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 100, 100);
-        doc.text(`Data: ${new Date(targetData.date).toLocaleDateString('pt-BR')} `, 14, 65);
+        if (targetData.title) {
+          doc.setFont("helvetica", "bold");
+          doc.text(targetData.title, 14, 55);
+        }
+        
+        if (targetData.date) {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100, 100, 100);
+          doc.text(`Data: ${formatDateDisplay(targetData.date)} `, 14, 65);
+        }
 
         const infoData: string[][] = [];
         // Nome do professor: prioriza o buscado do banco, depois o salvo no registro
@@ -846,13 +981,9 @@ export default function Dashboard({
           addPDFSection("Recursos Didáticos", targetData.resources || '');
           addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
           addPDFSection("Observações Adicionais", targetData.description || '');
-        } else if (activeTab === 'registro-mensal') {
-          addPDFSection("1. Identificação e Carga Horária", `Professor: ${targetData.professorName}\nDisciplina: ${targetData.discipline}\nUnidade: ${targetData.schoolUnit}\nTotal Aulas Dadas: ${targetData.totalAulasDadas}\nAulas Previstas: ${targetData.aulasPrevistas}\nAulas Pendentes: ${targetData.aulasPendentes}\nHoras APD: ${targetData.apdHours}`);
-          addPDFSection("2. Conteúdos e Metodologias", `Conteúdos: ${targetData.content}\nMetodologias: ${targetData.metodologias}`);
-          addPDFSection("3. Avaliações e Materiais", `Avaliações: ${targetData.evaluation}\nMateriais: ${targetData.materiaisDidaticos}`);
-          addPDFSection("4. Frequência e Comportamento", `Frequência: ${targetData.frequenciaDiaria}\nJustificativas: ${targetData.justificativasFaltas}\nComportamento: ${targetData.obsComportamento}`);
-          addPDFSection("5. Relacionamento Escola-Comunidade", `Comunicação: ${targetData.comunicacaoResponsaveis}\nConselhos: ${targetData.participacaoConselhos}\nAtividades Coletivas: ${targetData.atividadesColetivas}`);
-          addPDFSection("6. Reflexão e Desenvolvimento", `Formação: ${targetData.formacaoContinuada}\nAutoavaliação: ${targetData.autoavaliacao}\nFeedback: ${targetData.feedbackCoordenacao}`);
+
+        } else if (activeTab === 'reflexoes') {
+          addPDFSection("Registro de Percepções e Reflexões", targetData.description);
         } else {
           addPDFSection("Observações do Professor", targetData.description);
           addPDFSection("Tom do Texto", targetData.tone);
@@ -906,6 +1037,8 @@ export default function Dashboard({
       onGoToPayment={onGoToPayment}
       userDataExpiracao={userDataExpiracao}
       statusPagamento={statusPagamento}
+      robotName={robotName}
+      onSaveRobotName={handleSaveRobotName}
       subtitle={headerSubtitle}
     >
       <motion.div
@@ -942,114 +1075,130 @@ export default function Dashboard({
 
             <form onSubmit={handleSave} className="space-y-6">
               <>
-                <div className="bg-white border border-slate-200 shadow-sm p-8 rounded-3xl space-y-8 relative overflow-hidden group">
-                  <div className="absolute top-0 left-0 w-2 h-full bg-[#00A859] opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
-                    <div className="bg-[#00A859]/10 p-2.5 rounded-2xl text-[#00A859]">
-                      <Icons.FileText size={22} />
+                {activeTab !== 'reflexoes' && (
+                  <div className="bg-white border border-slate-200 shadow-sm p-8 rounded-3xl space-y-8 relative overflow-hidden group">
+                    <div className="absolute top-0 left-0 w-2 h-full bg-[#00A859] opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                      <div className="bg-[#00A859]/10 p-2.5 rounded-2xl text-[#00A859]">
+                        <Icons.FileText size={22} />
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-bold text-slate-800 tracking-tight">Informações Básicas</h4>
+                        <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-0.5">Identificação do Registro</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-lg font-bold text-slate-800 tracking-tight">Informações Básicas</h4>
-                      <p className="text-xs text-slate-400 font-medium uppercase tracking-widest mt-0.5">Identificação do Registro</p>
-                    </div>
-                  </div>
 
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                    <div className="space-y-2.5">
-                      <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Título do Registro *</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        placeholder="Ex: Registro do Aluno - João Silva"
-                        className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
-                      />
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                      <div className="space-y-2.5">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Título do Registro *</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.title}
+                          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                          placeholder="Ex: Registro do Aluno - João Silva"
+                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                        />
+                      </div>
+                      <div className="space-y-2.5">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Data *</label>
+                        <input
+                          type="date"
+                          required
+                          value={formData.date}
+                          onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-medium text-slate-600"
+                        />
+                      </div>
+                      <div className="space-y-2.5">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Professor(a) *</label>
+                        <input
+                          type="text"
+                          required
+                          value={formData.professorName}
+                          onChange={(e) => setFormData({ ...formData, professorName: e.target.value })}
+                          placeholder="Nome completo do docente"
+                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2.5">
-                      <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Data *</label>
-                      <input
-                        type="date"
-                        required
-                        value={formData.date}
-                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                        className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-medium text-slate-600"
-                      />
-                    </div>
-                    <div className="space-y-2.5">
-                      <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Professor(a) *</label>
-                      <input
-                        type="text"
-                        required
-                        value={formData.professorName}
-                        onChange={(e) => setFormData({ ...formData, professorName: e.target.value })}
-                        placeholder="Nome completo do docente"
-                        className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid md:grid-cols-3 gap-8 pt-2">
-                    <div className="space-y-2.5">
-                      <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Aluno (Opcional)</label>
-                      <select
-                        value={formData.alunoId}
-                        onChange={(e) => {
-                          const selected = supabaseStudents.find(s => s.id === e.target.value);
-                          setFormData({ ...formData, alunoId: e.target.value, alunoNome: selected?.nome || '' });
-                        }}
-                        className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-semibold text-slate-700 appearance-none cursor-pointer"
-                      >
-                        <option value="">Selecione o Aluno</option>
-                        {supabaseStudents.map((s) => (
-                          <option key={s.id} value={s.id}>{s.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-2.5">
-                      <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Componente Curricular</label>
-                      <input
-                        type="text"
-                        value={formData.curricularComponent}
-                        onChange={(e) => setFormData({ ...formData, curricularComponent: e.target.value })}
-                        placeholder="Ex: Língua Portuguesa"
-                        className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
-                      />
-                    </div>
-                    <div className="space-y-2.5">
-                      <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Período</label>
-                      <div className="relative">
-                        <select
-                          value={formData.period}
-                          onChange={(e) => setFormData({ ...formData, period: e.target.value })}
-                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-semibold text-slate-700 appearance-none cursor-pointer"
-                        >
-                          <option value="">Selecione o período</option>
-                          {activeTab === 'planejamento-diario' ? (
-                            <>
-                              <option value="Manhã">Manhã</option>
-                              <option value="Tarde">Tarde</option>
-                              <option value="Noite">Noite</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="1º Bimestre">1º Bimestre</option>
-                              <option value="2º Bimestre">2º Bimestre</option>
-                              <option value="3º Bimestre">3º Bimestre</option>
-                              <option value="4º Bimestre">4º Bimestre</option>
-                              <option value="1º Semestre">1º Semestre</option>
-                              <option value="2º Semestre">2º Semestre</option>
-                              <option value="Anual">Anual</option>
-                            </>
-                          )}
-                        </select>
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                          <Icons.ChevronDown size={18} />
+                    <div className="grid md:grid-cols-3 gap-8 pt-2">
+                      <div className="space-y-2.5">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Aluno (Opcional)</label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="text"
+                            value={formData.alunoNome}
+                            onChange={(e) => setFormData({ ...formData, alunoNome: e.target.value, alunoId: '' })}
+                            placeholder="Digite o nome ou selecione ao lado"
+                            className="w-full px-5 py-3.5 rounded-l-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                          />
+                          <select
+                            className="w-[120px] px-2 py-3.5 rounded-r-2xl border-y border-r border-slate-200 bg-slate-100/50 focus:border-[#00A859] outline-none transition-all font-bold text-[10px] uppercase tracking-wider text-slate-500 cursor-pointer appearance-none text-center"
+                            onChange={(e) => {
+                              const selected = supabaseStudents.find(s => s.id === e.target.value);
+                              if (selected) {
+                                setFormData({ ...formData, alunoId: selected.id, alunoNome: selected.nome });
+                              }
+                            }}
+                            value={formData.alunoId}
+                          >
+                            <option value="">FILTRAR LISTA</option>
+                            {supabaseStudents.map((s) => (
+                              <option key={s.id} value={s.id}>{s.nome}</option>
+                            ))}
+                          </select>
+                          <div className="absolute right-3 pointer-events-none text-slate-300">
+                            <Icons.ChevronDown size={14} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-2.5">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Componente Curricular</label>
+                        <input
+                          type="text"
+                          value={formData.curricularComponent}
+                          onChange={(e) => setFormData({ ...formData, curricularComponent: e.target.value })}
+                          placeholder="Ex: Língua Portuguesa"
+                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                        />
+                      </div>
+                      <div className="space-y-2.5">
+                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Período</label>
+                        <div className="relative">
+                          <select
+                            value={formData.period}
+                            onChange={(e) => setFormData({ ...formData, period: e.target.value })}
+                            className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-semibold text-slate-700 appearance-none cursor-pointer"
+                          >
+                            <option value="">Selecione o período</option>
+                            {activeTab === 'planejamento-diario' ? (
+                              <>
+                                <option value="Manhã">Manhã</option>
+                                <option value="Tarde">Tarde</option>
+                                <option value="Noite">Noite</option>
+                              </>
+                            ) : (
+                              <>
+                                <option value="1º Bimestre">1º Bimestre</option>
+                                <option value="2º Bimestre">2º Bimestre</option>
+                                <option value="3º Bimestre">3º Bimestre</option>
+                                <option value="4º Bimestre">4º Bimestre</option>
+                                <option value="1º Semestre">1º Semestre</option>
+                                <option value="2º Semestre">2º Semestre</option>
+                                <option value="Anual">Anual</option>
+                              </>
+                            )}
+                          </select>
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                            <Icons.ChevronDown size={18} />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
 
 
@@ -1065,9 +1214,7 @@ export default function Dashboard({
                       });
                     }}
                     onExportAll={(format) => {
-                      if (format === 'pdf') {
-                        alert("Preparando exportação completa do seu Portfólio Digital...");
-                      }
+                      handleExportAllPortfolio(format);
                     }}
                   />
                 ) : activeTab === 'indicadores' ? (
@@ -1112,18 +1259,6 @@ export default function Dashboard({
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Aluno (Opcional)</label>
-                          <select
-                            value={formData.alunoId}
-                            onChange={(e) => {
-                              const selected = supabaseStudents.find(s => s.id === e.target.value);
-                              setFormData({ ...formData, alunoId: e.target.value, alunoNome: selected?.nome || '' });
-                            }}
-                            className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] outline-none transition-all font-semibold text-slate-700 appearance-none"
-                          >
-                            <option value="">Selecione o Aluno</option>
-                            {supabaseStudents.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-                          </select>
                         </div>
                         <div className="space-y-2">
                           <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Componente Curricular</label>

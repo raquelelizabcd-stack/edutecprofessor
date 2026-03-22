@@ -107,12 +107,12 @@ export const NAV_ITEMS: NavItem[] = [
   // Registros Pedagógicos
   { id: 'planejamento-semanal', label: 'Planejamento Semanal', icon: 'Calendar', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro'] },
   { id: 'planejamento-mensal', label: 'Planejamento Mensal', icon: 'CalendarDays', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro'] },
-  { id: 'registro-mensal', label: 'Registro Mensal', icon: 'ClipboardList', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro'] },
+
   { id: 'planejamento-diario', label: 'Planejamento Diário', icon: 'FileEdit', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro'] },
 
   // Relatórios
   { id: 'relatorio-individual', label: 'Relatório Individual', icon: 'FileText', category: 'Relatórios', roles: ['diretor', 'professor', 'free', 'pro'] },
-  { id: 'parecer-pcd', label: 'Parecer PCD', icon: 'Accessibility', category: 'Relatórios', roles: ['diretor', 'professor', 'pro'] },
+
 
   // Prática Autônoma
   { id: 'portfolio', label: 'Portfólio Digital', icon: 'History', category: 'Prática Autônoma', roles: ['professor', 'pro'] },

@@ -13,9 +13,11 @@ interface HeaderProps {
     onGoToPayment?: () => void;
     userDataExpiracao?: string | null;
     statusPagamento?: string | null;
+    robotName?: string;
+    onSaveRobotName?: (name: string) => Promise<void>;
 }
 
-export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, userDataExpiracao, statusPagamento }: HeaderProps) {
+export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, userDataExpiracao, statusPagamento, robotName, onSaveRobotName }: HeaderProps) {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false);
@@ -254,6 +256,37 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                 Fazer Upgrade
                             </button>
                         )}
+                    </div>
+
+                    {/* Configuração do Assistente Virtual */}
+                    <div className="space-y-4 pt-2">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Meu Assistente Virtual</h4>
+                        <div className="p-4 bg-black/5 rounded-2xl space-y-3">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nome do Robô Pedagógico</label>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text" 
+                                        defaultValue={robotName || 'EduBot'} 
+                                        id="robot-name-input"
+                                        placeholder="Ex: Mestre BNCC..." 
+                                        className="flex-1 px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#009245] outline-none text-sm font-medium"
+                                    />
+                                    <button 
+                                        onClick={async () => {
+                                            const input = document.getElementById('robot-name-input') as HTMLInputElement;
+                                            if (input && onSaveRobotName) {
+                                                await onSaveRobotName(input.value);
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-[#009245] text-white text-xs font-bold rounded-xl hover:bg-[#006e34] transition-all shadow-sm"
+                                    >
+                                        Salvar
+                                    </button>
+                                </div>
+                                <p className="text-[9px] text-black/30 leading-tight italic">Este nome será usado pelo robô em todas as interações e sugestões de IA.</p>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Dados de Pagamento Section */}

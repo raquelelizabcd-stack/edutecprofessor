@@ -18,11 +18,12 @@ export default function PortfolioView({ records, onOpenRecord, onExportAll }: Po
   const stats = useMemo(() => {
     const total = records.length;
     const weekly = records.filter(r => r.moduleId === 'planejamento-semanal').length;
+    const monthly = records.filter(r => r.moduleId === 'planejamento-mensal').length;
     const daily = records.filter(r => r.moduleId === 'planejamento-diario').length;
     const reports = records.filter(r => ['relatorio-individual', 'parecer-pcd'].includes(r.moduleId)).length;
     const reflections = records.filter(r => r.moduleId === 'reflexoes').length;
 
-    return { total, weekly, daily, reports, reflections };
+    return { total, weekly, monthly, daily, reports, reflections };
   }, [records]);
 
   return (
@@ -51,12 +52,13 @@ export default function PortfolioView({ records, onOpenRecord, onExportAll }: Po
       </div>
 
       {/* Quick Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         {[
-          { label: 'Total de Registros', value: stats.total, icon: Icons.FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Total Registros', value: stats.total, icon: Icons.FileText, color: 'text-blue-600', bg: 'bg-blue-50' },
           { label: 'Planej. Semanais', value: stats.weekly, icon: Icons.Calendar, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Planej. Mensais', value: stats.monthly, icon: Icons.CalendarDays, color: 'text-cyan-600', bg: 'bg-cyan-50' },
           { label: 'Planej. Diários', value: stats.daily, icon: Icons.FileEdit, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Relatórios/Pareceres', value: stats.reports, icon: Icons.FileSignature, color: 'text-orange-600', bg: 'bg-orange-50' },
+          { label: 'Relatórios', value: stats.reports, icon: Icons.FileSignature, color: 'text-orange-600', bg: 'bg-orange-50' },
           { label: 'Reflexões', value: stats.reflections, icon: Icons.BookOpen, color: 'text-pink-600', bg: 'bg-pink-50' },
         ].map((stat, idx) => (
           <div key={idx} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">

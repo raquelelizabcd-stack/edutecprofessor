@@ -11,6 +11,8 @@ interface DashboardLayoutProps {
     onGoToPayment: () => void;
     userDataExpiracao?: string | null;
     statusPagamento?: string | null;
+    robotName?: string;
+    onSaveRobotName?: (name: string) => Promise<void>;
     subtitle?: string;
     children: React.ReactNode;
 }
@@ -23,6 +25,8 @@ export default function DashboardLayout({
     onGoToPayment,
     userDataExpiracao,
     statusPagamento,
+    robotName,
+    onSaveRobotName,
     subtitle,
     children
 }: DashboardLayoutProps) {
@@ -50,6 +54,8 @@ export default function DashboardLayout({
                     onGoToPayment={onGoToPayment}
                     userDataExpiracao={userDataExpiracao}
                     statusPagamento={statusPagamento}
+                    robotName={robotName}
+                    onSaveRobotName={onSaveRobotName}
                 />
                 <div className="flex-1 overflow-y-scroll p-4 md:p-8 custom-scrollbar">
                     {children}
