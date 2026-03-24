@@ -97,8 +97,7 @@ export default function Dashboard({
   const [supabaseStudents, setSupabaseStudents] = useState<Student[]>([]);
   const [manualBnccInput, setManualBnccInput] = useState('');
   const [directBnccInput, setDirectBnccInput] = useState('');
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [recordForExport, setRecordForExport] = useState<PedagogicalRecord | null>(null);
+
   const [wizardStep, setWizardStep] = useState(1);
   const { bnccStructure, bnccCodes: dbBnccCodes, isLoading: isBnccLoading } = useBncc();
   const [showBnccPicker, setShowBnccPicker] = useState(false);
@@ -696,350 +695,57 @@ export default function Dashboard({
   };
 
 
-  const handleExportAllPortfolio = async (format: 'pdf' | 'csv') => {
-    if (records.length === 0) {
-      alert("Nenhum registro encontrado para exportar.");
-      return;
-    }
 
-    try {
-      if (format === 'csv') {
-        const headers = ['Data', 'Módulo', 'Título', 'Aluno', 'Componente', 'Descrição'];
-        const csvRows = records.map(r => {
-          const navItem = NAV_ITEMS.find(item => item.id === r.moduleId);
-          return [
-            formatDateDisplay(r.date),
-            navItem?.label || r.moduleId,
-            r.title,
-            r.alunoNome || '',
-            r.curricularComponent || '',
-            r.description || r.content || ''
-          ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
-        });
-
-        const csvContent = [headers.join(','), ...csvRows].join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `Portfolio_Completo_${new Date().getTime()}.csv`;
-        link.click();
-      } else {
-        const doc = new jsPDF();
-        const pageWidth = doc.internal.pageSize.width;
-        
-        // Capa do Portfólio
-        doc.setFillColor(0, 168, 89);
-        doc.rect(0, 0, pageWidth, 60, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(28); doc.setFont("helvetica", "bold");
-        doc.text("EduTecProfessor", 14, 30);
-        doc.setFontSize(14); doc.setFont("helvetica", "normal");
-        doc.text("Portfólio Pedagógico Consolidado", 14, 45);
-        
-        doc.setTextColor(50, 50, 50);
-        doc.setFontSize(12);
-        doc.text(`Docente: ${professorNome}`, 14, 75);
-        doc.text(`Total de Registros: ${records.length}`, 14, 82);
-        doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 14, 89);
-        
-        doc.setDrawColor(200, 200, 200);
-        doc.line(14, 95, pageWidth - 14, 95);
-
-        let currentY = 110;
-
-        // Itera sobre os registros (ordenados por data decrescente)
-        const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-        for (const record of sorted) {
-          const navItem = NAV_ITEMS.find(item => item.id === record.moduleId);
-          
-          // Verifica quebra de página antes de iniciar o registro
-          if (currentY > 240) { doc.addPage(); currentY = 20; }
-
-          doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(0, 168, 89);
-          doc.text(`${navItem?.label || record.moduleId} - ${formatDateDisplay(record.date)}`, 14, currentY);
-          currentY += 8;
-          
-          doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(30, 30, 30);
-          doc.text(record.title, 14, currentY);
-          currentY += 6;
-
-          // Seções detalhadas
-          const addSection = (title: string, text: string) => {
-            if (!text) return;
-            if (currentY > 260) { doc.addPage(); currentY = 20; }
-            doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-            doc.text(title, 14, currentY); currentY += 5;
-            doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
-            const lines = doc.splitTextToSize(text, pageWidth - 28);
-            doc.text(lines, 14, currentY);
-            currentY += (lines.length * 5) + 5;
-          };
-
-          if (record.alunoNome) addSection("Aluno(a):", record.alunoNome);
-          if (record.curricularComponent) addSection("Componente Curricular:", record.curricularComponent);
-
-          // Renderização Especial da Grade Semanal
-          if (record.moduleId === 'planejamento-semanal' && record.weeklyData) {
-            const tableHeaders = [['Dia', 'Turno', 'Horário', 'Atividade', 'BNCC']];
-            const tableBody = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'].map(day => {
-              const dData = record.weeklyData?.[day] || {};
-              const bnccS = (dData.bnccCodes || []).join(', ');
-              const bnccT = dData.bncc_code_text || '';
-              return [day, dData.turno || '-', dData.horario || '-', dData.atividade || '-', [bnccS, bnccT].filter(Boolean).join(' / ') || '-'];
-            });
-
-            autoTable(doc, {
-              startY: currentY, head: tableHeaders, body: tableBody,
-              margin: { bottom: 20 },
-              theme: 'grid', headStyles: { fillColor: [0, 168, 89], fontSize: 7 },
-              styles: { fontSize: 7, cellPadding: 1 },
-              columnStyles: { 0: { fontStyle: 'bold', cellWidth: 20 } }
-            });
-            currentY = (doc as any).lastAutoTable.finalY + 10;
-          }
-
-          if (record.objectives) addSection("Objetivos:", record.objectives);
-          if (record.resources) addSection("Recursos:", record.resources);
-          if (record.evaluation) addSection("Avaliação/Acompanhamento:", record.evaluation);
-          if (record.description || record.content) addSection("Descrição/Observações:", record.description || record.content || '');
-
-          currentY += 10;
-          doc.setDrawColor(230, 230, 230);
-          doc.line(14, currentY - 5, pageWidth - 14, currentY - 5);
-        }
-
-        doc.save(`Portfolio_Digital_${new Date().getTime()}.pdf`);
-      }
-      alert("Portfólio exportado com sucesso!");
-    } catch (err: any) {
-      console.error("Erro na exportação do portfólio:", err);
-      alert("Erro ao exportar currículo pedagógico.");
-    }
-  };
-
-  const handleExport = async (recordToExport: PedagogicalRecord | null = null) => {
-    const targetData = recordToExport || formData;
-    const format = targetData.exportFormat || 'pdf';
-
-    if (activeTab !== 'reflexoes' && (!targetData.title || !targetData.date)) {
-      alert("Por favor, preencha os campos obrigatórios (Título e Data) antes de exportar.");
-      return;
-    }
-
-    try {
-      if (format === 'csv') {
-        // Generate CSV
-        const headers = ['Título', 'Data', 'Módulo', 'Aluno', 'Componente Curricular', 'Período', 'Descrição'];
-        const row = [
-          targetData.title,
-          targetData.date,
-          activeItem?.label || activeTab,
-          targetData.alunoNome || '',
-          targetData.curricularComponent || '',
-          targetData.period || '',
-          targetData.description || targetData.content || ''
-        ];
-
-
-
-        const csvContent = [headers.join(','), row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')].join('\n');
-
-        // Download CSV
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `EduTecProfessor_${activeItem?.label.replace(/ /g, '_')}_${new Date().getTime()}.csv`;
-        link.click();
-
-        // Send Email
-        await supabase.functions.invoke('sendExportEmail', {
-          body: { csvContent, format: 'csv' }
-        });
-
-      } else {
-        // Generate PDF
-        const isWeekly = activeTab === 'planejamento-semanal';
-        const doc = new jsPDF({
-          orientation: isWeekly ? 'landscape' : 'portrait'
-        });
-        const pageWidth = doc.internal.pageSize.width;
-
-        // Header
-        doc.setFillColor(0, 168, 89);
-        doc.rect(0, 0, pageWidth, 40, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(24);
-        doc.setFont("helvetica", "bold");
-        doc.text("EduTecProfessor", 14, 25);
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "normal");
-        doc.text(activeItem?.label || 'Documento Pedagógico', pageWidth - 14, 25, { align: 'right' });
-
-        // Document Info
-        doc.setTextColor(50, 50, 50);
-        doc.setFontSize(16);
-        if (targetData.title) {
-          doc.setFont("helvetica", "bold");
-          doc.text(targetData.title, 14, 55);
-        }
-        
-        if (targetData.date) {
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(100, 100, 100);
-          doc.text(`Data: ${formatDateDisplay(targetData.date)} `, 14, 65);
-        }
-
-        const infoData: string[][] = [];
-        // Nome do professor: prioriza o buscado do banco, depois o salvo no registro
-        const nomeProfessor = professorNome || targetData.professorName || '';
-        if (nomeProfessor) infoData.push(['Professor(a)', nomeProfessor]);
-        if (targetData.alunoNome) infoData.push(['Aluno', targetData.alunoNome || '-']);
-        if (targetData.curricularComponent) infoData.push(['Comp. Curricular (Geral)', targetData.curricularComponent]);
-        if (targetData.period) infoData.push(['Período', targetData.period]);
-        
-        if (!isWeekly && ( (targetData.bnccCodes && targetData.bnccCodes.length > 0) || targetData.bnccCodeText )) {
-          let bnccContent = '';
-          
-          if (targetData.bnccCodes && targetData.bnccCodes.length > 0) {
-            bnccContent = targetData.bnccCodes.map(code => {
-              const dbRef = dbBnccCodes.find(b => b.codigo === code);
-              if (!dbRef) return `Código: ${code}`;
-              
-              let info = `Código: ${code}`;
-              if (dbRef.campo_experiencia) info += `\nCampo: ${dbRef.campo_experiencia}`;
-              info += `\nObjetivo: ${dbRef.objetivo_aprendizagem || dbRef.descricao}`;
-              return info;
-            }).join('\n\n');
-          }
-
-          if (targetData.bnccCodeText) {
-            bnccContent += (bnccContent ? '\n\n' : '') + `Escrita Livre/Manual: ${targetData.bnccCodeText}`;
-          }
-
-          if (bnccContent) {
-            infoData.push(['BNCC', bnccContent]);
-          }
-        }
-
-        autoTable(doc, {
-          startY: 75,
-          body: infoData,
-          theme: 'plain',
-          styles: { fontSize: 11, cellPadding: 2 },
-          columnStyles: { 0: { fontStyle: 'bold', textColor: [0, 0, 0], cellWidth: 50 }, 1: { textColor: [80, 80, 80] } }
-        });
-
-        let currentY = (doc as any).lastAutoTable.finalY + 10; // Espaçamento de 1cm após a tabela ou info
-
-        const pageHeight = doc.internal.pageSize.height;
-        const marginBottom = 20; // 2cm de margem inferior
-
-        const addPDFSection = (title: string, content: string) => {
-          if (!content) return;
-          
-          const splitText = doc.splitTextToSize(content, pageWidth - 28);
-          const sectionHeight = (splitText.length * 5) + 15; // Estimativa de altura da seção
-
-          // Verifica se cabe na página atual (considerando margem de 2cm)
-          if (currentY + sectionHeight > pageHeight - marginBottom) {
-            doc.addPage();
-            currentY = 20; // Margem superior na nova página
-          }
-
-          doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(0, 168, 89);
-          doc.text(title, 14, currentY); currentY += 8;
-          doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(60, 60, 60);
-          doc.text(splitText, 14, currentY);
-          currentY += (splitText.length * 5) + 10; // Espaçamento após o bloco
-        };
-
-        if (isWeekly && targetData.weeklyData) {
-          const tableHeaders = [['Dia', 'Turno', 'Horário', 'Campo/Comp', 'BNCC', 'Atividade', 'Objetivo', 'Acomp.', 'Obs.']];
-          const tableBody = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira'].map(day => {
-            const dayData = targetData.weeklyData?.[day] || {};
-            const campoComp = targetData.etapa === 'EF' ? (dayData.componenteCurricular || targetData.componenteCurricular || '-') : (dayData.campoExperiencia || '-');
-            const bnccSelected = (dayData.bnccCodes || []).join(', ');
-            const bnccTyped = dayData.bncc_code_text || '';
-            const bnccFull = [bnccSelected, bnccTyped].filter(Boolean).join(' / ') || '-';
-
-            return [
-              day, dayData.turno || '-', dayData.horario || '-', campoComp,
-              bnccFull,
-              dayData.atividade || '-', dayData.objetivo_aprendizagem || '-',
-              dayData.acompanhamento || '-', dayData.observacoes || '-'
-            ];
-          });
-
-          autoTable(doc, {
-            startY: currentY, head: tableHeaders, body: tableBody,
-            margin: { bottom: marginBottom },
-            theme: 'grid', headStyles: { fillColor: [0, 168, 89], textColor: [255, 255, 255], fontSize: 8 },
-            styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
-            columnStyles: { 
-              0: { fontStyle: 'bold', cellWidth: 18 }, 1: { cellWidth: 15 }, 2: { cellWidth: 18 },
-              3: { cellWidth: 25 }, 4: { cellWidth: 25 }, 5: { cellWidth: 25 }, 
-              6: { cellWidth: 40 }, 7: { cellWidth: 40 }, 8: { cellWidth: 25 }, 9: { cellWidth: 25 }
-            }
-          });
-
-          currentY = (doc as any).lastAutoTable.finalY + 10; // 1cm após a tabela semanal
-
-          // Ordem solicitada no JSON: Objetivos, Recursos, Avaliação, Observações
-          addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
-          addPDFSection("Recursos Didáticos", targetData.resources || '');
-          addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
-          addPDFSection("Observações Adicionais", targetData.description || '');
-
-        } else if (activeTab === 'planejamento-mensal') {
-          addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
-          addPDFSection("Recursos Didáticos", targetData.resources || '');
-          addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
-          addPDFSection("Observações Adicionais", targetData.description || '');
-        } else if (activeTab === 'planejamento-diario') {
-          addPDFSection("Objetivos de Aprendizagem", targetData.objectives || '');
-          addPDFSection("Recursos Didáticos", targetData.resources || '');
-          addPDFSection("Avaliação e Acompanhamento", targetData.evaluation || '');
-          addPDFSection("Observações Adicionais", targetData.description || '');
-
-        } else if (activeTab === 'reflexoes') {
-          addPDFSection("Registro de Percepções e Reflexões", targetData.description);
-        } else {
-          addPDFSection("Observações do Professor", targetData.description);
-          addPDFSection("Tom do Texto", targetData.tone);
-        }
-
-        // Footer
-        const pageCount = doc.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-          doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
-          doc.text(`EduTecProfessor - Gerador de Relatórios Pedagógicos • Página ${i} de ${pageCount}`, pageWidth / 2, doc.internal.pageSize.height - 10, { align: 'center' });
-        }
-
-        const pdfBase64 = doc.output('datauristring').split(',')[1];
-        doc.save(`EduTecProfessor_${activeItem?.label.replace(/ /g, '_')}_${new Date().getTime()}.pdf`);
-
-        // Enviar por E-mail (Edge Function)
-        try {
-          await supabase.functions.invoke('sendExportEmail', {
-            body: { pdfContent: pdfBase64, format: 'pdf' }
-          });
-        } catch (emailErr) {
-          console.error("Erro ao enviar e-mail:", emailErr);
-        }
-
-        alert(`Documento gerado com sucesso!`);
-      } // Fim do else (PDF)
-    } catch (err: any) {
-      console.error("Erro na exportação:", err);
-      alert("Houve um erro geral na geração do documento: " + (err.message || "Verifique os dados."));
-    }
-  };
 
   const handleDelete = (id: string) => {
     if (window.confirm("Tem certeza que deseja excluir este registro?")) {
       setRecords(records.filter(r => r.id !== id));
+    }
+  };
+
+  const handleExport = (recordToExport?: PedagogicalRecord) => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+
+    const generateSingleRecord = (doc: jsPDF, record: PedagogicalRecord, yOffset: number = 0) => {
+      // Header do PDF com cor verde EduTecPro
+      doc.setFillColor(0, 168, 89);
+      doc.rect(0, yOffset, pageWidth, 35, 'F');
+      
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(20);
+      doc.setFont("helvetica", "bold");
+      doc.text("EduTecPro — Registro Pedagógico", 14, yOffset + 22);
+
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.text(record.title, 14, yOffset + 50);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Data: ${formatDateDisplay(record.date)}`, 14, yOffset + 58);
+      if (record.alunoNome) doc.text(`Aluno: ${record.alunoNome}`, 14, yOffset + 64);
+      if (record.curricularComponent) doc.text(`Componente: ${record.curricularComponent}`, 14, yOffset + 70);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Conteúdo / Descrição:", 14, yOffset + 85);
+      doc.setFont("helvetica", "normal");
+      const splitText = doc.splitTextToSize(record.description || record.content || 'Sem descrição detalhada.', pageWidth - 28);
+      doc.text(splitText, 14, yOffset + 92);
+
+      return yOffset + 100 + (splitText.length * 5);
+    };
+
+    if (recordToExport) {
+      generateSingleRecord(doc, recordToExport);
+      doc.save(`Registro_${recordToExport.title}.pdf`);
+    } else {
+      // Exportar todos os registros do módulo atual
+      currentModuleRecords.forEach((record, index) => {
+        if (index > 0) doc.addPage();
+        generateSingleRecord(doc, record);
+      });
+      doc.save(`Registros_${activeItem?.label}.pdf`);
     }
   };
 
@@ -1235,9 +941,6 @@ export default function Dashboard({
                         ...record,
                         date: record.date.split('T')[0]
                       });
-                    }}
-                    onExportAll={(format) => {
-                      handleExportAllPortfolio(format);
                     }}
                   />
                 ) : activeTab === 'indicadores' ? (
@@ -2516,20 +2219,7 @@ export default function Dashboard({
                 )}
               </>
 
-              <div className="bg-black/5 p-6 rounded-2xl space-y-4 mb-6">
-                <h4 className="text-sm font-black uppercase tracking-widest text-black/30">Configurações de Exportação</h4>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Formato de Exportação</label>
-                  <select
-                    value={formData.exportFormat}
-                    onChange={(e) => setFormData({ ...formData, exportFormat: e.target.value as 'pdf' | 'csv' })}
-                    className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all bg-white"
-                  >
-                    <option value="pdf">PDF (Documento Estruturado)</option>
-                    <option value="csv">CSV (Planilha Excel)</option>
-                  </select>
-                </div>
-              </div>
+
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <button
@@ -2545,13 +2235,7 @@ export default function Dashboard({
                 >
                   {['planejamento-diario', 'planejamento-semanal', 'planejamento-mensal'].includes(activeTab) ? 'Salvar Registro' : 'Salvar Alterações'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleExport()}
-                  className="flex-1 py-4 bg-black text-white rounded-full font-bold hover:bg-black/80 transition-all shadow-lg"
-                >
-                  Gerar Documento
-                </button>
+
                 <button
                   type="button"
                   onClick={() => setIsFormOpen(false)}
@@ -2576,13 +2260,22 @@ export default function Dashboard({
               <h3 className="text-2xl font-bold">
                 {`Registros em ${activeItem?.label}`}
               </h3>
-              <button
-                onClick={() => handleOpenForm()}
-                className="px-6 py-2.5 bg-[#00A859] text-white rounded-full font-bold hover:bg-[#008F4C] transition-all flex items-center gap-2 shadow-lg shadow-[#00A859]/20"
-              >
-                <Icons.Plus size={18} />
-                Novo Registro
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => handleExport()}
+                  className="px-6 py-2.5 bg-black text-white rounded-full font-bold hover:bg-black/80 transition-all flex items-center gap-2 shadow-lg"
+                >
+                  <Icons.FileDown size={18} />
+                  Baixar PDF (Todos)
+                </button>
+                <button
+                  onClick={() => handleOpenForm()}
+                  className="px-6 py-2.5 bg-[#00A859] text-white rounded-full font-bold hover:bg-[#008F4C] transition-all flex items-center gap-2 shadow-lg shadow-[#00A859]/20"
+                >
+                  <Icons.Plus size={18} />
+                  Novo Registro
+                </button>
+              </div>
             </div>
 
             <div className="grid gap-4">
@@ -2638,15 +2331,13 @@ export default function Dashboard({
                   </div>
                   <div className="flex items-center gap-2 self-end md:self-center">
                     <button
-                      onClick={() => {
-                        setRecordForExport(record);
-                        setIsExportModalOpen(true);
-                      }}
-                      className="p-2.5 bg-black/5 rounded-lg text-black/40 hover:text-[#00A859] hover:bg-[#00A859]/10 transition-all"
-                      title="Gerar Documento"
+                      onClick={() => handleExport(record)}
+                      className="p-2.5 bg-black/5 rounded-lg text-black/40 hover:text-black hover:bg-black/10 transition-all"
+                      title="Baixar PDF"
                     >
                       <Icons.FileDown size={18} />
                     </button>
+
                     <button
                       onClick={() => handleOpenForm(record)}
                       className="p-2.5 bg-black/5 rounded-lg text-black/40 hover:text-[#00A859] hover:bg-[#00A859]/10 transition-all"
@@ -2695,77 +2386,7 @@ export default function Dashboard({
         )}
       </motion.div>
       {/* Export Selection Modal */}
-      {isExportModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white rounded-[32px] p-8 max-w-md w-full shadow-2xl space-y-6"
-          >
-            <div className="flex items-center gap-4 mb-2">
-              <div className="w-12 h-12 bg-[#00A859]/10 rounded-2xl flex items-center justify-center text-[#00A859]">
-                <Icons.FileDown size={24} />
-              </div>
-              <div>
-                <h3 className="text-xl font-bold">Exportar Registro</h3>
-                <p className="text-sm text-black/40">Escolha o formato do documento</p>
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Formato de Exportação</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setRecordForExport(prev => prev ? { ...prev, exportFormat: 'pdf' } : null)}
-                    className={`py-4 rounded-2xl border-2 font-bold transition-all flex flex-col items-center gap-2 ${(recordForExport?.exportFormat || 'pdf') === 'pdf'
-                      ? 'border-[#00A859] bg-[#00A859]/5 text-[#00A859]'
-                      : 'border-black/5 hover:border-black/10 text-black/40'
-                      }`}
-                  >
-                    <Icons.FileText size={20} />
-                    PDF
-                  </button>
-                  <button
-                    onClick={() => setRecordForExport(prev => prev ? { ...prev, exportFormat: 'csv' } : null)}
-                    className={`py-4 rounded-2xl border-2 font-bold transition-all flex flex-col items-center gap-2 ${recordForExport?.exportFormat === 'csv'
-                      ? 'border-[#00A859] bg-[#00A859]/5 text-[#00A859]'
-                      : 'border-black/5 hover:border-black/10 text-black/40'
-                      }`}
-                  >
-                    <Icons.Table size={20} />
-                    CSV
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-4 bg-black/5 rounded-2xl">
-                <p className="text-xs text-black/40 leading-relaxed">
-                  O documento será baixado localmente e uma cópia será enviada automaticamente para seu e-mail cadastrado.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => handleExport(recordForExport)}
-                className="flex-1 py-4 bg-[#00A859] text-white rounded-full font-bold hover:bg-[#008F4C] transition-all shadow-lg shadow-[#00A859]/20"
-              >
-                Exportar agora
-              </button>
-              <button
-                onClick={() => {
-                  setIsExportModalOpen(false);
-                  setRecordForExport(null);
-                }}
-                className="flex-1 py-4 bg-black/5 text-black/60 rounded-full font-bold hover:bg-black/10 transition-all font-bold"
-              >
-                Cancelar
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
       {/* BNCC Assistant Component */}
       <BnccAssistant 
         isOpen={isAssistantOpen}

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { Student } from '../types';
-import { Plus, Edit2, Trash2, Search, X, Accessibility, ClipboardList, FileDown, Mail, Loader2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Accessibility, ClipboardList, FileDown, Check } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -20,8 +21,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
     const [formData, setFormData] = useState<Partial<Student>>({
         necessidades_especiais: false,
     });
-    const [isExporting, setIsExporting] = useState(false);
-    const [sendEmail, setSendEmail] = useState(false);
+
 
     useEffect(() => {
         fetchStudents();
@@ -66,6 +66,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                 nota_bimestre2: toNumeric(formData.nota_bimestre2),
                 nota_bimestre3: toNumeric(formData.nota_bimestre3),
                 nota_bimestre4: toNumeric(formData.nota_bimestre4),
+                limitacoes_pcd: formData.necessidades_especiais ? (formData.limitacoes_pcd || null) : null,
                 professor_id: professorId,
             };
 
@@ -139,165 +140,128 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
             setFormData(student);
         } else {
             setEditingStudent(null);
-            setFormData({ status: 'ativo', necessidades_especiais: false });
+            setFormData({ status: 'ativo', necessidades_especiais: false, limitacoes_pcd: '' });
         }
         setIsModalOpen(true);
     };
 
-    const exportarRegistrosPDF = async () => {
-        try {
-            setIsExporting(true);
-            
-            // 1. Buscar todos os dados necessários
-            const [
-                { data: alunos },
-                { data: semanal },
-                { data: mensal },
-                { data: diario },
-                { data: relatoriosAlunos }
-            ] = await Promise.all([
-                supabase.from('alunos').select('*').eq('professor_id', professorId),
-                supabase.from('planejamento_semanal').select('*').eq('professor_id', professorId),
-                supabase.from('planejamento_mensal').select('*').eq('professor_id', professorId),
-                supabase.from('planejamento_diario').select('*').eq('professor_id', professorId),
-                supabase.from('relatorios_alunos').select('*').eq('professor_id', professorId)
-            ]);
+    const gerarPDFAlunos = () => {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.width;
+        
+        // Header do PDF
+        doc.setFillColor(0, 168, 89);
+        doc.rect(0, 0, pageWidth, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.setFont("helvetica", "bold");
+        doc.text("Relatório de Alunos — EduTecPro", 14, 25);
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Data de Geração: ${new Date().toLocaleString('pt-BR')}`, 14, 50);
+        doc.text(`Total de Alunos: ${filteredStudents.length}`, 14, 56);
+        
+        const headers = [['Nome', 'Série/Nível', '1º Bim', '2º Bim', '3º Bim', '4º Bim', 'Status', 'Recursos']];
+        const data = filteredStudents.map(s => [
+            s.nome,
+            s.serie || '-',
+            s.nota_bimestre1 != null ? s.nota_bimestre1.toFixed(1) : '-',
+            s.nota_bimestre2 != null ? s.nota_bimestre2.toFixed(1) : '-',
+            s.nota_bimestre3 != null ? s.nota_bimestre3.toFixed(1) : '-',
+            s.nota_bimestre4 != null ? s.nota_bimestre4.toFixed(1) : '-',
+            s.status === 'ativo' ? 'Ativo' : 'Inativo',
+            s.necessidades_especiais ? 'Sim' : 'Não'
+        ]);
 
-            const doc = new jsPDF();
-            const pageWidth = doc.internal.pageSize.width;
-            
-            // Capa
-            doc.setFillColor(0, 168, 89);
-            doc.rect(0, 0, pageWidth, 40, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(22);
-            doc.text("EduTecPro - Relatório Consolidado", 14, 25);
-            
-            doc.setTextColor(0, 0, 0);
-            doc.setFontSize(10);
-            doc.text(`Data de Geração: ${new Date().toLocaleString('pt-BR')}`, 14, 50);
-            doc.text(`Total de Alunos: ${alunos?.length || 0}`, 14, 56);
-
-            let currentY = 70;
-
-            // Seção: Alunos
-            if (alunos && alunos.length > 0) {
-                doc.setFontSize(14);
-                doc.setFont("helvetica", "bold");
-                doc.text("Meus Alunos", 14, currentY);
-                currentY += 10;
-                
-                autoTable(doc, {
-                    startY: currentY,
-                    head: [['Nome', 'Série', 'Status', 'PCD']],
-                    body: alunos.map(a => [
-                        a.nome, 
-                        a.serie || '-', 
-                        a.status || 'ativo', 
-                        a.necessidades_especiais ? 'Sim' : 'Não'
-                    ]),
-                    theme: 'striped',
-                    headStyles: { fillColor: [0, 168, 89] }
-                });
-                currentY = (doc as any).lastAutoTable.finalY + 20;
+        autoTable(doc, {
+            startY: 65,
+            head: headers,
+            body: data,
+            theme: 'striped',
+            headStyles: { fillColor: [0, 168, 89], textColor: [255, 255, 255] },
+            styles: { fontSize: 9, cellPadding: 3 },
+            columnStyles: {
+                2: { halign: 'center' },
+                3: { halign: 'center' },
+                4: { halign: 'center' },
+                5: { halign: 'center' },
+                6: { halign: 'center' },
+                7: { halign: 'center' }
             }
+        });
 
-            // Seção: Planejamentos (Resumo)
-            const addPedagogicalSection = (title: string, data: any[], headers: string[], mapper: (item: any) => string[]) => {
-                if (data && data.length > 0) {
-                    if (currentY > 250) { doc.addPage(); currentY = 20; }
-                    doc.setFontSize(14);
-                    doc.setFont("helvetica", "bold");
-                    doc.text(title, 14, currentY);
-                    currentY += 10;
-                    
-                    autoTable(doc, {
-                        startY: currentY,
-                        head: [headers],
-                        body: data.map(mapper),
-                        theme: 'grid',
-                        headStyles: { fillColor: [50, 50, 50] },
-                        styles: { fontSize: 8 }
-                    });
-                    currentY = (doc as any).lastAutoTable.finalY + 20;
-                }
-            };
-
-            addPedagogicalSection(
-                "Planejamento Semanal", 
-                semanal || [], 
-                ['Data', 'Título', 'Objetivos'],
-                (r) => [r.data_ref || '-', r.titulo_registro || '-', r.objetivo_aprendizagem || '-']
-            );
-
-            addPedagogicalSection(
-                "Planejamento Mensal", 
-                mensal || [], 
-                ['Mês/Ano', 'Título', 'Atividades'],
-                (r) => [`${r.mes}/${r.ano}`, r.titulo_registro || '-', r.atividades || '-']
-            );
-
-            addPedagogicalSection(
-                "Planejamento Diário", 
-                diario || [], 
-                ['Data', 'Título', 'Conteúdo'],
-                (r) => [r.data || '-', r.titulo_registro || '-', r.conteudo || '-']
-            );
-
-            // Relatórios dos Alunos (Automações)
-            if (relatoriosAlunos && relatoriosAlunos.length > 0) {
-                if (currentY > 250) { doc.addPage(); currentY = 20; }
-                doc.setFontSize(14);
-                doc.setFont("helvetica", "bold");
-                doc.text("Histórico de Registros (Automações)", 14, currentY);
-                currentY += 10;
-
-                autoTable(doc, {
-                    startY: currentY,
-                    head: [['Data', 'Tipo', 'Aluno', 'Resumo']],
-                    body: relatoriosAlunos.map(r => {
-                        const alunoNome = alunos?.find(a => a.id === r.aluno_id)?.nome || 'N/A';
-                        const conteudo = typeof r.conteudo === 'string' ? JSON.parse(r.conteudo) : r.conteudo;
-                        return [
-                            new Date(r.created_at).toLocaleDateString('pt-BR'),
-                            r.tipo_registro,
-                            alunoNome,
-                            conteudo?.titulo || conteudo?.observacao || '-'
-                        ];
-                    }),
-                    theme: 'striped',
-                    headStyles: { fillColor: [100, 100, 100] }
-                });
-            }
-
-            // Download
-            const fileName = `Exportacao_EduTecPro_${new Date().getTime()}.pdf`;
-            doc.save(fileName);
-
-            // Envio por e-mail se solicitado
-            if (sendEmail) {
-                const pdfBase64 = doc.output('datauristring').split(',')[1];
-                const { error: emailError } = await supabase.functions.invoke('sendExportEmail', {
-                    body: { 
-                        pdfContent: pdfBase64, 
-                        format: 'pdf',
-                        filename: fileName 
-                    }
-                });
-
-                if (emailError) throw emailError;
-                alert("Registros exportados e cópia enviada para seu e-mail!");
-            } else {
-                alert("Registros exportados com sucesso!");
-            }
-
-        } catch (error: any) {
-            console.error('Erro na exportação:', error);
-            alert('Erro ao exportar registros: ' + (error.message || 'Verifique sua conexão.'));
-        } finally {
-            setIsExporting(false);
-        }
+        doc.save(`Alunos_EduTecPro_${new Date().getTime()}.pdf`);
     };
+
+    const exportarPDFAluno = (student?: Student) => {
+        const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.width;
+        
+        // Se for passado um aluno, usa ele; senão usa os dados do formulário
+        const data = student || formData;
+
+        // Header
+        doc.setFillColor(0, 168, 89);
+        doc.rect(0, 0, pageWidth, 40, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(22);
+        doc.setFont("helvetica", "bold");
+        doc.text("Ficha do Aluno — EduTecPro", 14, 25);
+        
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text(data.nome || 'Aluno Sem Nome', 14, 55);
+        
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Data de Nascimento: ${data.data_nascimento ? new Date(data.data_nascimento).toLocaleDateString('pt-BR') : '-'}`, 14, 65);
+        doc.text(`Série/Nível: ${data.serie || '-'}`, 14, 71);
+        doc.text(`Status: ${data.status === 'ativo' ? 'Ativo' : 'Inativo'}`, 14, 77);
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Contatos dos Responsáveis:", 14, 90);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Resp. 1: ${data.responsavel1_nome || '-'} (${data.responsavel1_telefone || '-'})`, 14, 97);
+        doc.text(`Resp. 2: ${data.responsavel2_nome || '-'} (${data.responsavel2_telefone || '-'})`, 14, 103);
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Observações Gerais:", 14, 115);
+        doc.setFont("helvetica", "normal");
+        const obsSplit = doc.splitTextToSize(data.nota || '-', pageWidth - 28);
+        doc.text(obsSplit, 14, 122);
+
+        doc.setFont("helvetica", "bold");
+        doc.text("Histórico de Notas (Bimestrais):", 14, 140);
+        autoTable(doc, {
+            startY: 145,
+            head: [['1º Bim', '2º Bim', '3º Bim', '4º Bim']],
+            body: [[
+                data.nota_bimestre1 != null ? data.nota_bimestre1.toFixed(1) : '-',
+                data.nota_bimestre2 != null ? data.nota_bimestre2.toFixed(1) : '-',
+                data.nota_bimestre3 != null ? data.nota_bimestre3.toFixed(1) : '-',
+                data.nota_bimestre4 != null ? data.nota_bimestre4.toFixed(1) : '-'
+            ]],
+            theme: 'grid',
+            headStyles: { fillColor: [0, 168, 89] },
+            styles: { halign: 'center' }
+        });
+
+        if (data.necessidades_especiais) {
+            const currentY = (doc as any).lastAutoTable.finalY + 15;
+            doc.setFont("helvetica", "bold");
+            doc.text("Educação Inclusiva (PCD) — Limitações:", 14, currentY);
+            doc.setFont("helvetica", "normal");
+            const limitSplit = doc.splitTextToSize(data.limitacoes_pcd || 'Não informadas.', pageWidth - 28);
+            doc.text(limitSplit, 14, currentY + 7);
+        }
+
+        doc.save(`Ficha_${data.nome}_${new Date().getTime()}.pdf`);
+    };
+
+
 
     const filteredStudents = students.filter(s =>
         s.nome.toLowerCase().includes(searchTerm.toLowerCase())
@@ -316,30 +280,13 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h2 className="text-2xl font-bold">Meus Alunos</h2>
                 <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex items-center gap-2 bg-black/5 px-3 py-2 rounded-xl border border-black/5">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input 
-                                type="checkbox" 
-                                checked={sendEmail}
-                                onChange={(e) => setSendEmail(e.target.checked)}
-                                className="w-4 h-4 rounded border-gray-300 text-[#00A859] focus:ring-[#00A859]"
-                            />
-                            <span className="text-xs font-semibold text-black/60 flex items-center gap-1">
-                                <Mail size={14} /> Enviar cópia por e-mail
-                            </span>
-                        </label>
-                    </div>
-
                     <button
-                        onClick={exportarRegistrosPDF}
-                        disabled={isExporting}
-                        className="bg-black/80 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-black transition-colors disabled:opacity-50"
-                        title="Exportar todos os registros pedagógicos em PDF"
+                        onClick={gerarPDFAlunos}
+                        className="bg-black text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-black/80 transition-colors shadow-lg active:scale-95"
                     >
-                        {isExporting ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />}
-                        <span>Exportar Meus Registros</span>
+                        <FileDown size={20} />
+                        <span>Baixar PDF</span>
                     </button>
-
                     <button
                         onClick={() => openModal()}
                         className="bg-[#00A859] text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-[#008F4C] transition-colors"
@@ -418,6 +365,13 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                         <td className="py-4 px-4 text-right">
                                             <div className="flex justify-end gap-2">
                                                 <button
+                                                    onClick={() => exportarPDFAluno(student)}
+                                                    className="p-2 hover:bg-black/5 rounded-lg text-black/60 hover:text-black transition-colors"
+                                                    title="Baixar Ficha PDF"
+                                                >
+                                                    <FileDown size={18} />
+                                                </button>
+                                                <button
                                                     onClick={() => openModal(student)}
                                                     className="p-2 hover:bg-black/5 rounded-lg text-black/60 hover:text-black transition-colors"
                                                 >
@@ -436,6 +390,16 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                <div className="mt-6 flex justify-end border-t border-black/5 pt-6">
+                    <button
+                        onClick={gerarPDFAlunos}
+                        className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl font-bold hover:bg-black/80 transition-all shadow-lg active:scale-95"
+                    >
+                        <FileDown size={20} />
+                        Baixar PDF
+                    </button>
                 </div>
             </div>
 
@@ -594,9 +558,24 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                     />
                                     <div>
                                         <span className="font-semibold block">Educação Inclusiva (PCD)</span>
-                                        <span className="text-xs text-black/60">Marcação para habilitar o uso do Parecer PCD Automático.</span>
                                     </div>
                                 </label>
+
+                                {formData.necessidades_especiais && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: -10 }} 
+                                        animate={{ opacity: 1, y: 0 }} 
+                                        className="mt-3 space-y-2"
+                                    >
+                                        <label className="text-xs font-bold text-black/50 uppercase tracking-wider pl-1">Limitações do Aluno</label>
+                                        <textarea
+                                            value={formData.limitacoes_pcd || ''}
+                                            onChange={(e) => setFormData({ ...formData, limitacoes_pcd: e.target.value })}
+                                            placeholder="Descreva as limitações ou necessidades específicas do aluno..."
+                                            className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all min-h-[100px] resize-none text-sm"
+                                        />
+                                    </motion.div>
+                                )}
                             </div>
 
                             <div className="pt-4 flex gap-3">
@@ -613,6 +592,16 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                 >
                                     {editingStudent ? 'Salvar Edição' : 'Cadastrar'}
                                 </button>
+                                {editingStudent && (
+                                    <button
+                                        type="button"
+                                        onClick={exportarPDFAluno}
+                                        className="flex-1 py-3.5 bg-black text-white font-semibold rounded-full shadow-lg hover:bg-black/80 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <FileDown size={18} />
+                                        Exportar PDF
+                                    </button>
+                                )}
                             </div>
                         </form>
                     </div>
@@ -621,10 +610,3 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
         </div>
     );
 }
-
-// Inline Check Icon since we might not have it from lucide right away
-const Check = ({ size, className }: { size: number, className: string }) => (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <polyline points="20 6 9 17 4 12"></polyline>
-    </svg>
-);

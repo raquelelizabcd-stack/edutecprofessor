@@ -3,14 +3,52 @@ import { motion } from 'framer-motion';
 import * as Icons from 'lucide-react';
 import { PedagogicalRecord, NAV_ITEMS } from '../types';
 import { cn } from '../lib/utils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface PortfolioViewProps {
   records: PedagogicalRecord[];
   onOpenRecord: (record: PedagogicalRecord) => void;
-  onExportAll: (format: 'pdf' | 'csv') => void;
 }
 
-export default function PortfolioView({ records, onOpenRecord, onExportAll }: PortfolioViewProps) {
+export default function PortfolioView({ records, onOpenRecord }: PortfolioViewProps) {
+  const handleExportAll = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+
+    const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    sorted.forEach((record, index) => {
+      if (index > 0) doc.addPage();
+      
+      // Header
+      doc.setFillColor(0, 168, 89);
+      doc.rect(0, 0, pageWidth, 40, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
+      doc.setFont("helvetica", "bold");
+      doc.text("Currículo Pedagógico Consolidado", 14, 25);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(14);
+      doc.text(record.title, 14, 50);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Data: ${new Date(record.date).toLocaleDateString('pt-BR')}`, 14, 58);
+      const navItem = NAV_ITEMS.find(item => item.id === record.moduleId);
+      doc.text(`Módulo: ${navItem?.label || record.moduleId}`, 14, 64);
+      if (record.alunoNome) doc.text(`Aluno: ${record.alunoNome}`, 14, 70);
+
+      doc.setFont("helvetica", "bold");
+      doc.text("Descrição / Conteúdo:", 14, 85);
+      doc.setFont("helvetica", "normal");
+      const splitText = doc.splitTextToSize(record.description || record.content || 'Sem descrição.', pageWidth - 28);
+      doc.text(splitText, 14, 92);
+    });
+
+    doc.save(`Curriculo_Pedagogico_${new Date().getTime()}.pdf`);
+  };
   const sortedRecords = useMemo(() => {
     return [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [records]);
@@ -39,16 +77,13 @@ export default function PortfolioView({ records, onOpenRecord, onExportAll }: Po
             <p className="text-sm text-slate-400 font-medium">Histórico consolidado de sua prática docente</p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <button 
-            type="button"
-            onClick={() => onExportAll('pdf')}
-            className="px-6 py-3 bg-slate-800 text-white rounded-full font-bold text-sm flex items-center gap-2 hover:bg-slate-900 transition-all shadow-lg shadow-slate-200"
-          >
-            <Icons.FileDown size={18} />
-            Exportar Todos (PDF)
-          </button>
-        </div>
+        <button
+          onClick={handleExportAll}
+          className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-2xl font-bold hover:bg-black/80 transition-all shadow-lg active:scale-95"
+        >
+          <Icons.FileDown size={20} />
+          Baixar Currículo (PDF)
+        </button>
       </div>
 
       {/* Quick Stats Grid */}

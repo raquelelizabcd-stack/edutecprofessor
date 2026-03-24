@@ -25,6 +25,7 @@ export interface Student {
   nota_bimestre2?: number | null;
   nota_bimestre3?: number | null;
   nota_bimestre4?: number | null;
+  limitacoes_pcd?: string;
   created_at?: string;
 }
 
@@ -97,7 +98,6 @@ export interface PedagogicalRecord {
   mesPlanejamento?: string;
   anoPlanejamento?: string;
   atividades?: string;
-  exportFormat?: 'pdf' | 'csv';
 }
 
 export const NAV_ITEMS: NavItem[] = [
