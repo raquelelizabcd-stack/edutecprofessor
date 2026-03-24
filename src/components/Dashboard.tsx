@@ -444,7 +444,7 @@ export default function Dashboard({
             alert(`Limite do Plano Free: 1 ${activeItem?.label} por dia. Mude para o Pro para ilimitado!`);
             return;
           }
-        } else if (['planejamento-semanal', 'registro-mensal', 'plano-aula', 'relatorios-aluno'].includes(activeTab)) {
+        } else if (['planejamento-semanal', 'planejamento-mensal', 'relatorios-aluno'].includes(activeTab)) {
           const weekRecords = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfWeek);
           if (weekRecords.length >= 1) {
             alert("Limite do Plano Free: 1 registro por semana neste módulo. Mude para o Pro para ilimitado!");

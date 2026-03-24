@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Student } from '../types';
-import { Plus, Edit2, Trash2, Search, X, Accessibility, ClipboardList } from 'lucide-react';
+import { Plus, Edit2, Trash2, Search, X, Accessibility, ClipboardList, FileDown, Mail, Loader2 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface StudentManagerProps {
     professorId: string;
@@ -16,9 +18,10 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [formData, setFormData] = useState<Partial<Student>>({
-        status: 'ativo',
         necessidades_especiais: false,
     });
+    const [isExporting, setIsExporting] = useState(false);
+    const [sendEmail, setSendEmail] = useState(false);
 
     useEffect(() => {
         fetchStudents();
@@ -141,6 +144,161 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
         setIsModalOpen(true);
     };
 
+    const exportarRegistrosPDF = async () => {
+        try {
+            setIsExporting(true);
+            
+            // 1. Buscar todos os dados necessários
+            const [
+                { data: alunos },
+                { data: semanal },
+                { data: mensal },
+                { data: diario },
+                { data: relatoriosAlunos }
+            ] = await Promise.all([
+                supabase.from('alunos').select('*').eq('professor_id', professorId),
+                supabase.from('planejamento_semanal').select('*').eq('professor_id', professorId),
+                supabase.from('planejamento_mensal').select('*').eq('professor_id', professorId),
+                supabase.from('planejamento_diario').select('*').eq('professor_id', professorId),
+                supabase.from('relatorios_alunos').select('*').eq('professor_id', professorId)
+            ]);
+
+            const doc = new jsPDF();
+            const pageWidth = doc.internal.pageSize.width;
+            
+            // Capa
+            doc.setFillColor(0, 168, 89);
+            doc.rect(0, 0, pageWidth, 40, 'F');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(22);
+            doc.text("EduTecPro - Relatório Consolidado", 14, 25);
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.text(`Data de Geração: ${new Date().toLocaleString('pt-BR')}`, 14, 50);
+            doc.text(`Total de Alunos: ${alunos?.length || 0}`, 14, 56);
+
+            let currentY = 70;
+
+            // Seção: Alunos
+            if (alunos && alunos.length > 0) {
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text("Meus Alunos", 14, currentY);
+                currentY += 10;
+                
+                autoTable(doc, {
+                    startY: currentY,
+                    head: [['Nome', 'Série', 'Status', 'PCD']],
+                    body: alunos.map(a => [
+                        a.nome, 
+                        a.serie || '-', 
+                        a.status || 'ativo', 
+                        a.necessidades_especiais ? 'Sim' : 'Não'
+                    ]),
+                    theme: 'striped',
+                    headStyles: { fillColor: [0, 168, 89] }
+                });
+                currentY = (doc as any).lastAutoTable.finalY + 20;
+            }
+
+            // Seção: Planejamentos (Resumo)
+            const addPedagogicalSection = (title: string, data: any[], headers: string[], mapper: (item: any) => string[]) => {
+                if (data && data.length > 0) {
+                    if (currentY > 250) { doc.addPage(); currentY = 20; }
+                    doc.setFontSize(14);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(title, 14, currentY);
+                    currentY += 10;
+                    
+                    autoTable(doc, {
+                        startY: currentY,
+                        head: [headers],
+                        body: data.map(mapper),
+                        theme: 'grid',
+                        headStyles: { fillColor: [50, 50, 50] },
+                        styles: { fontSize: 8 }
+                    });
+                    currentY = (doc as any).lastAutoTable.finalY + 20;
+                }
+            };
+
+            addPedagogicalSection(
+                "Planejamento Semanal", 
+                semanal || [], 
+                ['Data', 'Título', 'Objetivos'],
+                (r) => [r.data_ref || '-', r.titulo_registro || '-', r.objetivo_aprendizagem || '-']
+            );
+
+            addPedagogicalSection(
+                "Planejamento Mensal", 
+                mensal || [], 
+                ['Mês/Ano', 'Título', 'Atividades'],
+                (r) => [`${r.mes}/${r.ano}`, r.titulo_registro || '-', r.atividades || '-']
+            );
+
+            addPedagogicalSection(
+                "Planejamento Diário", 
+                diario || [], 
+                ['Data', 'Título', 'Conteúdo'],
+                (r) => [r.data || '-', r.titulo_registro || '-', r.conteudo || '-']
+            );
+
+            // Relatórios dos Alunos (Automações)
+            if (relatoriosAlunos && relatoriosAlunos.length > 0) {
+                if (currentY > 250) { doc.addPage(); currentY = 20; }
+                doc.setFontSize(14);
+                doc.setFont("helvetica", "bold");
+                doc.text("Histórico de Registros (Automações)", 14, currentY);
+                currentY += 10;
+
+                autoTable(doc, {
+                    startY: currentY,
+                    head: [['Data', 'Tipo', 'Aluno', 'Resumo']],
+                    body: relatoriosAlunos.map(r => {
+                        const alunoNome = alunos?.find(a => a.id === r.aluno_id)?.nome || 'N/A';
+                        const conteudo = typeof r.conteudo === 'string' ? JSON.parse(r.conteudo) : r.conteudo;
+                        return [
+                            new Date(r.created_at).toLocaleDateString('pt-BR'),
+                            r.tipo_registro,
+                            alunoNome,
+                            conteudo?.titulo || conteudo?.observacao || '-'
+                        ];
+                    }),
+                    theme: 'striped',
+                    headStyles: { fillColor: [100, 100, 100] }
+                });
+            }
+
+            // Download
+            const fileName = `Exportacao_EduTecPro_${new Date().getTime()}.pdf`;
+            doc.save(fileName);
+
+            // Envio por e-mail se solicitado
+            if (sendEmail) {
+                const pdfBase64 = doc.output('datauristring').split(',')[1];
+                const { error: emailError } = await supabase.functions.invoke('sendExportEmail', {
+                    body: { 
+                        pdfContent: pdfBase64, 
+                        format: 'pdf',
+                        filename: fileName 
+                    }
+                });
+
+                if (emailError) throw emailError;
+                alert("Registros exportados e cópia enviada para seu e-mail!");
+            } else {
+                alert("Registros exportados com sucesso!");
+            }
+
+        } catch (error: any) {
+            console.error('Erro na exportação:', error);
+            alert('Erro ao exportar registros: ' + (error.message || 'Verifique sua conexão.'));
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const filteredStudents = students.filter(s =>
         s.nome.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -157,13 +315,39 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h2 className="text-2xl font-bold">Meus Alunos</h2>
-                <button
-                    onClick={() => openModal()}
-                    className="bg-[#00A859] text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-[#008F4C] transition-colors"
-                >
-                    <Plus size={20} />
-                    <span>Novo Aluno</span>
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2 bg-black/5 px-3 py-2 rounded-xl border border-black/5">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                checked={sendEmail}
+                                onChange={(e) => setSendEmail(e.target.checked)}
+                                className="w-4 h-4 rounded border-gray-300 text-[#00A859] focus:ring-[#00A859]"
+                            />
+                            <span className="text-xs font-semibold text-black/60 flex items-center gap-1">
+                                <Mail size={14} /> Enviar cópia por e-mail
+                            </span>
+                        </label>
+                    </div>
+
+                    <button
+                        onClick={exportarRegistrosPDF}
+                        disabled={isExporting}
+                        className="bg-black/80 text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-black transition-colors disabled:opacity-50"
+                        title="Exportar todos os registros pedagógicos em PDF"
+                    >
+                        {isExporting ? <Loader2 size={18} className="animate-spin" /> : <FileDown size={18} />}
+                        <span>Exportar Meus Registros</span>
+                    </button>
+
+                    <button
+                        onClick={() => openModal()}
+                        className="bg-[#00A859] text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-[#008F4C] transition-colors"
+                    >
+                        <Plus size={20} />
+                        <span>Novo Aluno</span>
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden p-4 md:p-6">

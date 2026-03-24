@@ -110,15 +110,13 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
     const planFeatures = isFree ? [
       { label: 'Relatório Individual (1/dia)', icon: FileText },
       { label: 'Planejamento Semanal (1/semana)', icon: Calendar },
-      { label: 'Registro Mensal (1/mês)', icon: ClipboardList },
-      { label: 'Plano de Aula (1/semana)', icon: BookOpen },
-      { label: 'Banco de frases (2/semana)', icon: MessageSquare },
+      { label: 'Planejamento Mensal (1/mês)', icon: ClipboardList },
+      { label: 'Planejamento Diário (1/dia)', icon: BookOpen },
     ] : [
       { label: 'Relatórios ilimitados', icon: FileText },
       { label: 'Parecer PCD disponível', icon: Accessibility },
       { label: 'BNCC automática com Análise', icon: Zap },
-      { label: 'Banco de frases completo', icon: MessageSquare },
-      { label: 'Exportar relatórios em PDF', icon: FileDown },
+      { label: 'Exportar em PDF e CSV', icon: FileDown },
       { label: 'Dashboard de evolução', icon: LayoutDashboard },
     ];
 
@@ -340,9 +338,8 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 {[
                   'Relatório Individual (1/dia)',
                   'Planejamento Semanal (1/semana)',
-                  'Registro Mensal (1/mês)',
-                  'Plano de Aula (1/semana)',
-                  'Banco de frases (2/semana)'
+                  'Planejamento Mensal (1/mês)',
+                  'Planejamento Diário (1/dia)'
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-sm text-black/70">
                     <CheckCircle2 size={16} className="text-[#00A859] shrink-0" />
@@ -376,8 +373,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                   'Relatórios ilimitados',
                   'Parecer PCD disponível',
                   'BNCC automática com Análise',
-                  'Banco de frases completo',
-                  'Exportar relatórios em PDF',
+                  'Exportar em PDF e CSV',
                   'Dashboard de evolução'
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-sm text-black/70">
