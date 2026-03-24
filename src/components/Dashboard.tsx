@@ -746,7 +746,50 @@ export default function Dashboard({
         generateSingleRecord(doc, record);
       });
       doc.save(`Registros_${activeItem?.label}.pdf`);
-    }
+    };
+  };
+
+  const exportarPDFDiarioReflexoes = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+    
+    // Header com tom púrpura (identidade do Diário)
+    doc.setFillColor(147, 51, 234); 
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont("helvetica", "bold");
+    doc.text("Diário de Reflexões — EduTecPro", 14, 25);
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Registro de reflexão: ${new Date().toLocaleDateString('pt-BR')}`, 14, 55);
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text("1. Reflexões e Insights (O que aprendi hoje?):", 14, 70);
+    doc.setFont("helvetica", "normal");
+    const refSplit = doc.splitTextToSize(formData.description || 'Nenhuma reflexão registrada.', pageWidth - 28);
+    doc.text(refSplit, 14, 77);
+    
+    let nextY = 77 + (refSplit.length * 6) + 10;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("2. Foco Próximo Ciclo:", 14, nextY);
+    doc.setFont("helvetica", "normal");
+    const focoSplit = doc.splitTextToSize(formData.objectives || 'Não informado.', pageWidth - 28);
+    doc.text(focoSplit, 14, nextY + 7);
+
+    nextY = nextY + 7 + (focoSplit.length * 6) + 10;
+
+    doc.setFont("helvetica", "bold");
+    doc.text("3. Maiores Conquistas:", 14, nextY);
+    doc.setFont("helvetica", "normal");
+    const conquistasSplit = doc.splitTextToSize(formData.conquistas || 'Não informado.', pageWidth - 28);
+    doc.text(conquistasSplit, 14, nextY + 7);
+
+    doc.save(`Reflexao_${new Date().getTime()}.pdf`);
   };
 
   const currentModuleRecords = records.filter(r => r.moduleId === activeTab);
@@ -2243,6 +2286,17 @@ export default function Dashboard({
                 >
                   Cancelar
                 </button>
+
+                {activeTab === 'reflexoes' && (
+                  <button
+                    type="button"
+                    onClick={exportarPDFDiarioReflexoes}
+                    className="flex-1 py-4 bg-black text-white rounded-full font-bold hover:bg-black/80 transition-all flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    <Icons.FileDown size={18} />
+                    Exportar PDF
+                  </button>
+                )}
               </div>
             </form>
           </div>
