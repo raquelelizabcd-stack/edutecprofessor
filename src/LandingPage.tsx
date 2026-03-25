@@ -17,7 +17,8 @@ import {
   Accessibility,
   FileDown,
   LayoutDashboard,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { UserProfile } from './types';
@@ -113,11 +114,12 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
       { label: 'Planejamento Mensal (1/mês)', icon: ClipboardList },
       { label: 'Planejamento Diário (1/dia)', icon: BookOpen },
     ] : [
-      { label: 'Relatórios ilimitados', icon: FileText },
-      { label: 'Parecer PCD disponível', icon: Accessibility },
-      { label: 'BNCC automática com Análise', icon: Zap },
-      { label: 'Exportar em PDF e CSV', icon: FileDown },
-      { label: 'Dashboard de evolução', icon: LayoutDashboard },
+      { label: 'Calendário de presença dos alunos', icon: Calendar },
+      { label: 'Exportação de PDF diário e completo', icon: FileDown },
+      { label: 'Gestão detalhada de alunos', icon: Users },
+      { label: 'Controle de validade da assinatura', icon: ShieldCheck },
+      { label: 'Portfólio digital e relatórios avançados', icon: LayoutDashboard },
+      { label: 'Diário de reflexões sem limitações', icon: MessageSquare },
     ];
 
     return (
@@ -208,11 +210,31 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
               Chega de perder noites preparando relatórios e planejamentos. Nosso sistema automatiza tarefas, organiza sua rotina e gera relatórios alinhados à BNCC em segundos. Você ganha tempo, reduz estresse e foca no que realmente importa: ensinar com qualidade. <br /><br />
               <span className="font-bold text-black/80 italic">Todos os arquivos podem ser baixados e salvos em PDF e CSV.</span>
             </p>
-            <div className="bg-[#00A859]/5 border border-[#00A859]/20 p-4 rounded-2xl mb-8 flex items-center gap-3">
-              <Sparkles size={20} className="text-[#00A859] shrink-0" />
-              <p className="text-sm font-medium text-[#00A859]">
-                Experimente o <span className="font-bold">Plano Pro gratuitamente por 7 dias</span> agora mesmo.
-              </p>
+            <div className="bg-[#00A859]/5 border border-[#00A859]/20 p-6 rounded-3xl mb-8">
+              <div className="flex items-center gap-3 mb-4">
+                <Sparkles size={20} className="text-[#00A859] shrink-0" />
+                <p className="text-sm font-medium text-[#00A859]">
+                  Experimente o <span className="font-bold">Plano Pro gratuitamente por 7 dias</span> agora mesmo.
+                </p>
+              </div>
+              <div className="space-y-2 pt-2 border-t border-[#00A859]/10">
+                <p className="text-[10px] font-bold text-[#00A859] uppercase tracking-widest mb-2">Recursos do Plano Pro</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                  {[
+                    '✔ Calendário de presença dos alunos',
+                    '✔ Exportação de PDF diário e completo',
+                    '✔ Gestão detalhada de alunos',
+                    '✔ Controle de validade da assinatura',
+                    '✔ Portfólio digital e relatórios avançados',
+                    '✔ Diário de reflexões sem limitações'
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-center gap-2 text-[11px] text-[#00A859]/80 font-medium">
+                      <CheckCircle2 size={12} className="shrink-0" />
+                      {item.replace('✔ ', '')}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
               <button
@@ -368,20 +390,24 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 <span className="text-3xl md:text-4xl font-bold">R$ 29,90</span>
                 <span className="text-black/40">/mês</span>
               </div>
-              <ul className="space-y-3 md:space-y-4 mb-8 md:mb-10 flex-1">
-                {[
-                  'Relatórios ilimitados',
-                  'Parecer PCD disponível',
-                  'BNCC automática com Análise',
-                  'Exportar em PDF e CSV',
-                  'Dashboard de evolução'
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 text-sm text-black/70">
-                    <CheckCircle2 size={16} className="text-[#00A859] shrink-0" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
+              <div className="mb-4">
+                <p className="text-xs font-bold text-[#00A859] uppercase tracking-wider mb-3">Recursos do Plano Pro</p>
+                <ul className="space-y-3 md:space-y-4 mb-8 md:mb-10 flex-1">
+                  {[
+                    '✔ Calendário de presença dos alunos',
+                    '✔ Exportação de PDF diário e completo',
+                    '✔ Gestão detalhada de alunos (cadastro, edição, histórico)',
+                    '✔ Controle de validade da assinatura',
+                    '✔ Portfólio digital e relatórios avançados',
+                    '✔ Diário de reflexões pedagógicas sem limitações'
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-center gap-3 text-sm text-black/70">
+                      <CheckCircle2 size={16} className="text-[#00A859] shrink-0" />
+                      {item.replace('✔ ', '')}
+                    </li>
+                  ))}
+                </ul>
+              </div>
               <button
                 onClick={handleStartProTrial}
                 className="w-full py-3.5 md:py-4 bg-[#00A859] text-white rounded-full font-semibold hover:bg-[#008F4C] transition-all shadow-lg shadow-[#00A859]/20"
@@ -398,9 +424,25 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
         <div className="max-w-5xl mx-auto bg-[#1A1A1A] rounded-[40px] p-12 md:p-20 text-white relative overflow-hidden">
           <div className="relative z-10 max-w-2xl">
             <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-6">Teste o EduTecProfessor gratuitamente</h2>
-            <p className="text-white/60 text-lg mb-10">
+            <p className="text-white/60 text-lg mb-6">
               Ao se cadastrar, você recebe <span className="text-[#00A859] font-bold">7 dias de acesso completo</span> ao Plano Pro para experimentar todas as funcionalidades.
             </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 mb-10 p-6 bg-white/5 rounded-3xl border border-white/5">
+              <p className="col-span-full text-[10px] font-bold text-[#00A859] uppercase tracking-widest mb-1">Recursos do Plano Pro</p>
+              {[
+                '✔ Calendário de presença dos alunos',
+                '✔ Exportação de PDF diário e completo',
+                '✔ Gestão detalhada de alunos (cadastro, edição, histórico)',
+                '✔ Controle de validade da assinatura',
+                '✔ Portfólio digital e relatórios avançados',
+                '✔ Diário de reflexões pedagógicas sem limitações'
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-xs text-white/50">
+                  <CheckCircle2 size={14} className="text-[#00A859] shrink-0" />
+                  {item.replace('✔ ', '')}
+                </div>
+              ))}
+            </div>
             <button
               onClick={handleStartProTrial}
               className="px-8 py-4 bg-[#00A859] text-white rounded-full font-semibold hover:bg-[#008F4C] transition-all flex items-center gap-2"

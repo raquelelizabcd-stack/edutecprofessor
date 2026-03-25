@@ -563,16 +563,19 @@ export default function PaymentPage({
                             </div>
 
                             {/* Benefits List */}
-                            <div className="space-y-3 mb-10">
+                            <div className="space-y-4 mb-10">
+                                <p className="text-[10px] font-bold text-[#00A859] uppercase tracking-widest mb-4">Recursos do Plano Pro</p>
                                 {[
-                                    'Relatórios PDF Ilimitados',
-                                    'Planejamentos com Análise',
-                                    'Suporte Prioritário',
-                                    'Novas Funcionalidades Semanais'
+                                    '✔ Calendário de presença dos alunos',
+                                    '✔ Exportação de PDF diário e completo',
+                                    '✔ Gestão detalhada de alunos (cadastro, edição, histórico)',
+                                    '✔ Controle de validade da assinatura',
+                                    '✔ Portfólio digital e relatórios avançados',
+                                    '✔ Diário de reflexões pedagógicas sem limitações'
                                 ].map((item, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-xs text-white/50">
+                                    <div key={i} className="flex items-center gap-2 text-xs text-white/70">
                                         <CheckCircle2 size={14} className="text-[#00A859]" />
-                                        {item}
+                                        {item.replace('✔ ', '')}
                                     </div>
                                 ))}
                             </div>
