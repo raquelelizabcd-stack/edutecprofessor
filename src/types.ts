@@ -26,6 +26,7 @@ export interface Student {
   nota_bimestre3?: number | null;
   nota_bimestre4?: number | null;
   limitacoes_pcd?: string;
+  presenca?: 'Presente' | 'Faltou';
   created_at?: string;
 }
 
@@ -98,6 +99,7 @@ export interface PedagogicalRecord {
   mesPlanejamento?: string;
   anoPlanejamento?: string;
   atividades?: string;
+  presenca?: 'Presente' | 'Faltou';
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -120,4 +122,5 @@ export const NAV_ITEMS: NavItem[] = [
 
   // Gestão (Teacher centric)
   { id: 'alunos', label: 'Alunos', icon: 'Users', category: 'Gestão Pedagógica', roles: ['diretor', 'professor', 'pro'] },
+  { id: 'presenca', label: 'Presença do Aluno', icon: 'CheckSquare', category: 'Gestão Pedagógica', roles: ['diretor', 'professor', 'pro'] },
 ];

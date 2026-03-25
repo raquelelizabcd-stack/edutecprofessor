@@ -8,6 +8,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import EvolutionDashboard from './EvolutionDashboard';
 import StudentManager from './StudentManager';
+import AttendanceManager from './AttendanceManager';
 import PortfolioView from './PortfolioView';
 import PedagogicalIndicators from './PedagogicalIndicators';
 import { supabase } from '../lib/supabase';
@@ -200,6 +201,7 @@ export default function Dashboard({
     feedbackCoordenacao: '',
     conquistas: '',
     weeklyData: null as any,
+    presenca: '' as 'Presente' | 'Faltou' | '',
     exportFormat: 'pdf' as 'pdf' | 'csv'
   });
 
@@ -217,6 +219,8 @@ export default function Dashboard({
       const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
       // 5. Buscar Relatórios Individuais (filtrando inativos como parecer-pcd e registro-mensal)
       const { data: relatorios } = await supabase.from('relatorios').select('*, aluno:alunos(nome)').eq('professor_id', userId).eq('tipo', 'relatorio-individual').order('created_at', { ascending: false });
+      // 6. Buscar Registros Gerais do Portfólio
+      const { data: portf_digital } = await supabase.from('portfolio_digital').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
 
       const allRecords: PedagogicalRecord[] = [
         ...(diario || []).map(r => ({
@@ -291,6 +295,17 @@ export default function Dashboard({
           description: r.conteudo || '',
           alunoId: r.aluno_id,
           alunoNome: r.aluno?.nome || '',
+          createdAt: r.created_at
+        })),
+        ...(portf_digital || []).map(r => ({
+          id: r.id,
+          moduleId: 'portfolio',
+          title: r.titulo || `Registro de Portfólio`,
+          date: r.data || r.created_at?.split('T')[0],
+          description: r.descricao || '',
+          alunoId: r.aluno_id,
+          alunoNome: r.aluno?.nome || '',
+          presenca: r.presenca as 'Presente' | 'Faltou',
           createdAt: r.created_at
         }))
       ];
@@ -382,6 +397,7 @@ export default function Dashboard({
         autoavaliacao: record.autoavaliacao || '',
         feedbackCoordenacao: record.feedbackCoordenacao || '',
         conquistas: record.conquistas || '',
+        presenca: record.presenca || '',
         weeklyData: record.weeklyData || {
           'Segunda-feira': { bnccCodes: [], objetivo_aprendizagem: '' },
           'Terça-feira': { bnccCodes: [], objetivo_aprendizagem: '' },
@@ -426,6 +442,7 @@ export default function Dashboard({
         autoavaliacao: '',
         feedbackCoordenacao: '',
         conquistas: '',
+        presenca: '',
         weeklyData: null as any,
         exportFormat: 'pdf' as 'pdf' | 'csv'
       });
@@ -513,10 +530,9 @@ export default function Dashboard({
         return;
       }
     } else if (activeTab === 'reflexoes') {
-      if (!formData.description) {
-        alert("Por favor, registre suas reflexões pedagógicas.");
-        return;
-      }
+      // Reflexões: campos agora opcionais por solicitação do usuário
+    } else if (activeTab === 'portfolio') {
+      // Portfólio: descrição opcional por solicitação do usuário
     } else {
       if (!formData.description) {
         alert("Por favor, preencha a descrição do registro.");
@@ -619,6 +635,18 @@ export default function Dashboard({
             FOCO/METAS: ${formData.objectives || ''}
             CONQUISTAS: ${formData.conquistas || ''}
           `.trim(),
+          created_at: new Date().toISOString()
+        };
+      } else if (activeTab === 'portfolio') {
+        targetTable = 'portfolio_digital';
+        recordData = {
+          id: recordIdToSave,
+          professor_id: userId,
+          aluno_id: formData.alunoId || null,
+          titulo: formData.title || 'Registro Geral de Portfólio',
+          data: formData.date || new Date().toISOString().split('T')[0],
+          descricao: formData.description || '',
+          presenca: formData.presenca || null,
           created_at: new Date().toISOString()
         };
       }
@@ -749,6 +777,92 @@ export default function Dashboard({
     };
   };
 
+  const exportarPDFPortfolio = () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
+
+    // Cabeçalho Principal (Verde EduTec)
+    doc.setFillColor(0, 168, 89);
+    doc.rect(0, 0, pageWidth, 50, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(26);
+    doc.setFont("helvetica", "bold");
+    doc.text("Currículo Pedagógico Consolidado", 14, 25);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.text(`EduTecPro — Professor: ${professorNome}`, 14, 38);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 45);
+
+    let yPos = 65;
+
+    // Resumo Estatístico
+    const total = records.length;
+    const stats = [
+      { l: 'Total de Registros', v: total },
+      { l: 'Planej. Semanais', v: records.filter(r => r.moduleId === 'planejamento-semanal').length },
+      { l: 'Planej. Mensais', v: records.filter(r => r.moduleId === 'planejamento-mensal').length },
+      { l: 'Relatórios', v: records.filter(r => ['relatorio-individual', 'parecer-pcd'].includes(r.moduleId)).length }
+    ];
+
+    doc.setTextColor(0, 168, 89);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Resumo de Atividades", 14, yPos);
+    yPos += 10;
+
+    stats.forEach(stat => {
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${stat.l}:`, 14, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${stat.v}`, 60, yPos);
+      yPos += 7;
+    });
+
+    yPos += 10;
+    doc.setDrawColor(230, 230, 230);
+    doc.line(14, yPos, pageWidth - 14, yPos);
+    yPos += 15;
+
+    // Lista de Registros
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Histórico de Registros (Linha do Tempo)", 14, yPos);
+    yPos += 12;
+
+    const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    sorted.forEach((record, index) => {
+      if (yPos > 260) {
+        doc.addPage();
+        yPos = 20;
+      }
+
+      doc.setTextColor(0, 168, 89);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${new Date(record.date).toLocaleDateString('pt-BR')} — ${record.title}`, 14, yPos);
+      yPos += 5;
+
+      doc.setTextColor(100, 100, 100);
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      const modLabel = NAV_ITEMS.find(n => n.id === record.moduleId)?.label || record.moduleId;
+      const presencaInfo = record.presenca ? ` (${record.presenca})` : '';
+      doc.text(`Módulo: ${modLabel}${record.alunoNome ? ` | Aluno: ${record.alunoNome}${presencaInfo}` : ''}`, 14, yPos);
+      yPos += 5;
+
+      const desc = record.description || record.content || 'Sem descrição.';
+      const splitDesc = doc.splitTextToSize(desc, pageWidth - 28);
+      doc.text(splitDesc, 14, yPos);
+      yPos += (splitDesc.length * 5) + 8;
+    });
+
+    doc.save(`Portfolio_EducTecPro_${new Date().getTime()}.pdf`);
+  };
+
   const exportarPDFDiarioReflexoes = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -830,6 +944,8 @@ export default function Dashboard({
 
         {activeTab === 'alunos' ? (
           <StudentManager professorId={userId} />
+        ) : activeTab === 'presenca' ? (
+          <AttendanceManager professorId={userId} professorNome={professorNome} />
         ) : isFormOpen ? (
           /* Form View */
           <div className="bg-white rounded-[24px] md:rounded-[32px] border border-black/5 p-6 md:p-10 shadow-sm">
@@ -896,37 +1012,39 @@ export default function Dashboard({
                     </div>
 
                     <div className="grid md:grid-cols-3 gap-8 pt-2">
-                      <div className="space-y-2.5">
-                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Aluno (Opcional)</label>
-                        <div className="relative flex items-center">
-                          <input
-                            type="text"
-                            value={formData.alunoNome}
-                            onChange={(e) => setFormData({ ...formData, alunoNome: e.target.value, alunoId: '' })}
-                            placeholder="Digite o nome ou selecione ao lado"
-                            className="w-full px-5 py-3.5 rounded-l-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
-                          />
-                          <select
-                            className="w-[120px] px-2 py-3.5 rounded-r-2xl border-y border-r border-slate-200 bg-slate-100/50 focus:border-[#00A859] outline-none transition-all font-bold text-[10px] uppercase tracking-wider text-slate-500 cursor-pointer appearance-none text-center"
-                            onChange={(e) => {
-                              const selected = supabaseStudents.find(s => s.id === e.target.value);
-                              if (selected) {
-                                setFormData({ ...formData, alunoId: selected.id, alunoNome: selected.nome });
-                              }
-                            }}
-                            value={formData.alunoId}
-                          >
-                            <option value="">FILTRAR LISTA</option>
-                            {supabaseStudents.map((s) => (
-                              <option key={s.id} value={s.id}>{s.nome}</option>
-                            ))}
-                          </select>
-                          <div className="absolute right-3 pointer-events-none text-slate-300">
-                            <Icons.ChevronDown size={14} />
+                      {activeTab !== 'relatorio-individual' && activeTab !== 'planejamento-mensal' && (
+                        <div className="space-y-2.5">
+                          <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Aluno (Opcional)</label>
+                          <div className="relative flex items-center">
+                            <input
+                              type="text"
+                              value={formData.alunoNome}
+                              onChange={(e) => setFormData({ ...formData, alunoNome: e.target.value, alunoId: '' })}
+                              placeholder="Digite o nome ou selecione ao lado"
+                              className="w-full px-5 py-3.5 rounded-l-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                            />
+                            <select
+                              className="w-[120px] px-2 py-3.5 rounded-r-2xl border-y border-r border-slate-200 bg-slate-100/50 focus:border-[#00A859] outline-none transition-all font-bold text-[10px] uppercase tracking-wider text-slate-500 cursor-pointer appearance-none text-center"
+                              onChange={(e) => {
+                                const selected = supabaseStudents.find(s => s.id === e.target.value);
+                                if (selected) {
+                                  setFormData({ ...formData, alunoId: selected.id, alunoNome: selected.nome });
+                                }
+                              }}
+                              value={formData.alunoId}
+                            >
+                              <option value="">FILTRAR LISTA</option>
+                              {supabaseStudents.map((s) => (
+                                <option key={s.id} value={s.id}>{s.nome}</option>
+                              ))}
+                            </select>
+                            <div className="absolute right-3 pointer-events-none text-slate-300">
+                              <Icons.ChevronDown size={14} />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="space-y-2.5">
+                      )}
+                      <div className={cn("space-y-2.5", (activeTab === 'relatorio-individual' || activeTab === 'planejamento-mensal') && "md:col-span-2")}>
                         <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Componente Curricular</label>
                         <input
                           type="text"
@@ -977,6 +1095,7 @@ export default function Dashboard({
                 {activeTab === 'portfolio' ? (
                   <PortfolioView 
                     records={records}
+                    professorNome={professorNome}
                     onOpenRecord={(record) => {
                       setActiveTab(record.moduleId);
                       setFormData({
@@ -2231,6 +2350,20 @@ export default function Dashboard({
                           className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all"
                         />
                       </div>
+                      {activeTab === 'portfolio' && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Presença do Aluno</label>
+                          <select
+                            value={formData.presenca}
+                            onChange={(e) => setFormData({ ...formData, presenca: e.target.value as any })}
+                            className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all bg-white font-bold"
+                          >
+                            <option value="">Status de Presença</option>
+                            <option value="Presente" className="text-emerald-600">Presente</option>
+                            <option value="Faltou" className="text-red-500">Faltou</option>
+                          </select>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
@@ -2248,9 +2381,11 @@ export default function Dashboard({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Observações do Professor *</label>
+                      <label className="text-sm font-bold text-black/60 uppercase tracking-wider">
+                        Observações do Professor {activeTab !== 'portfolio' && '*'}
+                      </label>
                       <textarea
-                        required
+                        required={activeTab !== 'portfolio'}
                         rows={6}
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -2268,11 +2403,12 @@ export default function Dashboard({
                 <button
                   type="submit"
                   disabled={
-                    !formData.title || 
-                    !formData.date || 
-                    !formData.professorName ||
-                    (activeTab === 'planejamento-diario' && (!formData.objectives || !formData.content || !formData.resources || !formData.evaluation)) ||
-                    (activeTab === 'reflexoes' && !formData.description)
+                    activeTab !== 'reflexoes' && (
+                      !formData.title || 
+                      !formData.date || 
+                      !formData.professorName ||
+                      (activeTab === 'planejamento-diario' && (!formData.objectives || !formData.content || !formData.resources || !formData.evaluation))
+                    )
                   }
                   className="flex-1 py-4 bg-[#00A859] text-white rounded-full font-bold hover:bg-[#008F4C] transition-all shadow-lg shadow-[#00A859]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
                 >
@@ -2291,6 +2427,17 @@ export default function Dashboard({
                   <button
                     type="button"
                     onClick={exportarPDFDiarioReflexoes}
+                    className="flex-1 py-4 bg-black text-white rounded-full font-bold hover:bg-black/80 transition-all flex items-center justify-center gap-2 shadow-lg"
+                  >
+                    <Icons.FileDown size={18} />
+                    Exportar PDF
+                  </button>
+                )}
+
+                {activeTab === 'portfolio' && (
+                  <button
+                    type="button"
+                    onClick={exportarPDFPortfolio}
                     className="flex-1 py-4 bg-black text-white rounded-full font-bold hover:bg-black/80 transition-all flex items-center justify-center gap-2 shadow-lg"
                   >
                     <Icons.FileDown size={18} />

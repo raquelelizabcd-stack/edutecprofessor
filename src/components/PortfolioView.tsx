@@ -9,45 +9,98 @@ import autoTable from 'jspdf-autotable';
 interface PortfolioViewProps {
   records: PedagogicalRecord[];
   onOpenRecord: (record: PedagogicalRecord) => void;
+  professorNome?: string;
 }
 
-export default function PortfolioView({ records, onOpenRecord }: PortfolioViewProps) {
+export default function PortfolioView({ records, onOpenRecord, professorNome }: PortfolioViewProps) {
   const handleExportAll = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
 
+    // Cabeçalho Principal (Verde EduTec)
+    doc.setFillColor(0, 168, 89);
+    doc.rect(0, 0, pageWidth, 50, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(26);
+    doc.setFont("helvetica", "bold");
+    doc.text("Currículo Pedagógico Consolidado", 14, 25);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "normal");
+    doc.text(`EduTecPro — Professor: ${professorNome || 'Docente'}`, 14, 38);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 45);
+
+    let yPos = 65;
+
+    // Resumo Estatístico
+    const total = records.length;
+    const stats_summary = [
+      { l: 'Total de Registros', v: total },
+      { l: 'Planej. Semanais', v: records.filter(r => r.moduleId === 'planejamento-semanal').length },
+      { l: 'Planej. Mensais', v: records.filter(r => r.moduleId === 'planejamento-mensal').length },
+      { l: 'Planej. Diários', v: records.filter(r => r.moduleId === 'planejamento-diario').length },
+      { l: 'Relatórios Individuais', v: records.filter(r => r.moduleId === 'relatorio-individual').length },
+      { l: 'Reflexões Pedagógicas', v: records.filter(r => r.moduleId === 'reflexoes').length }
+    ];
+
+    doc.setTextColor(0, 168, 89);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Resumo de Atividades", 14, yPos);
+    yPos += 10;
+
+    stats_summary.forEach(stat => {
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${stat.l}:`, 14, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${stat.v}`, 70, yPos);
+      yPos += 7;
+    });
+
+    yPos += 10;
+    doc.setDrawColor(230, 230, 230);
+    doc.line(14, yPos, pageWidth - 14, yPos);
+    yPos += 15;
+
+    // Lista de Registros
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Histórico de Registros (Linha do Tempo)", 14, yPos);
+    yPos += 12;
+
     const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     sorted.forEach((record, index) => {
-      if (index > 0) doc.addPage();
-      
-      // Header
-      doc.setFillColor(0, 168, 89);
-      doc.rect(0, 0, pageWidth, 40, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22);
-      doc.setFont("helvetica", "bold");
-      doc.text("Currículo Pedagógico Consolidado", 14, 25);
-      
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(14);
-      doc.text(record.title, 14, 50);
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Data: ${new Date(record.date).toLocaleDateString('pt-BR')}`, 14, 58);
-      const navItem = NAV_ITEMS.find(item => item.id === record.moduleId);
-      doc.text(`Módulo: ${navItem?.label || record.moduleId}`, 14, 64);
-      if (record.alunoNome) doc.text(`Aluno: ${record.alunoNome}`, 14, 70);
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
 
+      doc.setTextColor(0, 168, 89);
+      doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
-      doc.text("Descrição / Conteúdo:", 14, 85);
+      doc.text(`${new Date(record.date).toLocaleDateString('pt-BR')} — ${record.title}`, 14, yPos);
+      yPos += 6;
+
+      doc.setTextColor(140, 140, 140);
+      doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
-      const splitText = doc.splitTextToSize(record.description || record.content || 'Sem descrição.', pageWidth - 28);
-      doc.text(splitText, 14, 92);
+      const modLabel = NAV_ITEMS.find(n => n.id === record.moduleId)?.label || record.moduleId;
+      const presencaInfo = record.presenca ? ` (${record.presenca})` : '';
+      doc.text(`Módulo: ${modLabel}${record.alunoNome ? ` | Aluno: ${record.alunoNome}${presencaInfo}` : ''}`, 14, yPos);
+      yPos += 6;
+
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(10);
+      const desc = record.description || record.content || 'Sem descrição detalhada.';
+      const splitDesc = doc.splitTextToSize(desc, pageWidth - 28);
+      doc.text(splitDesc, 14, yPos);
+      yPos += (splitDesc.length * 5) + 12;
     });
 
-    doc.save(`Curriculo_Pedagogico_${new Date().getTime()}.pdf`);
+    doc.save(`Curriculo_Consolidado_${new Date().getTime()}.pdf`);
   };
   const sortedRecords = useMemo(() => {
     return [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

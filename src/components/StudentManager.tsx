@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../lib/supabase';
 import { Student } from '../types';
 import { Plus, Edit2, Trash2, Search, X, Accessibility, ClipboardList, FileDown, Check } from 'lucide-react';
+import * as Icons from 'lucide-react';
+import { cn } from '../lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -20,7 +22,11 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
     const [editingStudent, setEditingStudent] = useState<Student | null>(null);
     const [formData, setFormData] = useState<Partial<Student>>({
         necessidades_especiais: false,
+        presenca: 'Presente'
     });
+    const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
+    const [newAttendanceDate, setNewAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+    const [newAttendanceStatus, setNewAttendanceStatus] = useState<'Presente' | 'Faltou'>('Presente');
 
 
     useEffect(() => {
@@ -67,6 +73,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                 nota_bimestre3: toNumeric(formData.nota_bimestre3),
                 nota_bimestre4: toNumeric(formData.nota_bimestre4),
                 limitacoes_pcd: formData.necessidades_especiais ? (formData.limitacoes_pcd || null) : null,
+                presenca: formData.presenca || 'Presente',
                 professor_id: professorId,
             };
 
@@ -134,15 +141,63 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
         }
     };
 
-    const openModal = (student?: Student) => {
+    const openModal = async (student?: Student) => {
         if (student) {
             setEditingStudent(student);
             setFormData(student);
+            fetchAttendanceHistory(student.id);
         } else {
             setEditingStudent(null);
             setFormData({ status: 'ativo', necessidades_especiais: false, limitacoes_pcd: '' });
+            setAttendanceHistory([]);
         }
         setIsModalOpen(true);
+    };
+
+    const fetchAttendanceHistory = async (alunoId: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('presenca_alunos')
+                .select('*')
+                .eq('aluno_id', alunoId)
+                .order('data', { ascending: false });
+            if (error) throw error;
+            setAttendanceHistory(data || []);
+        } catch (error) {
+            console.error('Erro ao buscar histórico:', error);
+        }
+    };
+
+    const handleAddHistoryPresence = async () => {
+        if (!editingStudent) return;
+        try {
+            const { error } = await supabase
+                .from('presenca_alunos')
+                .insert([{
+                    aluno_id: editingStudent.id,
+                    professor_id: professorId,
+                    data: newAttendanceDate,
+                    status: newAttendanceStatus
+                }]);
+            if (error) throw error;
+            fetchAttendanceHistory(editingStudent.id);
+        } catch (error) {
+            console.error('Erro ao adicionar presença:', error);
+        }
+    };
+
+    const handleDeleteHistoryPresence = async (id: string) => {
+        if (!window.confirm('Excluir este registro de presença?')) return;
+        try {
+            const { error } = await supabase
+                .from('presenca_alunos')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+            setAttendanceHistory(prev => prev.filter(a => a.id !== id));
+        } catch (error) {
+            console.error('Erro ao excluir presença:', error);
+        }
     };
 
     const gerarPDFAlunos = () => {
@@ -195,11 +250,10 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
         doc.save(`Alunos_EduTecPro_${new Date().getTime()}.pdf`);
     };
 
-    const exportarPDFAluno = (student?: Student) => {
+    const exportarPDFAluno = async (student?: Student) => {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.width;
         
-        // Se for passado um aluno, usa ele; senão usa os dados do formulário
         const data = student || formData;
 
         // Header
@@ -249,13 +303,51 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
             styles: { halign: 'center' }
         });
 
-        if (data.necessidades_especiais) {
-            const currentY = (doc as any).lastAutoTable.finalY + 15;
+        let nextY = (doc as any).lastAutoTable.finalY + 15;
+
+        // Histórico de Presença
+        if (data.id) {
+            const { data: attendData } = await supabase
+                .from('presenca_alunos')
+                .select('data, status')
+                .eq('aluno_id', data.id)
+                .order('data', { ascending: false });
+
             doc.setFont("helvetica", "bold");
-            doc.text("Educação Inclusiva (PCD) — Limitações:", 14, currentY);
+            doc.text("Histórico de Presença Permanente:", 14, nextY);
+            
+            if (attendData && attendData.length > 0) {
+                autoTable(doc, {
+                    startY: nextY + 5,
+                    head: [['Data do Registro', 'Status de Presença']],
+                    body: attendData.map(r => [
+                        new Date(r.data).toLocaleDateString('pt-BR'),
+                        r.status
+                    ]),
+                    theme: 'striped',
+                    headStyles: { fillColor: [51, 51, 51] },
+                    styles: { fontSize: 9 }
+                });
+                nextY = (doc as any).lastAutoTable.finalY + 15;
+            } else {
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(9);
+                doc.text("Nenhum registro de presença encontrado para este aluno.", 14, nextY + 7);
+                nextY += 20;
+            }
+        }
+
+        if (data.necessidades_especiais) {
+            if (nextY > 270) {
+                doc.addPage();
+                nextY = 20;
+            }
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
+            doc.text("Educação Inclusiva (PCD) — Limitações:", 14, nextY);
             doc.setFont("helvetica", "normal");
             const limitSplit = doc.splitTextToSize(data.limitacoes_pcd || 'Não informadas.', pageWidth - 28);
-            doc.text(limitSplit, 14, currentY + 7);
+            doc.text(limitSplit, 14, nextY + 7);
         }
 
         doc.save(`Ficha_${data.nome}_${new Date().getTime()}.pdf`);
@@ -320,6 +412,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                 <th className="text-center font-semibold text-black/60 pb-4 px-4">3º Bim</th>
                                 <th className="text-center font-semibold text-black/60 pb-4 px-4">4º Bim</th>
                                 <th className="text-center font-semibold text-black/60 pb-4 px-4">Status</th>
+                                <th className="text-center font-semibold text-black/60 pb-4 px-4">Presença</th>
                                 <th className="text-center font-semibold text-black/60 pb-4 px-4">Recursos</th>
                                 <th className="text-right font-semibold text-black/60 pb-4 px-4">Ações</th>
                             </tr>
@@ -349,6 +442,11 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                         <td className="py-4 px-4 text-center">
                                             <span className={`inline-flex px-2 !py-1 text-xs font-semibold rounded-full ${student.status === 'ativo' ? 'bg-[#00A859]/10 text-[#00A859]' : 'bg-red-100 text-red-600'}`}>
                                                 {student.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4 text-center">
+                                            <span className={`inline-flex px-2 !py-1 text-xs font-bold rounded-full ${student.presenca === 'Presente' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                                                {student.presenca || 'Presente'}
                                             </span>
                                         </td>
                                         <td className="py-4 px-4 text-center">
@@ -443,8 +541,8 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                     <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Status</label>
                                     <select
                                         value={formData.status || 'ativo'}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium appearance-none"
+                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
                                     >
                                         <option value="ativo">Ativo</option>
                                         <option value="inativo">Inativo</option>
@@ -452,9 +550,9 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 gap-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Série/Nível (Ex: 5º Ano / Intermediário)</label>
+                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Série/Nível</label>
                                     <input
                                         type="text"
                                         value={formData.serie || ''}
@@ -463,17 +561,29 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Nota/Observação Curta</label>
-                                    <input
-                                        type="text"
-                                        value={formData.nota || ''}
-                                        onChange={(e) => setFormData({ ...formData, nota: e.target.value })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                        placeholder="Ex: Aluno dedicado, dificuldade em matemática"
-                                    />
+                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Presença Atual</label>
+                                    <select
+                                        value={formData.presenca || 'Presente'}
+                                        onChange={(e) => setFormData({ ...formData, presenca: e.target.value as any })}
+                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-bold text-[#00A859]"
+                                    >
+                                        <option value="Presente">Presente</option>
+                                        <option value="Faltou">Faltou</option>
+                                    </select>
                                 </div>
                             </div>
                             
+                            <div>
+                                <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Nota/Observação Curta</label>
+                                <input
+                                    type="text"
+                                    value={formData.nota || ''}
+                                    onChange={(e) => setFormData({ ...formData, nota: e.target.value })}
+                                    className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
+                                    placeholder="Ex: Aluno dedicado, dificuldade em matemática"
+                                />
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Responsável 1</label>
@@ -578,6 +688,81 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                 )}
                             </div>
 
+                            {/* Attendance History Section (Only on Edit) */}
+                            {editingStudent && (
+                                <div className="border-t border-black/5 pt-6 space-y-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Icons.History size={16} className="text-[#00A859]" />
+                                        <span className="text-sm font-bold text-black/70 uppercase tracking-widest">Histórico de Presença</span>
+                                    </div>
+
+                                    {/* Add New Quick Entry */}
+                                    <div className="flex items-end gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                                        <div className="flex-1 space-y-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label>
+                                            <input 
+                                                type="date" 
+                                                value={newAttendanceDate}
+                                                onChange={(e) => setNewAttendanceDate(e.target.value)}
+                                                className="w-full bg-white border-none rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#00A859]/20"
+                                            />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
+                                            <select 
+                                                value={newAttendanceStatus}
+                                                onChange={(e) => setNewAttendanceStatus(e.target.value as any)}
+                                                className="w-full bg-white border-none rounded-lg px-3 py-2 text-xs font-black text-[#00A859] outline-none focus:ring-1 focus:ring-[#00A859]/20"
+                                            >
+                                                <option value="Presente">Presente</option>
+                                                <option value="Faltou">Faltou</option>
+                                            </select>
+                                        </div>
+                                        <button 
+                                            type="button"
+                                            onClick={handleAddHistoryPresence}
+                                            className="bg-[#00A859] text-white p-2.5 rounded-xl hover:bg-[#008F4C] transition-colors shadow-sm"
+                                        >
+                                            <Icons.Plus size={16} />
+                                        </button>
+                                    </div>
+
+                                    {/* History Table */}
+                                    <div className="max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                        {attendanceHistory.length === 0 ? (
+                                            <p className="text-center py-4 text-xs text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">Sem registros históricos.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {attendanceHistory.map(record => (
+                                                    <div key={record.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl hover:border-slate-200 transition-all group">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn(
+                                                                "w-2 h-2 rounded-full",
+                                                                record.status === 'Presente' ? "bg-emerald-500" : "bg-red-500"
+                                                            )} />
+                                                            <span className="text-xs font-bold text-slate-600">{new Date(record.data).toLocaleDateString('pt-BR')}</span>
+                                                            <span className={cn(
+                                                                "text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
+                                                                record.status === 'Presente' ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50"
+                                                            )}>
+                                                                {record.status}
+                                                            </span>
+                                                        </div>
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => handleDeleteHistoryPresence(record.id)}
+                                                            className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                                        >
+                                                            <Icons.Trash2 size={14} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="pt-4 flex gap-3">
                                 <button
                                     type="button"
@@ -595,7 +780,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                 {editingStudent && (
                                     <button
                                         type="button"
-                                        onClick={exportarPDFAluno}
+                                        onClick={() => exportarPDFAluno(editingStudent)}
                                         className="flex-1 py-3.5 bg-black text-white font-semibold rounded-full shadow-lg hover:bg-black/80 transition-all flex items-center justify-center gap-2"
                                     >
                                         <FileDown size={18} />
