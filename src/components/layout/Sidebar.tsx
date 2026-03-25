@@ -126,6 +126,16 @@ export default function Sidebar({
                     ))}
                 </nav>
 
+                {role === 'free' && ['planejamento-semanal', 'planejamento-mensal', 'planejamento-diario', 'relatorio-individual'].includes(activeTab) && (
+                    <div className="mx-4 mb-4 p-4 bg-white/5 rounded-2xl border border-white/10 text-center">
+                        <p className="text-[9px] font-bold text-white/30 uppercase tracking-[0.2em] mb-2">Publicidade AdSense</p>
+                        <div className="w-full h-24 bg-white/5 border border-dashed border-white/10 rounded-xl flex items-center justify-center overflow-hidden">
+                            <span className="text-[10px] text-white/20 italic">Bloco de Anúncios Google</span>
+                        </div>
+                        <p className="text-[8px] text-white/20 mt-2">Remova os anúncios com o Plano Pro</p>
+                    </div>
+                )}
+
                 <div className="p-4 border-t border-white/10">
                     <button
                         onClick={onLogout}

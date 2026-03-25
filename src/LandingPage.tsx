@@ -109,17 +109,17 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
   if (selectedPlanView !== 'none') {
     const isFree = selectedPlanView === 'free';
     const planFeatures = isFree ? [
-      { label: 'Relatório Individual (1/dia)', icon: FileText },
       { label: 'Planejamento Semanal (1/semana)', icon: Calendar },
       { label: 'Planejamento Mensal (1/mês)', icon: ClipboardList },
       { label: 'Planejamento Diário (1/dia)', icon: BookOpen },
+      { label: 'Relatório Individual (1/dia)', icon: FileText },
+      { label: 'Exportação PDF bloqueada', icon: X },
+      { label: 'Dados apagados após 3 dias', icon: Zap },
     ] : [
-      { label: 'Calendário de presença dos alunos', icon: Calendar },
-      { label: 'Exportação de PDF diário e completo', icon: FileDown },
-      { label: 'Gestão detalhada de alunos', icon: Users },
-      { label: 'Controle de validade da assinatura', icon: ShieldCheck },
-      { label: 'Portfólio digital e relatórios avançados', icon: LayoutDashboard },
-      { label: 'Diário de reflexões sem limitações', icon: MessageSquare },
+      { label: 'Todos os recursos Pro (limite: 3 cada)', icon: Star },
+      { label: 'Exportação de até 3 PDFs', icon: FileDown },
+      { label: 'Sem anúncios e interrupções', icon: ShieldCheck },
+      { label: '7 dias grátis para testar', icon: Zap },
     ];
 
     return (
@@ -343,7 +343,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16 md:mb-20">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Escolha seu plano</h2>
-            <p className="text-black/60">Experimente o Pro grátis por 7 dias ou comece com o Free.</p>
+            <p className="text-black/60">Comece grátis ou experimente o Pro por 7 dias.</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
             {/* Plano Free */}
@@ -358,14 +358,17 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
               </div>
               <ul className="space-y-3 md:space-y-4 mb-8 md:mb-10 flex-1">
                 {[
-                  'Relatório Individual (1/dia)',
                   'Planejamento Semanal (1/semana)',
                   'Planejamento Mensal (1/mês)',
-                  'Planejamento Diário (1/dia)'
+                  'Planejamento Diário (1/dia)',
+                  'Relatório Individual (1/dia)',
+                  '❌ Exportação em PDF bloqueada',
+                  '⚠️ Dados apagados após 3 dias',
+                  'Ads discretos no sistema'
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-sm text-black/70">
-                    <CheckCircle2 size={16} className="text-[#00A859] shrink-0" />
-                    {item}
+                    <CheckCircle2 size={16} className={cn("shrink-0", item.startsWith('❌') || item.startsWith('⚠️') ? "text-red-400" : "text-[#00A859]")} />
+                    {item.replace('❌ ', '').replace('⚠️ ', '')}
                   </li>
                 ))}
               </ul>
@@ -394,12 +397,12 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 <p className="text-xs font-bold text-[#00A859] uppercase tracking-wider mb-3">Recursos do Plano Pro</p>
                 <ul className="space-y-3 md:space-y-4 mb-8 md:mb-10 flex-1">
                   {[
-                    '✔ Calendário de presença dos alunos',
-                    '✔ Exportação de PDF diário e completo',
-                    '✔ Gestão detalhada de alunos (cadastro, edição, histórico)',
-                    '✔ Controle de validade da assinatura',
-                    '✔ Portfólio digital e relatórios avançados',
-                    '✔ Diário de reflexões pedagógicas sem limitações'
+                    '✔ Recursos Pro ilimitados',
+                    '✔ Exportação PDF Ilimitada',
+                    '✔ Gestão completa de alunos',
+                    '✔ Portfólio e Reflexões sem limites',
+                    '✔ Calendário de presença',
+                    '✔ Experiência sem anúncios'
                   ].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-sm text-black/70">
                       <CheckCircle2 size={16} className="text-[#00A859] shrink-0" />

@@ -43,19 +43,19 @@ export default function DataRetentionBanner({
 
         const diffTime = Math.abs(today.getTime() - createdDate.getTime());
         daysPassed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        daysLeft = Math.max(0, 15 - daysPassed);
+        daysLeft = Math.max(0, 3 - daysPassed); // Novo limite: 3 dias
 
         const expDate = new Date(createdDate);
-        expDate.setDate(expDate.getDate() + 15);
+        expDate.setDate(expDate.getDate() + 3);
         expirationDateStr = expDate.toLocaleDateString('pt-BR');
 
         title = 'Aviso de Retenção de Dados (Plano Free)';
-        const baseMsg = 'Aviso de Retenção de Dados (Plano Free): Os dados ficam armazenados por até 15 dias. Exportação disponível desde o primeiro dia. Exclusão automática de todos os dados do professor no dia 15.';
+        const baseMsg = 'No Plano Free seus dados ficam armazenados por apenas 3 dias para fins de teste rápido. Após esse período os dados são excluídos permanentemente.';
         message = `${baseMsg} Faltam ${daysLeft} dias para expirar.`;
 
-        if (daysLeft <= 1) { // day 14 and 15
+        if (daysLeft <= 1) { 
             showWarningUI = true;
-            message = `ALERTA: ${baseMsg} Faltam ${daysLeft} dias para seus dados serem removidos permanentemente.`;
+            message = `ALERTA: Seus dados serão removidos em ${daysLeft} dia(s). Faça upgrade para o Pro para mantê-los seguros!`;
         }
 
         // Botão sempre disponível para o Plano Free conforme solicitado
@@ -63,7 +63,7 @@ export default function DataRetentionBanner({
 
         // Se a pessoa passou os 15 dias, a conta será deletada, mas enquanto a session ta ativa mostramos:
         if (daysLeft === 0) {
-            message = `O tempo limite de retenção dos seus dados foi atingido (${expirationDateStr}). Eles podem ser excluídos a qualquer momento pelo sistema.`;
+            message = `O tempo limite de retenção de 3 dias foi atingido. Seus dados podem ser excluídos a qualquer momento.`;
             showWarningUI = true;
         }
 
@@ -78,9 +78,9 @@ export default function DataRetentionBanner({
                     </button>
                     <Icons.ShieldCheck className="text-[#00A859] shrink-0 mt-0.5" size={24} />
                     <div className="pr-6 flex-1">
-                        <h4 className="font-bold text-[#00A859] text-sm">Assinatura Ativa (Válida até {expDateStr})</h4>
+                        <h4 className="font-bold text-[#00A859] text-sm">Período de Teste Grátis (Válida até {expDateStr})</h4>
                         <p className="text-sm text-black/70 mt-1 mb-3">
-                            Sua assinatura está ativa. Os dados permanecem armazenados sem prazo de exclusão. Mantenha o pagamento em dia para continuar com os dados armazenados de forma segura.
+                            Você está no período de 7 dias grátis. Após este prazo, se não houver assinatura ativa, todos os dados salvos serão excluídos permanentemente por segurança.
                         </p>
                     </div>
                 </div>

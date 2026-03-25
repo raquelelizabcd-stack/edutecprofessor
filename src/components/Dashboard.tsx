@@ -446,32 +446,41 @@ export default function Dashboard({
         weeklyData: null as any,
         exportFormat: 'pdf' as 'pdf' | 'csv'
       });
-      // Check limits for Free plan
-      if (role === 'free') {
-        const now = new Date();
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).getTime();
-
+      // Check limits for Free and Trial plans
+      if (role === 'free' || statusPagamento === 'trial') {
         const moduleRecords = records.filter(r => r.moduleId === activeTab);
+        const isTrial = statusPagamento === 'trial';
+        const limit = isTrial ? 3 : 1; // 3 para Trial, 1 para Free (regras anteriores mantidas para Free)
 
-        if (activeTab === 'relatorio-individual' || activeTab === 'planejamento-diario') {
-          const todayRecords = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfDay);
-          if (todayRecords.length >= 1) {
-            alert(`Limite do Plano Free: 1 ${activeItem?.label} por dia. Mude para o Pro para ilimitado!`);
-            return;
-          }
-        } else if (['planejamento-semanal', 'planejamento-mensal', 'relatorios-aluno'].includes(activeTab)) {
-          const weekRecords = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfWeek);
-          if (weekRecords.length >= 1) {
-            alert("Limite do Plano Free: 1 registro por semana neste módulo. Mude para o Pro para ilimitado!");
-            return;
-          }
+        if (isTrial) {
+             if (moduleRecords.length >= limit) {
+                alert(`Limite do Período de Teste: Máximo ${limit} registros por módulo. Assine o Pro para liberar o uso ilimitado!`);
+                return;
+             }
         } else {
-          // Default limit for other modules in Free plan
-          if (moduleRecords.length >= 1) {
-            alert("Limite do Plano Free atingido para este módulo. Mude para o Pro para ilimitado!");
-            return;
-          }
+            // Lógica existente para Free (foi solicitada manutenção dos limites 1/dia etc)
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).getTime();
+
+            if (activeTab === 'relatorio-individual' || activeTab === 'planejamento-diario') {
+                const todayRecords = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfDay);
+                if (todayRecords.length >= 1) {
+                    alert(`Limite do Plano Free: 1 ${activeItem?.label} por dia. Mude para o Pro para ilimitado!`);
+                    return;
+                }
+            } else if (['planejamento-semanal', 'planejamento-mensal', 'relatorios-aluno'].includes(activeTab)) {
+                const weekRecords = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfWeek);
+                if (weekRecords.length >= 1) {
+                    alert("Limite do Plano Free: 1 registro por semana neste módulo. Mude para o Pro para ilimitado!");
+                    return;
+                }
+            } else {
+                if (moduleRecords.length >= 1) {
+                    alert("Limite do Plano Free atingido para este módulo. Mude para o Pro para ilimitado!");
+                    return;
+                }
+            }
         }
       }
 
@@ -732,6 +741,23 @@ export default function Dashboard({
   };
 
   const handleExport = (recordToExport?: PedagogicalRecord) => {
+    // Bloqueio Plano Free
+    if (role === 'free') {
+      alert("⚠️ Exportação em PDF bloqueada no Plano Free. Faça upgrade para o Pro para baixar seus arquivos!");
+      return;
+    }
+
+    // Limite Plano Pro Trial (7 dias)
+    if (statusPagamento === 'trial') {
+      // Simplificando: permite até 3 exportações (podemos contar no localStorage ou banco, mas aqui faremos via lógica de registros se houver muitos)
+      const exportCount = parseInt(localStorage.getItem('trial_exports') || '0');
+      if (exportCount >= 3) {
+        alert("⚠️ Limite de exportação atingido no período de teste (máximo 3 PDFs). Assine o Plano Pro Pago para exportações ilimitadas!");
+        return;
+      }
+      localStorage.setItem('trial_exports', (exportCount + 1).toString());
+    }
+
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
 
@@ -778,6 +804,22 @@ export default function Dashboard({
   };
 
   const exportarPDFPortfolio = () => {
+    // Bloqueio Plano Free
+    if (role === 'free') {
+      alert("⚠️ Exportação em PDF bloqueada no Plano Free. Faça upgrade para o Pro para baixar seu portfólio!");
+      return;
+    }
+
+    // Limite Plano Pro Trial
+    if (statusPagamento === 'trial') {
+      const exportCount = parseInt(localStorage.getItem('trial_exports') || '0');
+      if (exportCount >= 3) {
+        alert("⚠️ Limite de exportação atingido no período de teste. Assine o Plano Pro Pago para exportações ilimitadas!");
+        return;
+      }
+      localStorage.setItem('trial_exports', (exportCount + 1).toString());
+    }
+
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
 

@@ -566,12 +566,12 @@ export default function PaymentPage({
                             <div className="space-y-4 mb-10">
                                 <p className="text-[10px] font-bold text-[#00A859] uppercase tracking-widest mb-4">Recursos do Plano Pro</p>
                                 {[
-                                    '✔ Calendário de presença dos alunos',
-                                    '✔ Exportação de PDF diário e completo',
-                                    '✔ Gestão detalhada de alunos (cadastro, edição, histórico)',
-                                    '✔ Controle de validade da assinatura',
-                                    '✔ Portfólio digital e relatórios avançados',
-                                    '✔ Diário de reflexões pedagógicas sem limitações'
+                                    '✔ Recursos Pro ilimitados',
+                                    '✔ Exportação PDF Ilimitada',
+                                    '✔ Gestão completa de alunos',
+                                    '✔ Portfólio e Reflexões sem limites',
+                                    '✔ Calendário de presença',
+                                    '✔ Experiência sem anúncios'
                                 ].map((item, i) => (
                                     <div key={i} className="flex items-center gap-2 text-xs text-white/70">
                                         <CheckCircle2 size={14} className="text-[#00A859]" />
