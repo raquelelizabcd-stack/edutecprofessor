@@ -23,7 +23,6 @@ export default function LandingNavbar({ onGoToLogin }: LandingNavbarProps) {
                     <a href="#home" className="hover:text-[#00A859] transition-colors">Início</a>
                     <a href="#funcionalidades" className="hover:text-[#00A859] transition-colors">Funcionalidades</a>
                     <a href="#planos" className="hover:text-[#00A859] transition-colors">Planos</a>
-                    <a href="#contato" className="hover:text-[#00A859] transition-colors">Contato</a>
                     <button
                         onClick={onGoToLogin}
                         className="px-5 py-2.5 bg-[#1A1A1A] text-white rounded-full hover:bg-black transition-all"
@@ -53,7 +52,6 @@ export default function LandingNavbar({ onGoToLogin }: LandingNavbarProps) {
                             <a href="#home" onClick={() => setIsMenuOpen(false)} className="text-lg hover:text-[#00A859]">Início</a>
                             <a href="#funcionalidades" onClick={() => setIsMenuOpen(false)} className="text-lg hover:text-[#00A859]">Funcionalidades</a>
                             <a href="#planos" onClick={() => setIsMenuOpen(false)} className="text-lg hover:text-[#00A859]">Planos</a>
-                            <a href="#contato" onClick={() => setIsMenuOpen(false)} className="text-lg hover:text-[#00A859]">Contato</a>
                             <button
                                 onClick={() => { onGoToLogin(); setIsMenuOpen(false); }}
                                 className="w-full py-4 bg-[#1A1A1A] text-white rounded-full font-semibold"

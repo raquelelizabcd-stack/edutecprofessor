@@ -132,12 +132,11 @@ export default function Dashboard({
       try {
         const { data } = await supabase
           .from('users')
-          .select('nome, nome_robo, password_hash')
+          .select('nome, nome_robo')
           .eq('id', userId)
           .single();
         if (data?.nome) setProfessorNome(data.nome);
         if (data?.nome_robo) setRobotName(data.nome_robo);
-        if (data?.password_hash) setUserPassword(data.password_hash);
       } catch (err) {
         console.error('Erro ao buscar nome do professor:', err);
       }
@@ -217,10 +216,10 @@ export default function Dashboard({
       const { data: mensal } = await supabase.from('planejamento_mensal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: true });
       // 4. Buscar Reflexões
       const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
-      // 5. Buscar Relatórios Individuais (filtrando inativos como parecer-pcd e registro-mensal)
-      const { data: relatorios } = await supabase.from('relatorios').select('*, aluno:alunos(nome)').eq('professor_id', userId).eq('tipo', 'relatorio-individual').order('created_at', { ascending: false });
+      // 5. Buscar Relatórios Individuais (Usando tabela relatorios vinculada por aluno)
+      const { data: relatorios } = await supabase.from('relatorios').select('*, aluno:alunos!inner(nome, professor_id)').eq('aluno.professor_id', userId).eq('tipo', 'relatorio-individual').order('created_at', { ascending: false });
       // 6. Buscar Registros Gerais do Portfólio
-      const { data: portf_digital } = await supabase.from('portfolio_digital').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
+      const { data: portf_digital } = await supabase.from('portfolio_digital').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: false });
 
       const allRecords: PedagogicalRecord[] = [
         ...(diario || []).map(r => ({
@@ -301,7 +300,7 @@ export default function Dashboard({
           id: r.id,
           moduleId: 'portfolio',
           title: r.titulo || `Registro de Portfólio`,
-          date: r.data || r.created_at?.split('T')[0],
+          date: r.data_ref || r.created_at?.split('T')[0],
           description: r.descricao || '',
           alunoId: r.aluno_id,
           alunoNome: r.aluno?.nome || '',
