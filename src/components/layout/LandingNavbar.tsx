@@ -1,3 +1,4 @@
+// Atualizado: 26/03/2026 - Versão final estável sem Contato
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
