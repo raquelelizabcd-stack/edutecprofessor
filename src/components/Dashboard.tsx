@@ -18,7 +18,7 @@ import { bnccCodesList } from '../lib/bnccCodes';
 import DataRetentionBanner from './DataRetentionBanner';
 import { useBncc } from '../hooks/useBncc';
 import { getSuggestionByCode } from '../lib/bnccSuggestions';
-import BnccAssistant from './BnccAssistant';
+import EduBot from './EduBot';
 
 interface DashboardProps {
   userId: string;
@@ -975,7 +975,7 @@ export default function Dashboard({
       robotName={robotName}
       onSaveRobotName={handleSaveRobotName}
       subtitle={headerSubtitle}
-      onStartTour={() => setIsTourActive(true)}
+      onStartTour={() => setIsAssistantOpen(true)}
       userEmail={userEmail}
       userPassword={userPassword}
     >
@@ -2651,11 +2651,17 @@ export default function Dashboard({
       </motion.div>
       {/* Export Selection Modal */}
 
-      {/* BNCC Assistant Component */}
-      <BnccAssistant 
+      {/* EduBot Assistant Component (Expands BNCC Assistant) */}
+      <EduBot 
         isOpen={isAssistantOpen}
         onClose={() => setIsAssistantOpen(false)}
         robotName={robotName}
+        activeTab={activeTab}
+        onNavigate={setActiveTab}
+        onStartTour={() => {
+          setIsAssistantOpen(false);
+          setIsTourActive(true);
+        }}
         onInsertCode={(code) => {
           if (!formData.bnccCodes.includes(code)) {
             if (formData.bnccCodes.length < 2) {

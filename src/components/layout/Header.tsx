@@ -23,7 +23,6 @@ interface HeaderProps {
 export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, onStartTour, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword }: HeaderProps) {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
-    const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -61,7 +60,6 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
 
     const profileMenuItems = [
         { id: 'edit-profile', label: 'Editar Dados Pessoais', icon: Icons.User, onClick: () => setIsEditProfileOpen(true) },
-        { id: 'change-photo', label: 'Alterar Foto/Avatar', icon: Icons.Camera, onClick: () => setIsChangePhotoOpen(true) },
         { id: 'account-settings', label: 'Configurações da Conta', icon: Icons.Settings, onClick: () => setIsSettingsOpen(true) },
         { id: 'logout', label: 'Sair do Sistema', icon: Icons.LogOut, onClick: onLogout, className: 'text-red-500 hover:bg-red-50' },
     ];
@@ -120,7 +118,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                 <button 
                   onClick={onStartTour}
                   className="p-2 md:p-2.5 bg-black/5 rounded-full text-black/40 hover:text-[#00A859] hover:bg-[#00A859]/10 transition-colors"
-                  title="Reiniciar Tour do Sistema"
+                  title="Centro de Ajuda e Dicas"
                 >
                     <Icons.HelpCircle size={20} />
                 </button>
@@ -228,27 +226,6 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                 </form>
             </Modal>
 
-            <Modal
-                isOpen={isChangePhotoOpen}
-                onClose={() => setIsChangePhotoOpen(false)}
-                title="Alterar Foto de Perfil"
-            >
-                <div className="flex flex-col items-center gap-6 p-4">
-                    <div className="w-24 h-24 bg-gradient-to-br from-[#00A859] to-[#008F4C] rounded-full flex items-center justify-center text-white text-3xl font-bold shadow-lg">
-                        RD
-                    </div>
-                    <div className="w-full space-y-3">
-                        <button className="w-full py-4 border-2 border-dashed border-[#00A859]/30 rounded-2xl text-black/60 font-medium hover:border-[#00A859] hover:bg-[#00A859]/5 transition-all flex flex-col items-center justify-center gap-2">
-                            <Icons.Upload size={24} className="text-[#00A859]" />
-                            <span>Clique para carregar nova foto</span>
-                            <span className="text-[10px] uppercase">JPG ou PNG, máx 2MB</span>
-                        </button>
-                        <button className="w-full py-3 text-red-500 font-bold text-sm hover:underline">
-                            Remover foto atual
-                        </button>
-                    </div>
-                </div>
-            </Modal>
 
             <Modal
                 isOpen={isSettingsOpen}
@@ -270,37 +247,6 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                 Fazer Upgrade
                             </button>
                         )}
-                    </div>
-
-                    {/* Configuração do Assistente Virtual */}
-                    <div className="space-y-4 pt-2">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Meu Assistente Virtual</h4>
-                        <div className="p-4 bg-black/5 rounded-2xl space-y-3">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nome do Robô Pedagógico</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        defaultValue={robotName || 'EduBot'} 
-                                        id="robot-name-input"
-                                        placeholder="Ex: Mestre BNCC..." 
-                                        className="flex-1 px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#009245] outline-none text-sm font-medium"
-                                    />
-                                    <button 
-                                        onClick={async () => {
-                                            const input = document.getElementById('robot-name-input') as HTMLInputElement;
-                                            if (input && onSaveRobotName) {
-                                                await onSaveRobotName(input.value);
-                                            }
-                                        }}
-                                        className="px-4 py-2 bg-[#009245] text-white text-xs font-bold rounded-xl hover:bg-[#006e34] transition-all shadow-sm"
-                                    >
-                                        Salvar
-                                    </button>
-                                </div>
-                                <p className="text-[9px] text-black/30 leading-tight italic">Este nome será usado pelo robô em todas as interações e sugestões de IA.</p>
-                            </div>
-                        </div>
                     </div>
 
                     {/* Dados de Pagamento Section */}
