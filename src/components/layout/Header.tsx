@@ -11,6 +11,7 @@ interface HeaderProps {
     setIsSidebarOpen: (isOpen: boolean) => void;
     onLogout?: () => void;
     onGoToPayment?: () => void;
+    onStartTour?: () => void;
     userDataExpiracao?: string | null;
     statusPagamento?: string | null;
     robotName?: string;
@@ -19,7 +20,7 @@ interface HeaderProps {
     userPassword?: string;
 }
 
-export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword }: HeaderProps) {
+export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, onStartTour, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword }: HeaderProps) {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false);
@@ -116,6 +117,13 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
+                <button 
+                  onClick={onStartTour}
+                  className="p-2 md:p-2.5 bg-black/5 rounded-full text-black/40 hover:text-[#00A859] hover:bg-[#00A859]/10 transition-colors"
+                  title="Reiniciar Tour do Sistema"
+                >
+                    <Icons.HelpCircle size={20} />
+                </button>
                 <button className="p-2 md:p-2.5 bg-black/5 rounded-full text-black/40 hover:text-black transition-colors relative">
                     <Icons.Bell size={20} />
                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />

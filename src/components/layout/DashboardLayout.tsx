@@ -9,6 +9,7 @@ interface DashboardLayoutProps {
     setActiveTab: (tab: string) => void;
     onLogout: () => void;
     onGoToPayment: () => void;
+    onStartTour?: () => void;
     userDataExpiracao?: string | null;
     statusPagamento?: string | null;
     robotName?: string;
@@ -25,6 +26,7 @@ export default function DashboardLayout({
     setActiveTab,
     onLogout,
     onGoToPayment,
+    onStartTour,
     userDataExpiracao,
     statusPagamento,
     robotName,
@@ -56,6 +58,7 @@ export default function DashboardLayout({
                     setIsSidebarOpen={setIsSidebarOpen}
                     onLogout={onLogout}
                     onGoToPayment={onGoToPayment}
+                    onStartTour={onStartTour}
                     userDataExpiracao={userDataExpiracao}
                     statusPagamento={statusPagamento}
                     robotName={robotName}

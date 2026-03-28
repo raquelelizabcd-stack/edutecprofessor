@@ -4,7 +4,7 @@ export interface NavItem {
   id: string;
   label: string;
   icon: string;
-  category: '' | 'Registros Pedagógicos' | 'Relatórios' | 'Gestão Pedagógica' | 'Prática Autônoma';
+  category: '' | 'Registros Pedagógicos' | 'Relatórios' | 'Gestão Pedagógica' | 'Prática Autônoma' | 'Suporte';
   roles: ('diretor' | 'professor' | 'free' | 'pro')[];
 }
 
@@ -123,4 +123,7 @@ export const NAV_ITEMS: NavItem[] = [
   // Gestão (Teacher centric)
   { id: 'alunos', label: 'Alunos', icon: 'Users', category: 'Gestão Pedagógica', roles: ['diretor', 'professor', 'pro'] },
   { id: 'presenca', label: 'Presença do Aluno', icon: 'CheckSquare', category: 'Gestão Pedagógica', roles: ['diretor', 'professor', 'pro'] },
+
+  // Suporte
+  { id: 'ajuda', label: 'Como usar o sistema', icon: 'HelpCircle', category: 'Suporte', roles: ['diretor', 'professor', 'free', 'pro'] },
 ];

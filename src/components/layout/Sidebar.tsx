@@ -106,6 +106,7 @@ export default function Sidebar({
                                     .map(item => (
                                         <button
                                             key={item.id}
+                                            id={`nav-${item.id}`}
                                             onClick={() => {
                                                 setActiveTab(item.id);
                                                 setIsSidebarOpen(false);

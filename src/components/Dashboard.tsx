@@ -11,6 +11,8 @@ import StudentManager from './StudentManager';
 import AttendanceManager from './AttendanceManager';
 import PortfolioView from './PortfolioView';
 import PedagogicalIndicators from './PedagogicalIndicators';
+import HelpGuide from './HelpGuide';
+import SystemTour from './SystemTour';
 import { supabase } from '../lib/supabase';
 import { bnccCodesList } from '../lib/bnccCodes';
 import DataRetentionBanner from './DataRetentionBanner';
@@ -106,6 +108,14 @@ export default function Dashboard({
   const [professorNome, setProfessorNome] = useState<string>('');
   const [robotName, setRobotName] = useState<string>('EduBot');
   const [userPassword, setUserPassword] = useState<string>('');
+  const [isTourActive, setIsTourActive] = useState(false);
+
+  useEffect(() => {
+    const hasSeen = localStorage.getItem('hasSeenTour');
+    if (!hasSeen) {
+      setIsTourActive(true);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -965,9 +975,19 @@ export default function Dashboard({
       robotName={robotName}
       onSaveRobotName={handleSaveRobotName}
       subtitle={headerSubtitle}
+      onStartTour={() => setIsTourActive(true)}
       userEmail={userEmail}
       userPassword={userPassword}
     >
+      <AnimatePresence>
+        {isTourActive && (
+          <SystemTour 
+            onSetActiveTab={setActiveTab} 
+            onFinish={() => setIsTourActive(false)}
+            onOpenSidebar={setIsSidebarOpen}
+          />
+        )}
+      </AnimatePresence>
       <motion.div
         key={activeTab + (isFormOpen ? '-form' : '-list')}
         initial={{ opacity: 0, y: 10 }}
@@ -987,6 +1007,8 @@ export default function Dashboard({
           <StudentManager professorId={userId} />
         ) : activeTab === 'presenca' ? (
           <AttendanceManager professorId={userId} professorNome={professorNome} />
+        ) : activeTab === 'ajuda' ? (
+          <HelpGuide onNavigate={setActiveTab} />
         ) : isFormOpen ? (
           /* Form View */
           <div className="bg-white rounded-[24px] md:rounded-[32px] border border-black/5 p-6 md:p-10 shadow-sm">
