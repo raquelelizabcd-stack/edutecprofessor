@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as Icons from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 import { UserProfile, NavItem } from '../../types';
 
 interface HeaderProps {
@@ -24,6 +25,8 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+    const [isCreatingSession, setIsCreatingSession] = useState(false);
     
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -57,6 +60,42 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    const handleCreateStripeSession = async () => {
+        setIsCreatingSession(true);
+        try {
+            const { data, error } = await supabase.auth.getUser();
+            if (error || !data?.user) {
+                alert('Erro: Usuário não autenticado.');
+                return;
+            }
+            const userId = data.user.id;
+            const uemail = data.user.email;
+
+            const response = await fetch('http://localhost:3001/api/create-stripe-session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, email: uemail })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Erro ao criar sessão de checkout');
+            }
+
+            const result = await response.json();
+            if (result.url) {
+                window.location.href = result.url;
+            } else {
+                throw new Error('URL de checkout não retornada');
+            }
+        } catch (err) {
+            console.error('Erro no checkout:', err);
+            alert('Não foi possível iniciar o checkout. Tente novamente mais tarde.');
+        } finally {
+            setIsCreatingSession(false);
+        }
+    };
 
     const profileMenuItems = [
         { id: 'edit-profile', label: 'Editar Dados Pessoais', icon: Icons.User, onClick: () => setIsEditProfileOpen(true) },
@@ -152,6 +191,14 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                                 </>
                                             ) : 'CONTA FREE'}
                                         </span>
+                                        {role === 'free' && (
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setIsUpgradeModalOpen(true); }}
+                                                className="mt-1 px-2 py-0.5 bg-teal-500 hover:bg-teal-600 text-white rounded text-[10px] font-black uppercase tracking-wider transition-colors shadow-sm ml-1"
+                                            >
+                                                Migrar para Pro
+                                            </button>
+                                        )}
                                     </span>
                                 )}
                             </p>
@@ -270,6 +317,69 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                             </div>
 
                         </div>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Modal de Upgrade Pro com Integração Stripe */}
+            <Modal
+                isOpen={isUpgradeModalOpen}
+                onClose={() => setIsUpgradeModalOpen(false)}
+                title="Evolua para o Plano Pro"
+            >
+                <div className="space-y-6">
+                    <p className="text-sm text-black/60 -mt-2">
+                        Potencialize seu fluxo educacional e tenha acesso sem limites ao sistema.
+                    </p>
+                    <div className="space-y-4">
+                        <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-full bg-[#00A859]/10 flex items-center justify-center shrink-0">
+                                <Icons.Infinity size={20} className="text-[#00A859]" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm">Retenção Ilimitada</h4>
+                                <p className="text-xs text-black/50 leading-relaxed">Não perca o histórico de chamadas, planejamentos e alunos. Suas informações guardadas em segurança pelo tempo que precisar.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-full bg-[#00A859]/10 flex items-center justify-center shrink-0">
+                                <Icons.TrendingUp size={20} className="text-[#00A859]" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm">Relatórios Avançados</h4>
+                                <p className="text-xs text-black/50 leading-relaxed">Emita diários de turma automáticos, consolidação de freqüência e resumos dinâmicos de atividades.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-full bg-[#00A859]/10 flex items-center justify-center shrink-0">
+                                <Icons.Headphones size={20} className="text-[#00A859]" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm">Suporte Premium Prioritário</h4>
+                                <p className="text-xs text-black/50 leading-relaxed">Nossa equipe focada em maximizar o uso da plataforma para você ter muito mais tempo livre e zero burocracia diária.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="pt-4 border-t border-black/5">
+                        <button 
+                            onClick={handleCreateStripeSession}
+                            disabled={isCreatingSession}
+                            className="w-full py-4 bg-[#00A859] text-white rounded-xl font-bold hover:bg-[#008F4C] transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isCreatingSession ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                    Preparando pagamento...
+                                </>
+                            ) : (
+                                <>
+                                    <Icons.CreditCard size={20} />
+                                    Assinar Agora R$ 29,90/mês
+                                </>
+                            )}
+                        </button>
+                        <p className="text-[10px] text-center text-black/40 mt-3 font-medium">Pagamento seguro via Stripe. Cancele quando quiser.</p>
                     </div>
                 </div>
             </Modal>

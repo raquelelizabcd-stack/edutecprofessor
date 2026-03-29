@@ -1,8 +1,8 @@
-require('dotenv').config();
-const express = require('express');
-const { MercadoPagoConfig, PreApproval } = require('mercadopago');
-const { createClient } = require('@supabase/supabase-js');
-const cors = require('cors');
+import 'dotenv/config';
+import express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import cors from 'cors';
+import Stripe from 'stripe';
 
 const app = express();
 app.use(express.json());
@@ -11,131 +11,101 @@ app.use(cors());
 // Configuração Supabase
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-// Configuração Mercado Pago (SDK v2)
-const mpClient = new MercadoPagoConfig({ 
-    accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
-    options: { timeout: 5000 } 
+// Configuração Stripe
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2023-10-16',
 });
 
-const preApproval = new PreApproval(mpClient);
+app.get('/api/status', (req, res) => {
+    res.json({ status: 'online', service: 'EduTec-API' });
+});
 
 /**
- * Endpoints: /criar-assinatura
+ * Endpoint para criar sessão de checkout no Stripe
  */
-app.post('/criar-assinatura', async (req, res) => {
-    const { userId, email, plano } = req.body;
+app.post('/api/create-stripe-session', async (req, res) => {
+    const { userId, email } = req.body;
 
-    if (!userId || !plano) {
-        return res.status(400).json({ error: 'userId e plano são obrigatórios.' });
+    if (!userId) {
+        return res.status(400).json({ error: 'userId é obrigatório.' });
     }
 
     try {
-        if (plano === 'free') {
-            // Plano Free: Apenas registrar no Supabase e liberar acesso básico
-            await supabase
-                .from('users')
-                .update({ plano: 'free', status_pagamento: 'pendente' })
-                .eq('id', userId);
-
-            return res.json({ 
-                message: 'Plano Free configurado com sucesso.',
-                checkout_url: null 
-            });
-        }
-
-        // Configuração comum para assinaturas recursivas
-        const body = {
-            reason: plano === 'pro_teste' ? 'Plano Pro EduTec (7 Dias Grátis)' : 'Plano Pro Mensal EduTec',
-            external_reference: userId,
-            payer_email: email,
-            auto_recurring: {
-                frequency: 1,
-                frequency_type: 'months',
-                transaction_amount: plano === 'pro_teste' ? 29.90 : 29.90, // Valor padrão
-                currency_id: 'BRL',
-                // Período de teste para pro_teste (7 dias) se houver suporte, 
-                // caso contrário, usaremos cobrança iniciada após 7 dias
-                free_trial: plano === 'pro_teste' ? {
-                    frequency: 7,
-                    frequency_type: 'days'
-                } : null
-            },
-            back_url: 'https://seusite.com/dashboard', // Ajustar conforme necessário
-            status: 'pending'
-        };
-
-        const result = await preApproval.create({ body });
-        
-        // Retorna o link para o usuário confirmar
-        res.json({ 
-            id: result.id,
-            checkout_url: result.init_point,
-            status: result.status 
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card', 'boleto'],
+            mode: 'subscription',
+            customer_email: email,
+            client_reference_id: userId,
+            line_items: [
+                {
+                    price: process.env.STRIPE_PRICE_ID, // Use the price ID configured in .env
+                    quantity: 1,
+                },
+            ],
+            success_url: process.env.SUCCESS_URL || 'http://localhost:5173/dashboard?payment_success=true',
+            cancel_url: process.env.CANCEL_URL || 'http://localhost:5173/dashboard?payment_canceled=true',
         });
 
+        res.json({ id: session.id, url: session.url });
     } catch (error) {
-        console.error('Erro ao criar assinatura:', error);
+        console.error('Erro ao criar sessão Stripe:', error);
         res.status(500).json({ error: error.message || 'Erro interno no servidor' });
     }
 });
 
 /**
- * Webhook: /webhook
- * Recebe notificações do Mercado Pago e atualiza Supabase
+ * Webhook do Stripe
  */
-app.post('/webhook', async (req, res) => {
-    const { action, data, type } = req.body;
-    console.log('Webhook recebido:', { action, type, data });
+app.post('/api/webhook/stripe', async (req, res) => {
+    const event = req.body;
 
     try {
-        // O Mercado Pago envia o ID do recurso (pre-approval ou payment)
-        if (type === 'preapproval' || action === 'preapproval.created' || action === 'preapproval.updated') {
-            const preApprovalId = data.id || req.query.id;
+        if (event.type === 'checkout.session.completed') {
+            const session = event.data.object;
+            const userId = session.client_reference_id;
+            const customerEmail = session.customer_details?.email;
             
-            // Consultar detalhes da assinatura
-            const sub = await preApproval.get({ preApprovalId });
-            const userId = sub.external_reference;
-            const status = sub.status; // authorized, cancelled, pending...
-            
-            // Atualizar tabela de pagamentos no Supabase
-            await supabase
-                .from('payments')
-                .insert({
-                    user_id: userId,
-                    valor: sub.auto_recurring.transaction_amount,
-                    forma_pagamento: 'mercadopago_subscription',
-                    status: status,
-                    data_pagamento: new Date().toISOString(),
-                    plano: sub.reason.includes('7 Dias') ? 'pro_teste' : 'pro_pago'
-                });
+            if (userId) {
+                // Atualiza status do usuário para PRO e renova data de expiração (ex: +30 dias)
+                const dataExpiracao = new Date();
+                dataExpiracao.setDate(dataExpiracao.getDate() + 30);
 
-            // Atualizar o perfil do usuário
-            let planoLabel = sub.reason.includes('7 Dias') ? 'pro' : 'pro';
-            let statusPagamento = status === 'authorized' ? 'aprovado' : status;
+                await supabase
+                    .from('users')
+                    .update({
+                        plano: 'pro',
+                        status_pagamento: 'ativo',
+                        data_expiracao: dataExpiracao.toISOString().split('T')[0]
+                    })
+                    .eq('id', userId);
 
-            await supabase
-                .from('users')
-                .update({ 
-                    plano: planoLabel, 
-                    status_pagamento: statusPagamento,
-                    data_expiracao: status === 'authorized' ? new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0] : null
-                })
-                .eq('id', userId);
+                // Opcional: registrar em tabela de pagamentos
+                await supabase
+                    .from('payments')
+                    .insert({
+                        user_id: userId,
+                        valor: session.amount_total ? session.amount_total / 100 : 29.90,
+                        forma_pagamento: 'stripe',
+                        status: 'authorized',
+                        plano: 'pro_pago'
+                    });
+                
+                console.log(`[Stripe Webhook] Conta PRO ativada para usuário: ${userId} (${customerEmail})`);
+            }
         }
 
-        res.status(200).send('OK');
+        res.status(200).json({ received: true });
     } catch (error) {
-        console.error('Erro ao processar webhook:', error);
-        res.status(500).send('Erro interno');
+        console.error('Erro no processamento do webhook Stripe:', error);
+        res.status(500).send('Erro interno do webhook');
     }
 });
 
 /**
  * GET status-assinatura/:userId
  */
-app.get('/status-assinatura/:userId', async (req, res) => {
+app.get('/api/status-assinatura/:userId', async (req, res) => {
     const { userId } = req.params;
-
     try {
         const { data, error } = await supabase
             .from('users')
@@ -145,14 +115,17 @@ app.get('/status-assinatura/:userId', async (req, res) => {
 
         if (error) throw error;
         if (!data) return res.status(404).json({ error: 'Usuário não encontrado.' });
-
         res.json(data);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-});
+// Para desenvolvimento local
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => console.log(`Rodando localmente na porta ${PORT}`));
+}
+
+// Exportar para o Vercel Serverless
+export default app;
