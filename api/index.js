@@ -36,7 +36,6 @@ const createStripeSessionHandler = async (req, res) => {
 
     try {
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card', 'boleto', 'pix'],
             mode: 'subscription',
             customer_email: email,
             client_reference_id: userId,
