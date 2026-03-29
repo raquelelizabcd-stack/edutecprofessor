@@ -25,9 +25,9 @@ app.get('/api/status', (req, res) => {
 });
 
 /**
- * Endpoint para criar sessão de checkout no Stripe
+ * Endpoints for Stripe Sessions
  */
-app.post('/api/create-stripe-session', async (req, res) => {
+const createStripeSessionHandler = async (req, res) => {
     const { userId, email } = req.body;
 
     if (!userId) {
@@ -42,7 +42,7 @@ app.post('/api/create-stripe-session', async (req, res) => {
             client_reference_id: userId,
             line_items: [
                 {
-                    price: process.env.ID_PRECO_STRIPE || process.env.STRIPE_PRICE_ID, // Use the price ID configured in .env
+                    price: process.env.ID_PREÇO_STRIPE || process.env.ID_PRECO_STRIPE || process.env.STRIPE_PRICE_ID,
                     quantity: 1,
                 },
             ],
@@ -55,12 +55,15 @@ app.post('/api/create-stripe-session', async (req, res) => {
         console.error('Erro ao criar sessão Stripe:', error);
         res.status(500).json({ error: error.message || 'Erro interno no servidor' });
     }
-});
+};
+
+app.post('/api/create-stripe-session', createStripeSessionHandler);
+app.post('/create-stripe-session', createStripeSessionHandler);
 
 /**
  * Webhook do Stripe
  */
-app.post('/api/webhook/stripe', async (req, res) => {
+const stripeWebhookHandler = async (req, res) => {
     const event = req.body;
 
     try {
@@ -103,12 +106,15 @@ app.post('/api/webhook/stripe', async (req, res) => {
         console.error('Erro no processamento do webhook Stripe:', error);
         res.status(500).send('Erro interno do webhook');
     }
-});
+};
+
+app.post('/api/webhook/stripe', stripeWebhookHandler);
+app.post('/webhook/stripe', stripeWebhookHandler);
 
 /**
  * GET status-assinatura/:userId
  */
-app.get('/api/status-assinatura/:userId', async (req, res) => {
+const statusAssinaturaHandler = async (req, res) => {
     const { userId } = req.params;
     try {
         const { data, error } = await supabase
@@ -123,7 +129,10 @@ app.get('/api/status-assinatura/:userId', async (req, res) => {
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
-});
+};
+
+app.get('/api/status-assinatura/:userId', statusAssinaturaHandler);
+app.get('/status-assinatura/:userId', statusAssinaturaHandler);
 
 // Para desenvolvimento local
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
