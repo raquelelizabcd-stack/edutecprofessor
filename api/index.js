@@ -42,7 +42,7 @@ app.post('/api/create-stripe-session', async (req, res) => {
             client_reference_id: userId,
             line_items: [
                 {
-                    price: process.env.STRIPE_PRICE_ID, // Use the price ID configured in .env
+                    price: process.env.ID_PRECO_STRIPE || process.env.STRIPE_PRICE_ID, // Use the price ID configured in .env
                     quantity: 1,
                 },
             ],
