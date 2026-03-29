@@ -72,7 +72,13 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             const userId = data.user.id;
             const uemail = data.user.email;
 
-            const response = await fetch('http://localhost:3001/api/create-stripe-session', {
+            // Use '/api' for Vercel production and 'http://localhost:3001/api' for local dev
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const apiUrl = isLocal 
+                ? 'http://localhost:3001/api/create-stripe-session'
+                : '/api/create-stripe-session';
+
+            const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, email: uemail })
