@@ -194,8 +194,9 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                         {role === 'free' && (
                                             <button 
                                                 onClick={(e) => { e.stopPropagation(); setIsUpgradeModalOpen(true); }}
-                                                className="mt-1 px-2 py-0.5 bg-teal-500 hover:bg-teal-600 text-white rounded text-[10px] font-black uppercase tracking-wider transition-colors shadow-sm ml-1"
+                                                className="mt-1 px-2.5 py-1 bg-gradient-to-r from-teal-500 to-[#00A859] hover:from-teal-400 hover:to-[#00A859] text-white rounded text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-[#00A859]/20 flex items-center gap-1.5 ml-1 transform hover:scale-105"
                                             >
+                                                <Icons.Crown size={12} className="text-yellow-200" />
                                                 Migrar para Pro
                                             </button>
                                         )}
@@ -325,61 +326,89 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             <Modal
                 isOpen={isUpgradeModalOpen}
                 onClose={() => setIsUpgradeModalOpen(false)}
-                title="Evolua para o Plano Pro"
+                title="Desbloqueie o Poder Total"
             >
                 <div className="space-y-6">
-                    <p className="text-sm text-black/60 -mt-2">
-                        Potencialize seu fluxo educacional e tenha acesso sem limites ao sistema.
-                    </p>
-                    <div className="space-y-4">
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-full bg-[#00A859]/10 flex items-center justify-center shrink-0">
-                                <Icons.Infinity size={20} className="text-[#00A859]" />
+                    {/* Hero Banner inside modal */}
+                    <div className="p-5 bg-gradient-to-br from-[#00A859] to-[#008F4C] rounded-2xl text-white shadow-lg relative overflow-hidden">
+                        <div className="absolute top-0 right-[-10px] p-4 opacity-10">
+                            <Icons.Zap size={100} className="transform rotate-12" />
+                        </div>
+                        <h4 className="text-xl font-black mb-1 relative z-10 flex items-center gap-2">
+                            <Icons.Crown size={22} className="text-yellow-300" />
+                            Plano Pro EduTec
+                        </h4>
+                        <p className="text-sm text-emerald-50 relative z-10 font-medium leading-relaxed max-w-[90%]">
+                            Potencialize sua gestão educacional com recursos ilimitados criados para simplificar o seu dia a dia.
+                        </p>
+                    </div>
+
+                    <div className="space-y-5 px-2">
+                        <div className="flex items-center gap-4 group">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-100 to-teal-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-sm">
+                                <Icons.Database size={24} className="text-emerald-700" />
                             </div>
                             <div>
-                                <h4 className="font-bold text-sm">Retenção Ilimitada</h4>
-                                <p className="text-xs text-black/50 leading-relaxed">Não perca o histórico de chamadas, planejamentos e alunos. Suas informações guardadas em segurança pelo tempo que precisar.</p>
+                                <h4 className="font-bold text-[15px] text-gray-800">Armazenamento Vitalício</h4>
+                                <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Seu histórico de aulas, avaliações e alunos guardados com segurança militar para sempre.</p>
                             </div>
                         </div>
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-full bg-[#00A859]/10 flex items-center justify-center shrink-0">
-                                <Icons.TrendingUp size={20} className="text-[#00A859]" />
+
+                        <div className="flex items-center gap-4 group">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-sm">
+                                <Icons.BarChart3 size={24} className="text-amber-700" />
                             </div>
                             <div>
-                                <h4 className="font-bold text-sm">Relatórios Avançados</h4>
-                                <p className="text-xs text-black/50 leading-relaxed">Emita diários de turma automáticos, consolidação de freqüência e resumos dinâmicos de atividades.</p>
+                                <h4 className="font-bold text-[15px] text-gray-800">Relatórios Inteligentes</h4>
+                                <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Gere diários de classe automatizados, cálculo de médias e consolidação de chamadas em 1 clique.</p>
                             </div>
                         </div>
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-full bg-[#00A859]/10 flex items-center justify-center shrink-0">
-                                <Icons.Headphones size={20} className="text-[#00A859]" />
+
+                        <div className="flex items-center gap-4 group">
+                            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-100 to-indigo-100 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform shadow-sm">
+                                <Icons.Headset size={24} className="text-blue-700" />
                             </div>
                             <div>
-                                <h4 className="font-bold text-sm">Suporte Premium Prioritário</h4>
-                                <p className="text-xs text-black/50 leading-relaxed">Nossa equipe focada em maximizar o uso da plataforma para você ter muito mais tempo livre e zero burocracia diária.</p>
+                                <h4 className="font-bold text-[15px] text-gray-800">Suporte Dedicado</h4>
+                                <p className="text-[13px] text-gray-500 leading-snug mt-0.5">Nossa equipe especialista sempre alerta para te ajudar via e-mail e chat com prioridade.</p>
                             </div>
                         </div>
                     </div>
                     
-                    <div className="pt-4 border-t border-black/5">
+                    <div className="pt-6 border-t border-black/5 mt-2">
                         <button 
                             onClick={handleCreateStripeSession}
                             disabled={isCreatingSession}
-                            className="w-full py-4 bg-[#00A859] text-white rounded-xl font-bold hover:bg-[#008F4C] transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full relative group overflow-hidden py-4 bg-gradient-to-r from-zinc-900 to-black text-white rounded-2xl font-black text-[15px] hover:shadow-2xl hover:shadow-black/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
                         >
-                            {isCreatingSession ? (
-                                <>
-                                    <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                    Preparando pagamento...
-                                </>
-                            ) : (
-                                <>
-                                    <Icons.CreditCard size={20} />
-                                    Assinar Agora R$ 29,90/mês
-                                </>
-                            )}
+                            <div className="absolute inset-0 w-full h-full bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="relative z-10 flex items-center justify-center gap-3">
+                                {isCreatingSession ? (
+                                    <>
+                                        <div className="w-5 h-5 border-3 border-white/20 border-t-white rounded-full animate-spin" />
+                                        <span>Preparando o ambiente seguro...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span className="text-[#00A859]">★</span>
+                                        <span>Assinar agora por R$ 29,90 / mês</span>
+                                    </>
+                                )}
+                            </div>
                         </button>
-                        <p className="text-[10px] text-center text-black/40 mt-3 font-medium">Pagamento seguro via Stripe. Cancele quando quiser.</p>
+                        
+                        <div className="flex items-center justify-center gap-2 mt-4">
+                            <Icons.ShieldCheck size={16} className="text-[#00A859]" />
+                            <p className="text-xs text-black/40 font-bold uppercase tracking-wider">
+                                Checkout Seguro via Stripe
+                            </p>
+                        </div>
+                        <div className="flex justify-center gap-2 mt-2 opacity-50">
+                            {/* Ícones de pagamento puramente visuais */}
+                            <div className="px-2 py-0.5 border border-black/20 rounded text-[10px] font-bold">PIX</div>
+                            <div className="px-2 py-0.5 border border-black/20 rounded text-[10px] font-bold">CARTÃO</div>
+                            <div className="px-2 py-0.5 border border-black/20 rounded text-[10px] font-bold">BOLETO</div>
+                        </div>
                     </div>
                 </div>
             </Modal>

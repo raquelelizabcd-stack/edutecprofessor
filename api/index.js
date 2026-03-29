@@ -9,8 +9,12 @@ app.use(express.json());
 app.use(cors());
 
 // Configuração Supabase
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseKey) {
+    console.error("VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY faltando no .env");
+}
+const supabase = createClient(supabaseUrl || "", supabaseKey || "");
 // Configuração Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
@@ -32,7 +36,7 @@ app.post('/api/create-stripe-session', async (req, res) => {
 
     try {
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card', 'boleto'],
+            payment_method_types: ['card', 'boleto', 'pix'],
             mode: 'subscription',
             customer_email: email,
             client_reference_id: userId,
