@@ -45,6 +45,7 @@ const createStripeSessionHandler = async (req, res) => {
                     quantity: 1,
                 },
             ],
+            allow_promotion_codes: true,
             success_url: process.env.URL_DE_SUCESSO || process.env.SUCCESS_URL || 'http://localhost:5173/dashboard?payment_success=true',
             cancel_url: process.env.URL_DE_CANCELAMENTO || process.env.CANCEL_URL || 'http://localhost:5173/dashboard?payment_canceled=true',
         });
