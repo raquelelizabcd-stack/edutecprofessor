@@ -213,7 +213,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         <input type="email" defaultValue={userEmail || "contato@raquelduarte.com"} className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">WhatsApp</label>
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Telefone de Contato</label>
                         <input type="text" placeholder="Ex: (21) 99999-9999" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
                     </div>
                     <div className="space-y-2">

@@ -166,19 +166,17 @@ export default function HelpGuide({ onNavigate }: HelpGuideProps) {
         <div className="relative z-10 space-y-4">
             <h2 className="text-3xl md:text-4xl font-black">Ainda precisa de suporte?</h2>
             <p className="text-white/80 max-w-lg mx-auto text-lg font-medium">
-              Nossa equipe técnica e pedagógica está pronta para te atender. Clique no botão abaixo para falar conosco agora pelo WhatsApp.
+              Nossa equipe técnica e pedagógica está pronta para te atender. Envie um e-mail para darmos todo o suporte necessário.
             </p>
         </div>
         
         <div className="relative z-10">
             <a
-            href="https://wa.me/5511999999999"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="mailto:edutecprof1@gmail.com"
             className="inline-flex items-center gap-3 px-10 py-5 bg-white text-[#00A859] font-black rounded-2xl hover:bg-gray-50 transition-all shadow-xl hover:scale-105 active:scale-95 group"
             >
-            {renderIcon('MessageCircle', 24, "group-hover:rotate-12 transition-transform")}
-            Falar com Suporte WhatsApp
+            {renderIcon('Mail', 24, "group-hover:rotate-12 transition-transform")}
+            Suporte por E-mail
             </a>
             <p className="mt-6 text-white/50 text-xs font-bold uppercase tracking-widest">Atendimento de Segunda a Sexta: 08h às 18h</p>
         </div>

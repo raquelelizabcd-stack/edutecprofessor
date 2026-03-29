@@ -92,8 +92,8 @@ const KNOWLEDGE_BASE = [
   },
   {
     category: 'Suporte',
-    keywords: ['suporte', 'ajuda', 'ajuda', 'contato', 'whatsapp', 'problema'],
-    response: 'Para suporte direto, acesse a aba "Ajuda" ou clique no botão de contato por WhatsApp na parte inferior do guia.',
+    keywords: ['suporte', 'ajuda', 'contato', 'email', 'e-mail', 'problema'],
+    response: 'Para suporte direto, acesse a aba "Ajuda" ou envie um e-mail para edutecprof1@gmail.com. Nossa equipe está pronta para te atender.',
     tabId: 'ajuda'
   }
 ];
