@@ -247,6 +247,7 @@ export default function Dashboard({
           professorName: r.professor_nome || professorNome,
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
+          period: r.periodo || '',
           createdAt: r.created_at
         })),
         ...(semanal || []).map(r => ({
@@ -581,6 +582,7 @@ export default function Dashboard({
           bncc_code_text: formData.bnccCodeText || '',
           bncc_codes: formData.bnccCodes || [],
           componente: formData.curricularComponent,
+          periodo: formData.period,
           objetivos: formData.objectives,
           conteudo: formData.content,
           recursos: formData.resources,
