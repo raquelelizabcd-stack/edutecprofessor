@@ -278,6 +278,7 @@ export default function Dashboard({
           date: r.data_ref || r.created_at?.split('T')[0],
           description: r.observacoes || '',
           objectives: r.objetivos,
+          content: r.atividades || '',
           resources: r.recursos,
           evaluation: r.avaliacao,
           curricularComponent: r.componente_curricular,
@@ -627,6 +628,7 @@ export default function Dashboard({
         recordData = {
           id: recordIdToSave,
           professor_id: userId,
+          professor_nome: formData.professorName || professorNome,
           aluno_id: formData.alunoId || null,
           mes: formData.mesPlanejamento || '',
           ano: parseInt(formData.anoPlanejamento || new Date().getFullYear().toString()),
