@@ -3,211 +3,411 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Mapeamento amigável de nomes de tabelas para títulos de módulos
-const moduleTitles: Record<string, string> = {
-  'planejamento_diario': 'Planejamento Diário',
-  'planejamento_semanal': 'Planejamento Semanal',
-  'planejamento_mensal': 'Planejamento Mensal',
-  'relatorios': 'Relatório Individual',
-  'diario_reflexoes': 'Diário de Reflexões',
-  'portfolio_digital': 'Portfólio Digital',
-  'avaliacoes_alunos': 'Avaliações de Alunos'
+// ==================================================
+// CAMPOS EM PAR: renderizados em 2 colunas lado a lado
+// Demais campos: renderizados em bloco full-width
+// ==================================================
+const MODULE_CONFIG: Record<string, {
+  title: string;
+  pairFields: Array<[{ key: string; label: string; type?: string }, { key: string; label: string; type?: string }]>;
+  sections: Array<{ heading: string; fields: Array<{ key: string; label: string; type?: string }> }>;
+}> = {
+  planejamento_diario: {
+    title: "Planejamento Diario",
+    pairFields: [
+      [{ key: "titulo_registro", label: "Titulo do Registro" }, { key: "data", label: "Data", type: "date" }],
+      [{ key: "professor_nome", label: "Professor(a)" }, { key: "aluno_nome", label: "Aluno" }],
+      [{ key: "componente", label: "Componente Curricular" }, { key: "periodo", label: "Periodo" }],
+    ],
+    sections: [
+      { heading: "Conteudo Pedagogico", fields: [
+        { key: "objetivos", label: "Objetivos da Aula" },
+        { key: "conteudo", label: "Conteudo / Atividades Planejadas" },
+      ]},
+      { heading: "Recursos e Avaliacao", fields: [
+        { key: "recursos", label: "Recursos Didaticos" },
+        { key: "avaliacao", label: "Avaliacao / Observacoes" },
+      ]},
+      { heading: "Codigos BNCC Selecionados", fields: [
+        { key: "bncc_codes", label: "Codigos", type: "array" },
+      ]},
+    ]
+  },
+
+  planejamento_semanal: {
+    title: "Planejamento Semanal",
+    pairFields: [
+      [{ key: "titulo_registro", label: "Titulo do Registro" }, { key: "data_ref", label: "Data", type: "date" }],
+      [{ key: "professor_name", label: "Professor(a)" },        { key: "aluno_nome", label: "Aluno" }],
+      [{ key: "componentes_curriculares", label: "Componente Curricular" }, { key: "preset_default_ref", label: "Periodo" }],
+    ],
+    sections: [
+      { heading: "Conteudo da Semana", fields: [
+        { key: "objetivo_aprendizagem", label: "Objetivos de Aprendizagem" }, 
+        { key: "atividade", label: "Atividades Planejadas" }, 
+        { key: "recursos_didaticos", label: "Recursos Didaticos" },
+        { key: "avaliacao_acompanhamento", label: "Avaliacao e Acompanhamento" },
+        { key: "observacoes_adicionais", label: "Observacoes Adicionais" },
+      ]},
+      { heading: "Codigos BNCC", fields: [
+        { key: "bncc_code_text", label: "Codigo BNCC (Escrita Livre)" },
+        { key: "bncc_codes", label: "Codigos Selecionados", type: "array" },
+      ]},
+      { heading: "Grade Semanal Detalhada", fields: [
+        { key: "grade_semanal_json", label: "Grade", type: "grade" },
+      ]},
+    ]
+  },
+
+  planejamento_mensal: {
+    title: "Planejamento Mensal",
+    pairFields: [
+      [{ key: "titulo_registro", label: "Titulo do Registro" }, { key: "data_ref", label: "Data", type: "date" }],
+      [{ key: "mes", label: "Mes" },                           { key: "ano", label: "Ano" }],
+      [{ key: "aluno_nome", label: "Aluno" },                  { key: "componente_curricular", label: "Componente Curricular" }],
+    ],
+    sections: [
+      { heading: "Conteudo do Mes", fields: [
+        { key: "objetivos", label: "Objetivos de Aprendizagem" },
+        { key: "atividades", label: "Atividades Planejadas" },
+      ]},
+      { heading: "Recursos e Avaliacao", fields: [
+        { key: "recursos", label: "Recursos Didaticos" },
+        { key: "avaliacao", label: "Avaliacao e Acompanhamento" },
+        { key: "observacoes", label: "Observacoes Adicionais" },
+      ]},
+      { heading: "Codigos BNCC", fields: [
+        { key: "bncc_code_text", label: "Codigo BNCC (Escrita Livre)" },
+        { key: "bncc_codes", label: "Codigos Selecionados", type: "array" },
+      ]},
+    ]
+  },
+
+  relatorios: {
+    title: "Relatorio Individual",
+    pairFields: [
+      [{ key: "tipo", label: "Tipo de Relatorio" }, { key: "aluno_nome", label: "Aluno" }],
+    ],
+    sections: [
+      { heading: "Conteudo do Relatorio", fields: [
+        { key: "conteudo", label: "Conteudo" },
+      ]},
+    ]
+  },
+
+  diario_reflexoes: {
+    title: "Diario de Reflexoes",
+    pairFields: [
+      [{ key: "titulo", label: "Titulo" }, { key: "data", label: "Data", type: "date" }],
+    ],
+    sections: [
+      { heading: "Reflexoes e Percepcoes", fields: [
+        { key: "percepcoes", label: "Percepcoes" },
+      ]},
+    ]
+  },
+
+  portfolio_digital: {
+    title: "Portfolio Digital",
+    pairFields: [
+      [{ key: "titulo_registro", label: "Titulo" }, { key: "data_ref", label: "Data", type: "date" }],
+    ],
+    sections: [
+      { heading: "Descricao", fields: [
+        { key: "descricao", label: "Descricao" },
+      ]},
+    ]
+  },
 };
 
-// Campos que devem ser exibidos na seção "Informações Básicas" (campos curtos)
-const basicInfoFields = [
-  'titulo', 'titulo_registro', 'data', 'data_ref', 'aluno_nome', 
-  'componente', 'componente_curricular', 'componentes_curriculares',
-  'periodo', 'periodo_default', 'turno', 'professor_name', 'mes', 'ano',
-  'presenca', 'tipo'
-];
+// ==============================
+// UTILIDADES
+// ==============================
+function fmtDate(v: string): string {
+  try { const d = new Date(v); return isNaN(d.getTime()) ? v : d.toLocaleDateString('pt-BR', { timeZone: 'UTC' }); } catch { return v; }
+}
 
-// Campos técnicos que devem ser ignorados na listagem direta
-const ignoreFields = ['id', 'professor_id', 'created_at', 'updated_at', 'aluno_id'];
+function rawToStr(raw: unknown): string {
+  if (raw === null || raw === undefined) return '';
+  if (typeof raw === 'object') return JSON.stringify(raw);
+  return String(raw);
+}
 
+// ==============================
+// BLOCO: PAR DE CAMPOS (2 colunas)
+// ==============================
+function drawInfoGrid(
+  doc: jsPDF,
+  pairs: Array<[{ key: string; label: string; type?: string }, { key: string; label: string; type?: string }]>,
+  rec: Record<string, unknown>,
+  yRef: { y: number }
+) {
+  const COL_W = 84;   // largura de cada coluna
+  const COL1_X = 15;
+  const COL2_X = 111; // 15 + 84 + 12 de gutter
+  const PAGE_H = 282;
+
+  // Cabecalho da secao Informacoes Basicas
+  doc.setFillColor(240, 249, 244);
+  doc.rect(15, yRef.y - 5, 180, 11, 'F');
+  doc.setDrawColor(0, 168, 89);
+  doc.line(15, yRef.y - 5, 15, yRef.y + 6);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(0, 100, 0);
+  doc.text("INFORMACOES BASICAS", 20, yRef.y + 1.5);
+  yRef.y += 14;
+
+  pairs.forEach(([left, right]) => {
+    const lv = left.type === 'date' ? fmtDate(rawToStr(rec[left.key])) : rawToStr(rec[left.key]);
+    const rv = right.type === 'date' ? fmtDate(rawToStr(rec[right.key])) : rawToStr(rec[right.key]);
+    if (!lv && !rv) return;
+
+    if (yRef.y > PAGE_H - 14) { doc.addPage(); yRef.y = 25; }
+
+    // Linha de fundo
+    doc.setFillColor(250, 250, 250);
+    doc.rect(15, yRef.y - 4, 180, 13, 'F');
+    doc.setDrawColor(230, 230, 230);
+    doc.rect(15, yRef.y - 4, 180, 13); // borda externa
+    doc.line(COL2_X - 6, yRef.y - 4, COL2_X - 6, yRef.y + 9); // divisor central
+
+    // Coluna esquerda
+    if (lv) {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+      doc.text(left.label + ":", COL1_X + 2, yRef.y + 0.5);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(20, 20, 20);
+      const ls = doc.splitTextToSize(lv, COL_W - 4);
+      doc.text(ls[0], COL1_X + 2, yRef.y + 6.5);
+    }
+    // Coluna direita
+    if (rv) {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+      doc.text(right.label + ":", COL2_X, yRef.y + 0.5);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(20, 20, 20);
+      const rs = doc.splitTextToSize(rv, COL_W - 4);
+      doc.text(rs[0], COL2_X, yRef.y + 6.5);
+    }
+    yRef.y += 15;
+  });
+  yRef.y += 6;
+}
+
+// ==============================
+// BLOCO: CAMPO TEXTO LONGO (full-width)
+// ==============================
+function drawField(doc: jsPDF, label: string, value: string, yRef: { y: number }) {
+  if (!value || value.trim() === '' || value === '[]') return;
+  if (yRef.y > 272) { doc.addPage(); yRef.y = 25; }
+
+  doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(80, 80, 80);
+  doc.text(label + ":", 20, yRef.y);
+  yRef.y += 6;
+
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(25, 25, 25);
+  const lines = doc.splitTextToSize(value, 170);
+  lines.forEach((line: string) => {
+    if (yRef.y > 281) { doc.addPage(); yRef.y = 25; }
+    doc.text(line, 20, yRef.y);
+    yRef.y += 5.5;
+  });
+  yRef.y += 5;
+}
+
+// ==============================
+// BLOCO: HEADING DE SECAO
+// ==============================
+function drawHeading(doc: jsPDF, text: string, yRef: { y: number }) {
+  if (yRef.y > 272) { doc.addPage(); yRef.y = 25; }
+  doc.setFillColor(240, 249, 244);
+  doc.rect(15, yRef.y - 5, 180, 11, 'F');
+  doc.setDrawColor(0, 168, 89);
+  doc.line(15, yRef.y - 5, 15, yRef.y + 6);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(0, 100, 0);
+  doc.text(text.toUpperCase(), 20, yRef.y + 1.5);
+  yRef.y += 14;
+}
+
+// ==============================
+// GRADE SEMANAL (tabela completa)
+// ==============================
+function renderGradeTable(doc: jsPDF, grade: Record<string, unknown>, yRef: { y: number }) {
+  const DIA_ORDER = ['segunda', 'terca', 'quarta', 'quinta', 'sexta'];
+  // 8 colunas, total = 180mm
+  const COLS = [
+    { key: 'turno',                 label: 'Turno',          w: 16 },
+    { key: 'horario',               label: 'Horario',        w: 16 },
+    { key: 'componenteCurricular',  label: 'Disciplina',     w: 26, fb: 'campoExperiencia' },
+    { key: 'bncc_code_text',        label: 'BNCC',           w: 18 },
+    { key: 'atividade',             label: 'Atividade',      w: 24 },
+    { key: 'objetivo_aprendizagem', label: 'Objetivo',       w: 24 },
+    { key: 'acompanhamento',        label: 'Acompanhamento', w: 28 },
+    { key: 'observacoes',           label: 'Observacoes',    w: 28 },
+  ];
+
+  const dias = Object.keys(grade).sort((a, b) => {
+    const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const ai = DIA_ORDER.findIndex(d => norm(a).startsWith(d));
+    const bi = DIA_ORDER.findIndex(d => norm(b).startsWith(d));
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
+
+  dias.forEach(dia => {
+    const info = grade[dia] as Record<string, unknown>;
+    if (!info || typeof info !== 'object') return;
+    const has = Object.entries(info).some(([k, v]) => k !== 'bnccCodes' && v && v !== '' && !(Array.isArray(v) && v.length === 0));
+    if (!has) return;
+
+    if (yRef.y > 265) { doc.addPage(); yRef.y = 25; }
+
+    // Barra do dia
+    doc.setFillColor(0, 140, 70); doc.rect(15, yRef.y - 4, 180, 8, 'F');
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+    doc.text(dia, 18, yRef.y + 1.5); yRef.y += 11;
+
+    // Cabecalho colunas
+    let x = 15;
+    doc.setFillColor(232, 248, 240); doc.rect(15, yRef.y - 3.5, 180, 7, 'F');
+    doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(40, 40, 40);
+    COLS.forEach(col => { doc.text(col.label, x + 1, yRef.y + 0.5); x += col.w; });
+    yRef.y += 7.5;
+
+    // Dados
+    if (yRef.y > 270) { doc.addPage(); yRef.y = 25; }
+    x = 15;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(25, 25, 25);
+    let maxL = 1;
+    const cells: string[][] = [];
+    COLS.forEach(col => {
+      const fb = (col as { fb?: string }).fb;
+      let val: unknown = fb ? (info[fb] || info[col.key]) : info[col.key];
+      if (typeof val === 'object') val = JSON.stringify(val);
+      const split = doc.splitTextToSize(String(val ?? ''), col.w - 2);
+      cells.push(split);
+      if (split.length > maxL) maxL = split.length;
+    });
+
+    const rH = maxL * 4.2 + 5;
+    if (yRef.y + rH > 282) { doc.addPage(); yRef.y = 25; }
+    doc.setFillColor(254, 254, 254); doc.rect(15, yRef.y - 2, 180, rH, 'F');
+    doc.setDrawColor(210, 210, 210); doc.rect(15, yRef.y - 2, 180, rH);
+    x = 15;
+    COLS.forEach((col, i) => {
+      doc.text(cells[i], x + 1, yRef.y + 2.5);
+      if (i < COLS.length - 1) { doc.setDrawColor(210, 210, 210); doc.line(x + col.w, yRef.y - 2, x + col.w, yRef.y - 2 + rH); }
+      x += col.w;
+    });
+    yRef.y += rH + 4;
+  });
+}
+
+// ==============================
+// HANDLER PRINCIPAL
+// ==============================
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
-
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   try {
     const { tableName, id } = await req.json();
-    
-    if (!tableName || !id) {
-      return new Response(JSON.stringify({ error: "Parâmetros 'tableName' e 'id' são obrigatórios." }), { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-        status: 400 
-      });
-    }
+    const sc = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data: rec, error } = await sc.from(tableName).select('*').eq('id', id).single();
+    if (error || !rec) return new Response("Nao encontrado", { status: 404 });
 
-    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // 1. Buscar o registro dinamicamente
-    const { data: record, error: fetchError } = await supabaseClient
-      .from(tableName)
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (fetchError || !record) {
-      console.error(`Erro ao buscar registro na tabela ${tableName}:`, fetchError);
-      return new Response(JSON.stringify({ error: "Registro não encontrado." }), { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" }, 
-        status: 404 
-      });
-    }
-
-    // 2. Gerar o PDF
+    const cfg = MODULE_CONFIG[tableName];
+    const moduleTitle = cfg?.title || tableName.replace(/_/g, ' ');
     const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
-    const margin = 20;
-    const contentWidth = pageWidth - (margin * 2);
-    let y = 0;
+    const PW = doc.internal.pageSize.width;
 
-    // --- CABEÇALHO ---
-    const titleHeader = moduleTitles[tableName] || tableName.replace(/_/g, ' ').toUpperCase();
-    doc.setFillColor(0, 168, 89); // Verde Institucional EduTec
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    
+    // ───── CABECALHO ─────
+    doc.setFillColor(0, 168, 89); doc.rect(0, 0, PW, 48, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(22);
-    doc.text("EduTecProfessor", pageWidth / 2, 20, { align: "center" });
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "normal");
-    doc.text(titleHeader, pageWidth / 2, 30, { align: "center" });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(24);
+    doc.text("EduTecProfessor", PW / 2, 22, { align: "center" });
+    doc.setFontSize(13); doc.setFont("helvetica", "normal");
+    doc.text(moduleTitle, PW / 2, 34, { align: "center" });
+    doc.setFontSize(8); doc.setTextColor(200, 255, 200);
+    doc.text("Gerado em: " + new Date().toLocaleDateString('pt-BR'), PW - 18, 44, { align: "right" });
 
-    // Separar campos por categoria
-    const basicInfo: [string, string][] = [];
-    const contentBlocks: [string, string][] = [];
-    const otherFields: [string, any][] = [];
+    const yRef = { y: 62 };
 
-    Object.keys(record).forEach(key => {
-      if (ignoreFields.includes(key)) return;
-      
-      const value = record[key];
-      if (value === null || value === undefined) return;
+    if (cfg) {
+      // INFORMACOES BASICAS em duas colunas
+      const hasPairs = cfg.pairFields.some(([l, r]) => rec[l.key] || rec[r.key]);
+      if (hasPairs) drawInfoGrid(doc, cfg.pairFields, rec, yRef);
 
-      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      // SECOES de conteudo
+      for (const sec of cfg.sections) {
+        const hasData = sec.fields.some(f => {
+          const v = rec[f.key];
+          if (v === null || v === undefined) return false;
+          if (Array.isArray(v) && v.length === 0) return false;
+          if (typeof v === 'string' && v.trim() === '') return false;
+          return true;
+        });
+        if (!hasData) continue;
 
-      // Classificar campos
-      if (basicInfoFields.includes(key) && (typeof value === 'string' || typeof value === 'number')) {
-        let formattedValue = String(value);
-        if (key.includes('data')) {
-            try { formattedValue = new Date(formattedValue).toLocaleDateString('pt-BR'); } catch (e) {}
+        // Nao mostrar heading para grade (ja tem cabecalho proprio)
+        if (!(sec.fields.length === 1 && sec.fields[0].type === 'grade')) {
+          drawHeading(doc, sec.heading, yRef);
         }
-        basicInfo.push([label, formattedValue]);
-      } else if (typeof value === 'string' && value.length > 50) {
-        contentBlocks.push([label, value]);
-      } else {
-        otherFields.push([label, value]);
+
+        for (const f of sec.fields) {
+          const raw = rec[f.key];
+          if (raw === null || raw === undefined) continue;
+
+          if (f.type === 'grade') {
+            let g = raw;
+            if (typeof g === 'string') { try { g = JSON.parse(g); } catch(_) {} }
+            if (g && typeof g === 'object' && !Array.isArray(g) && Object.keys(g).length > 0) {
+              drawHeading(doc, "Grade Semanal Detalhada", yRef);
+              renderGradeTable(doc, g as Record<string, unknown>, yRef);
+            }
+            continue;
+          }
+
+          if (f.type === 'array') {
+            let arr = raw;
+            if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch(_) {} }
+            if (!Array.isArray(arr) || arr.length === 0) continue;
+            drawField(doc, f.label, arr.join(', '), yRef);
+            continue;
+          }
+
+          const txt = f.type === 'date' ? fmtDate(rawToStr(raw)) : rawToStr(raw);
+          drawField(doc, f.label, txt, yRef);
+        }
+        yRef.y += 4;
       }
-    });
-
-    // --- INFORMAÇÕES BÁSICAS ---
-    y = 55;
-    if (basicInfo.length > 0) {
-      doc.setTextColor(30, 41, 59);
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("INFORMAÇÕES BÁSICAS", margin, y);
-      y += 2;
-      doc.setDrawColor(226, 232, 240);
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 8;
-
-      basicInfo.forEach(([label, value]) => {
-        if (y > 270) { doc.addPage(); y = 20; }
-        doc.setFont("helvetica", "bold");
-        doc.text(label + ":", margin, y);
-        doc.setFont("helvetica", "normal");
-        doc.text(value, margin + 50, y);
-        y += 7;
-      });
-      y += 10;
+    } else {
+      // Fallback generico
+      const skip = new Set(['id', 'professor_id', 'created_at', 'updated_at', 'aluno_id', 'bncc_code_id']);
+      for (const [k, v] of Object.entries(rec)) {
+        if (skip.has(k) || !v) continue;
+        drawField(doc, k.replace(/_/g, ' ').toUpperCase(), rawToStr(v), yRef);
+      }
     }
 
-    // --- CONTEÚDO (Textos Longos) ---
-    contentBlocks.forEach(([label, content]) => {
-      if (y > 230) { doc.addPage(); y = 30; }
-      
-      doc.setFillColor(241, 245, 249);
-      doc.rect(margin, y, contentWidth, 10, 'F');
-      doc.setTextColor(51, 65, 85);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.text(label.toUpperCase(), margin + 5, y + 7);
-      y += 15;
-
-      doc.setTextColor(71, 85, 105);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      const splitText = doc.splitTextToSize(content, contentWidth - 10);
-      doc.text(splitText, margin + 5, y);
-      y += (splitText.length * 5.5) + 15;
-    });
-
-    // --- OUTROS CAMPOS (BNCC, JSON, ETC) ---
-    otherFields.forEach(([label, value]) => {
-        if (y > 240) { doc.addPage(); y = 30; }
-
-        doc.setTextColor(30, 41, 59);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        doc.text(label + ":", margin, y);
-        y += 6;
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        let displayValue = "";
-        
-        if (Array.isArray(value)) {
-            displayValue = value.join(", ");
-        } else if (typeof value === 'object') {
-            displayValue = JSON.stringify(value, null, 2);
-        } else {
-            displayValue = String(value);
-        }
-
-        const splitOther = doc.splitTextToSize(displayValue, contentWidth);
-        doc.text(splitOther, margin, y);
-        y += (splitOther.length * 4.5) + 8;
-    });
-
-    // --- RODAPÉ ---
-    const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 1; i <= totalPages; i++) {
+    // ───── RODAPE ─────
+    const tot = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= tot; i++) {
       doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.text("PDF gerado automaticamente pelo sistema EduTecProfessor", pageWidth / 2, 285, { align: "center" });
-      doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, 285, { align: "right" });
+      doc.setDrawColor(0, 168, 89); doc.line(15, 285, PW - 15, 285);
+      doc.setFontSize(8); doc.setTextColor(130);
+      doc.text("PDF gerado automaticamente pelo sistema EduTecProfessor", PW / 2, 290, { align: "center" });
+      doc.text(`Pagina ${i} de ${tot}`, PW - 15, 290, { align: "right" });
     }
 
-    // --- RETORNO BINÁRIO ---
-    const pdfArrayBuffer = doc.output('arraybuffer');
-
-    return new Response(pdfArrayBuffer, {
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Export_${tableName}_${id}.pdf"`
-      },
+    return new Response(doc.output('arraybuffer'), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/pdf' },
       status: 200,
     });
-
   } catch (err) {
-    console.error("Erro na Edge Function:", err);
-    return new Response(
-      JSON.stringify({ error: err.message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-    );
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
 });

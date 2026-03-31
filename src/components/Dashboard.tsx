@@ -187,6 +187,7 @@ export default function Dashboard({
     bnccCodeText: '',
     objectives: '',
     content: '',
+    atividades: '',
     resources: '',
     evaluation: '',
     // New Monthly Record fields
@@ -221,7 +222,7 @@ export default function Dashboard({
       // 1. Buscar Diários
       const { data: diario } = await supabase.from('planejamento_diario').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
       // 2. Buscar Semanais (agrupando por dia conforme modelo atual ou listando os registros globais)
-      const { data: semanal } = await supabase.from('planejamento_semanal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: true });
+      const { data: semanal } = await supabase.from('planejamento_semanal').select('*').eq('professor_id', userId).order('data_ref', { ascending: true });
       // 3. Buscar Mensais
       const { data: mensal } = await supabase.from('planejamento_mensal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: true });
       // 4. Buscar Reflexões
@@ -255,15 +256,16 @@ export default function Dashboard({
           moduleId: 'planejamento-semanal',
           title: r.titulo_registro || `Semana - ${formatDateDisplay(r.data_ref || r.created_at)}`,
           date: r.data_ref || r.created_at?.split('T')[0],
-          description: r.observacoes_adicionais || r.observacoes || '',
-          objectives: r.objetivo_aprendizagem || r.objetivos,
-          resources: r.recursos_didaticos || r.recursos,
-          evaluation: r.avaliacao_acompanhamento || r.acompanhamento,
-          curricularComponent: r.componentes_curriculares || r.componente_curricular,
-          alunoId: r.aluno_id,
-          alunoNome: r.aluno_nome || r.aluno?.nome || '',
-          professorName: r.professor_name || r.professor_nome || professorNome,
-          period: r.preset_default_ref || r.turno,
+          description: r.observacoes_adicionais || '',
+          objectives: r.objetivo_aprendizagem || '',
+          content: r.atividade || '',
+          resources: r.recursos_didaticos || '',
+          evaluation: r.avaliacao_acompanhamento || '',
+          curricularComponent: r.componentes_curriculares || '',
+          alunoId: undefined,
+          alunoNome: r.aluno_nome || '',
+          professorName: r.professor_name || professorNome,
+          period: r.preset_default_ref || '',
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
           weeklyData: r.grade_semanal_json || {},
@@ -386,6 +388,7 @@ export default function Dashboard({
         bnccCodes: Array.isArray(record.bnccCodes) ? record.bnccCodes : [],
         objectives: record.objectives || '',
         content: record.content || '',
+        atividades: record.content || '',
         resources: record.resources || '',
         evaluation: record.evaluation || '',
         professorName: record.professorName || '',
@@ -431,6 +434,7 @@ export default function Dashboard({
         bnccCodes: [],
         objectives: '',
         content: '',
+        atividades: '',
         resources: '',
         evaluation: '',
         professorName: '',
@@ -576,6 +580,7 @@ export default function Dashboard({
           data: formData.date,
           aluno_id: formData.alunoId || null,
           aluno_nome: formData.alunoNome || '',
+          professor_nome: formData.professorName || professorNome,
           bncc_code_text: formData.bnccCodeText || '',
           bncc_codes: formData.bnccCodes || [],
           componente: formData.curricularComponent,
@@ -593,7 +598,6 @@ export default function Dashboard({
           professor_name: formData.professorName || professorNome,
           data_ref: formData.date,
           titulo_registro: formData.title,
-          aluno_id: formData.alunoId || null,
           aluno_nome: formData.alunoNome || '',
           componentes_curriculares: formData.curricularComponent,
           preset_default_ref: formData.period,
@@ -601,7 +605,10 @@ export default function Dashboard({
           avaliacao_acompanhamento: formData.evaluation,
           observacoes_adicionais: formData.description,
           bncc_codes: formData.bnccCodes || [],
-          grade_semanal_json: formData.weeklyData || {}
+          bncc_code_text: formData.bnccCodeText || '',
+          grade_semanal_json: formData.weeklyData || {},
+          objetivo_aprendizagem: formData.objectives,
+          atividade: formData.atividades
         };
       } else if (activeTab === 'relatorio-individual') {
         targetTable = 'relatorios';
@@ -786,7 +793,7 @@ export default function Dashboard({
       const tableName = tableMapping[activeTab] || activeTab.replace(/-/g, '_');
 
       // Chamada para a Edge Function
-      const { data, error } = await supabase.functions.invoke('pdf-edutec-final', {
+      const { data, error } = await supabase.functions.invoke('pdf-edutec-v4', {
         body: { tableName, id: recordToExport.id }
       });
 
