@@ -544,10 +544,7 @@ export default function Dashboard({
         return;
       }
     } else if (activeTab === 'planejamento-semanal') {
-      if (!formData.title || !formData.date || !formData.objectives || !formData.atividades || !formData.resources || !formData.evaluation) {
-        alert("Por favor, preencha todos os campos obrigatórios da semana (Título, Data, Objetivos, Atividades, Recursos e Avaliação).");
-        return;
-      }
+      // Todos os campos são opcionais — professor pode salvar com qualquer combinação
     } else if (activeTab === 'reflexoes') {
       // Reflexões: campos agora opcionais por solicitação do usuário
     } else if (activeTab === 'portfolio') {
@@ -751,7 +748,7 @@ export default function Dashboard({
     }
   };
 
-  const handleExport = (recordToExport?: PedagogicalRecord) => {
+  const handleExport = async (recordToExport?: PedagogicalRecord) => {
     // Bloqueio Plano Free
     if (role === 'free') {
       alert("⚠️ Exportação em PDF bloqueada no Plano Free. Faça upgrade para o Pro para baixar seus arquivos!");
@@ -760,7 +757,6 @@ export default function Dashboard({
 
     // Limite Plano Pro Trial (7 dias)
     if (statusPagamento === 'trial') {
-      // Simplificando: permite até 3 exportações (podemos contar no localStorage ou banco, mas aqui faremos via lógica de registros se houver muitos)
       const exportCount = parseInt(localStorage.getItem('trial_exports') || '0');
       if (exportCount >= 3) {
         alert("⚠️ Limite de exportação atingido no período de teste (máximo 3 PDFs). Assine o Plano Pro Pago para exportações ilimitadas!");
@@ -769,49 +765,55 @@ export default function Dashboard({
       localStorage.setItem('trial_exports', (exportCount + 1).toString());
     }
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.width;
+    // Se não for um registro específico, mantemos a lógica local de exportação em lote (ou alertamos)
+    if (!recordToExport) {
+        alert("A exportação em lote (Todos) está sendo otimizada. Por favor, exporte os registros individualmente para o formato profissional.");
+        return;
+    }
 
-    const generateSingleRecord = (doc: jsPDF, record: PedagogicalRecord, yOffset: number = 0) => {
-      // Header do PDF com cor verde EduTecPro
-      doc.setFillColor(0, 168, 89);
-      doc.rect(0, yOffset, pageWidth, 35, 'F');
-      
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
-      doc.setFont("helvetica", "bold");
-      doc.text("EduTecPro — Registro Pedagógico", 14, yOffset + 22);
+    try {
+      // Mapeamento de abas do Dashboard para tabelas do Supabase
+      const tableMapping: Record<string, string> = {
+        'planejamento-diario': 'planejamento_diario',
+        'planejamento-semanal': 'planejamento_semanal',
+        'planejamento-mensal': 'planejamento_mensal',
+        'relatorio-individual': 'relatorios',
+        'parecer-pcd': 'relatorios',
+        'reflexoes': 'diario_reflexoes',
+        'portfolio': 'portfolio_digital'
+      };
 
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(14);
-      doc.text(record.title, 14, yOffset + 50);
-      
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Data: ${formatDateDisplay(record.date)}`, 14, yOffset + 58);
-      if (record.alunoNome) doc.text(`Aluno: ${record.alunoNome}`, 14, yOffset + 64);
-      if (record.curricularComponent) doc.text(`Componente: ${record.curricularComponent}`, 14, yOffset + 70);
+      const tableName = tableMapping[activeTab] || activeTab.replace(/-/g, '_');
 
-      doc.setFont("helvetica", "bold");
-      doc.text("Conteúdo / Descrição:", 14, yOffset + 85);
-      doc.setFont("helvetica", "normal");
-      const splitText = doc.splitTextToSize(record.description || record.content || 'Sem descrição detalhada.', pageWidth - 28);
-      doc.text(splitText, 14, yOffset + 92);
-
-      return yOffset + 100 + (splitText.length * 5);
-    };
-
-    if (recordToExport) {
-      generateSingleRecord(doc, recordToExport);
-      doc.save(`Registro_${recordToExport.title}.pdf`);
-    } else {
-      // Exportar todos os registros do módulo atual
-      currentModuleRecords.forEach((record, index) => {
-        if (index > 0) doc.addPage();
-        generateSingleRecord(doc, record);
+      // Chamada para a Edge Function
+      const { data, error } = await supabase.functions.invoke('pdf-edutec-final', {
+        body: { tableName, id: recordToExport.id }
       });
-      doc.save(`Registros_${activeItem?.label}.pdf`);
-    };
+
+      if (error) {
+        console.error('Erro na Edge Function:', error);
+        throw new Error('Falha ao gerar PDF dinâmico.');
+      }
+
+      // Se data for nulo ou indefinido, houve erro silencioso
+      if (!data) throw new Error('Nenhum dado retornado pela função.');
+
+      // Converter o retorno (blob) em download automático
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `EduTecPro_${recordToExport.title || 'Registro'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+    } catch (err: any) {
+      console.error('Erro ao exportar PDF:', err);
+      const errorMsg = err.message || (typeof err === 'string' ? err : 'Erro desconhecido');
+      alert(`⚠️ Erro ao gerar o PDF profissional: ${errorMsg}\n\nVerifique se o seu Plano Pro está ativo e sua conexão com a internet.`);
+    }
   };
 
   const exportarPDFPortfolio = () => {
