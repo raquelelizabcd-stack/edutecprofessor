@@ -282,6 +282,7 @@ export default function Dashboard({
           resources: r.recursos,
           evaluation: r.avaliacao,
           curricularComponent: r.componente_curricular,
+          period: r.periodo || '',
           alunoId: r.aluno_id,
           alunoNome: r.aluno_nome || r.aluno?.nome || '',
           professorName: r.professor_nome || professorNome,
@@ -638,6 +639,7 @@ export default function Dashboard({
           bncc_code_text: formData.bnccCodeText || '',
           bncc_codes: formData.bnccCodes || [],
           componente_curricular: formData.curricularComponent || '',
+          periodo: formData.period || '',
           objetivos: formData.objectives || '',
           atividades: formData.atividades || '',
           recursos: formData.resources || '',
@@ -795,7 +797,7 @@ export default function Dashboard({
       const tableName = tableMapping[activeTab] || activeTab.replace(/-/g, '_');
 
       // Chamada para a Edge Function
-      const { data, error } = await supabase.functions.invoke('pdf-edutec-v4', {
+      const { data, error } = await supabase.functions.invoke('pdf-edutec-final-v1', {
         body: { tableName, id: recordToExport.id }
       });
 
