@@ -220,17 +220,17 @@ export default function Dashboard({
     if (!userId) return;
     try {
       // 1. Buscar Diários
-      const { data: diario } = await supabase.from('planejamento_diario').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
-      // 2. Buscar Semanais (agrupando por dia conforme modelo atual ou listando os registros globais)
+      const { data: diario } = await supabase.from('planejamento_diario').select('*').eq('professor_id', userId).order('data', { ascending: false });
+      // 2. Buscar Semanais
       const { data: semanal } = await supabase.from('planejamento_semanal').select('*').eq('professor_id', userId).order('data_ref', { ascending: true });
       // 3. Buscar Mensais
-      const { data: mensal } = await supabase.from('planejamento_mensal').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: true });
+      const { data: mensal } = await supabase.from('planejamento_mensal').select('*').eq('professor_id', userId).order('data_ref', { ascending: true });
       // 4. Buscar Reflexões
-      const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data', { ascending: false });
-      // 5. Buscar Relatórios Individuais (Usando tabela relatorios vinculada por aluno)
-      const { data: relatorios } = await supabase.from('relatorios').select('*, aluno:alunos!inner(nome, professor_id)').eq('aluno.professor_id', userId).eq('tipo', 'relatorio-individual').order('created_at', { ascending: false });
+      const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*').eq('professor_id', userId).order('data', { ascending: false });
+      // 5. Buscar Relatórios Individuais
+      const { data: relatorios } = await supabase.from('relatorios').select('*').eq('professor_id', userId).eq('tipo', 'relatorio-individual').order('created_at', { ascending: false });
       // 6. Buscar Registros Gerais do Portfólio
-      const { data: portf_digital } = await supabase.from('portfolio_digital').select('*, aluno:alunos(nome)').eq('professor_id', userId).order('data_ref', { ascending: false });
+      const { data: portf_digital } = await supabase.from('portfolio_digital').select('*').eq('professor_id', userId).order('data_ref', { ascending: false });
 
       const allRecords: PedagogicalRecord[] = [
         ...(diario || []).map(r => ({
@@ -243,8 +243,7 @@ export default function Dashboard({
           resources: r.recursos,
           evaluation: r.avaliacao,
           curricularComponent: r.componente,
-          alunoId: r.aluno_id,
-          alunoNome: r.aluno_nome || r.aluno?.nome || '',
+          alunoNome: r.aluno_nome || '',
           professorName: r.professor_nome || professorNome,
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
@@ -262,10 +261,9 @@ export default function Dashboard({
           resources: r.recursos_didaticos || '',
           evaluation: r.avaliacao_acompanhamento || '',
           curricularComponent: r.componentes_curriculares || '',
-          alunoId: undefined,
           alunoNome: r.aluno_nome || '',
-          professorName: r.professor_name || professorNome,
-          period: r.preset_default_ref || '',
+          professorName: r.professor_nome || professorNome,
+          period: r.periodo || '',
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
           weeklyData: r.grade_semanal_json || {},
@@ -283,11 +281,19 @@ export default function Dashboard({
           evaluation: r.avaliacao,
           curricularComponent: r.componente_curricular,
           period: r.periodo || '',
-          alunoId: r.aluno_id,
-          alunoNome: r.aluno_nome || r.aluno?.nome || '',
+          alunoNome: r.aluno_nome || '',
           professorName: r.professor_nome || professorNome,
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
+          createdAt: r.created_at
+        })),
+        ...(relatorios || []).map(r => ({
+          id: r.id,
+          moduleId: r.tipo || 'relatorio-individual',
+          title: r.titulo || `Relatório Individual - ${r.aluno_nome || ''}`,
+          date: r.data || r.created_at?.split('T')[0],
+          description: r.conteudo || '',
+          alunoNome: r.aluno_nome || '',
           createdAt: r.created_at
         })),
         ...(reflexoes || []).map(r => ({
@@ -296,30 +302,17 @@ export default function Dashboard({
           title: r.titulo,
           date: r.data?.split('T')[0],
           description: r.percepcoes || '',
-          alunoId: r.aluno_id,
-          alunoNome: r.aluno?.nome || '',
+          alunoNome: r.aluno_nome || '',
           bnccCodes: [],
-          createdAt: r.created_at
-        })),
-        ...(relatorios || []).map(r => ({
-          id: r.id,
-          moduleId: r.tipo || 'relatorio-individual',
-          title: r.titulo || `Relatório Individual - ${r.aluno?.nome || ''}`,
-          date: r.data || r.created_at?.split('T')[0],
-          description: r.conteudo || '',
-          alunoId: r.aluno_id,
-          alunoNome: r.aluno?.nome || '',
           createdAt: r.created_at
         })),
         ...(portf_digital || []).map(r => ({
           id: r.id,
           moduleId: 'portfolio',
-          title: r.titulo || `Registro de Portfólio`,
+          title: r.titulo_registro || `Registro de Portfólio`,
           date: r.data_ref || r.created_at?.split('T')[0],
           description: r.descricao || '',
-          alunoId: r.aluno_id,
-          alunoNome: r.aluno?.nome || '',
-          presenca: r.presenca as 'Presente' | 'Faltou',
+          alunoNome: r.aluno_nome || '',
           createdAt: r.created_at
         }))
       ];
@@ -580,7 +573,6 @@ export default function Dashboard({
           ...recordData,
           titulo_registro: formData.title,
           data: formData.date,
-          aluno_id: formData.alunoId || null,
           aluno_nome: formData.alunoNome || '',
           professor_nome: formData.professorName || professorNome,
           bncc_code_text: formData.bnccCodeText || '',
@@ -597,12 +589,12 @@ export default function Dashboard({
         recordData = {
           id: recordIdToSave,
           professor_id: userId,
-          professor_name: formData.professorName || professorNome,
+          professor_nome: formData.professorName || professorNome,
           data_ref: formData.date,
           titulo_registro: formData.title,
           aluno_nome: formData.alunoNome || '',
           componentes_curriculares: formData.curricularComponent,
-          preset_default_ref: formData.period,
+          periodo: formData.period,
           recursos_didaticos: formData.resources,
           avaliacao_acompanhamento: formData.evaluation,
           observacoes_adicionais: formData.description,
@@ -614,15 +606,12 @@ export default function Dashboard({
         };
       } else if (activeTab === 'relatorio-individual') {
         targetTable = 'relatorios';
-        
         let bundledContent = formData.description || formData.content;
-
-
         recordData = {
           ...recordData,
-          aluno_id: formData.alunoId || null,
           tipo: activeTab,
-          conteudo: bundledContent
+          conteudo: bundledContent,
+          aluno_nome: formData.alunoNome || ''
         };
       } else if (activeTab === 'planejamento-mensal') {
         targetTable = 'planejamento_mensal';
@@ -630,7 +619,6 @@ export default function Dashboard({
           id: recordIdToSave,
           professor_id: userId,
           professor_nome: formData.professorName || professorNome,
-          aluno_id: formData.alunoId || null,
           mes: formData.mesPlanejamento || '',
           ano: parseInt(formData.anoPlanejamento || new Date().getFullYear().toString()),
           data_ref: formData.date,
@@ -651,13 +639,12 @@ export default function Dashboard({
         targetTable = 'diario_reflexoes';
         const autoDate = formData.date || new Date().toISOString().split('T')[0];
         const autoTitle = formData.title || `Reflexão - ${new Date(autoDate).toLocaleDateString('pt-BR')}`;
-        
         recordData = {
           id: recordIdToSave,
           professor_id: userId,
-          aluno_id: formData.alunoId || null,
           titulo: autoTitle,
           data: autoDate,
+          aluno_nome: formData.alunoNome || '',
           percepcoes: `
             REFLEXÃO: ${formData.description || ''}
             FOCO/METAS: ${formData.objectives || ''}
@@ -670,11 +657,10 @@ export default function Dashboard({
         recordData = {
           id: recordIdToSave,
           professor_id: userId,
-          aluno_id: formData.alunoId || null,
-          titulo: formData.title || 'Registro Geral de Portfólio',
-          data: formData.date || new Date().toISOString().split('T')[0],
+          titulo_registro: formData.title || 'Registro Geral de Portfólio',
+          data_ref: formData.date || new Date().toISOString().split('T')[0],
           descricao: formData.description || '',
-          presenca: formData.presenca || null,
+          aluno_nome: formData.alunoNome || '',
           created_at: new Date().toISOString()
         };
       }
@@ -797,7 +783,7 @@ export default function Dashboard({
       const tableName = tableMapping[activeTab] || activeTab.replace(/-/g, '_');
 
       // Chamada para a Edge Function
-      const { data, error } = await supabase.functions.invoke('pdf-edutec-final-v1', {
+      const { data, error } = await supabase.functions.invoke('generate-module-pdf', {
         body: { tableName, id: recordToExport.id }
       });
 
@@ -2398,8 +2384,8 @@ export default function Dashboard({
                           <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Aluno (Opcional)</label>
                           {formData.turma ? (
                             <select
-                              value={formData.studentName}
-                              onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
+                              value={formData.alunoNome}
+                              onChange={(e) => setFormData({ ...formData, alunoNome: e.target.value })}
                               className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all bg-white"
                             >
                               <option value="">Selecione o Aluno (Opcional)</option>
@@ -2410,8 +2396,8 @@ export default function Dashboard({
                           ) : (
                             <input
                               type="text"
-                              value={formData.studentName}
-                              onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
+                              value={formData.alunoNome}
+                              onChange={(e) => setFormData({ ...formData, alunoNome: e.target.value })}
                               placeholder="Selecione a Turma primeiro ou digite aqui"
                               className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all"
                             />

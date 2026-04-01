@@ -12,8 +12,7 @@ const corsHeaders = {
 
 // ============================================================
 // CONFIGURAÇÃO DOS MÓDULOS
-// Validado contra o schema atual do Supabase (2026-03-31)
-// Colunas verificadas em cada tabela antes de incluir aqui.
+// Validado contra o schema atual do Supabase (2026-04-01)
 // ============================================================
 type FieldDef = { key: string; label: string; type?: 'date' | 'array' | 'grade' | 'number' };
 type PairRow  = [FieldDef, FieldDef];
@@ -24,20 +23,24 @@ interface ModuleConfig {
   sections: Array<{ heading: string; fields: FieldDef[] }>;
 }
 
+// Campos comuns de cabeçalho para todos os planejamentos (Basic Info)
+const COMMON_PAIRS: PairRow[] = [
+  [{ key: "titulo_registro",      label: "Titulo do Registro"    }, { key: "data_ref",           label: "Data",             type: "date" }],
+  [{ key: "professor_nome",       label: "Professor(a)"          }, { key: "aluno_nome",          label: "Aluno"                            }],
+  [{ key: "componente_curricular",label: "Componente Curricular" }, { key: "periodo",             label: "Periodo"                          }],
+  [{ key: "mes",                  label: "Mes"                   }, { key: "ano",                 label: "Ano",               type: "number"}],
+];
+
 const MODULE_CONFIG: Record<string, ModuleConfig> = {
   // ─────────────────────────────────────────────────────────
   // planejamento_diario
-  // Colunas: id, data, componente, objetivos, conteudo,
-  //          recursos, avaliacao, professor_id, created_at,
-  //          aluno_id, professor_nome, bncc_code_text,
-  //          bncc_codes, aluno_nome, titulo_registro, periodo
   // ─────────────────────────────────────────────────────────
   planejamento_diario: {
     title: "Planejamento Diario",
     pairFields: [
-      [{ key: "titulo_registro", label: "Titulo do Registro" }, { key: "data",      label: "Data",      type: "date" }],
-      [{ key: "professor_nome",  label: "Professor(a)"       }, { key: "aluno_nome",label: "Aluno"                  }],
-      [{ key: "componente",      label: "Componente Curricular" }, { key: "periodo", label: "Periodo"              }],
+      [{ key: "titulo_registro", label: "Titulo do Registro"    }, { key: "data",           label: "Data",             type: "date" }],
+      [{ key: "professor_nome",  label: "Professor(a)"          }, { key: "aluno_nome",      label: "Aluno"                            }],
+      [{ key: "componente",      label: "Componente Curricular" }, { key: "periodo",         label: "Periodo"                          }],
     ],
     sections: [
       { heading: "Conteudo Pedagogico", fields: [
@@ -57,19 +60,13 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
 
   // ─────────────────────────────────────────────────────────
   // planejamento_semanal
-  // Colunas: id, atividade, objetivo_aprendizagem, created_at,
-  //          professor_id, data_ref, professor_name,
-  //          componentes_curriculares, preset_default_ref,
-  //          recursos_didaticos, avaliacao_acompanhamento,
-  //          observacoes_adicionais, bncc_codes, bncc_code_text,
-  //          titulo_registro, aluno_nome, grade_semanal_json
   // ─────────────────────────────────────────────────────────
   planejamento_semanal: {
     title: "Planejamento Semanal",
     pairFields: [
       [{ key: "titulo_registro",         label: "Titulo do Registro"    }, { key: "data_ref",         label: "Data de Referencia", type: "date" }],
-      [{ key: "professor_name",          label: "Professor(a)"          }, { key: "aluno_nome",        label: "Aluno"                            }],
-      [{ key: "componentes_curriculares",label: "Componente Curricular" }, { key: "preset_default_ref",label: "Periodo"                          }],
+      [{ key: "professor_nome",          label: "Professor(a)"          }, { key: "aluno_nome",        label: "Aluno"                            }],
+      [{ key: "componentes_curriculares",label: "Componente Curricular" }, { key: "periodo",           label: "Periodo"                          }],
     ],
     sections: [
       { heading: "Conteudo da Semana", fields: [
@@ -91,20 +88,10 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
 
   // ─────────────────────────────────────────────────────────
   // planejamento_mensal
-  // Colunas: id, mes, ano, componente_curricular, objetivos,
-  //          atividades, recursos, avaliacao, observacoes,
-  //          professor_id, aluno_id, created_at, data_ref,
-  //          titulo_registro, bncc_code_text, bncc_codes,
-  //          aluno_nome, professor_nome, periodo
   // ─────────────────────────────────────────────────────────
   planejamento_mensal: {
     title: "Planejamento Mensal",
-    pairFields: [
-      [{ key: "titulo_registro",      label: "Titulo do Registro"    }, { key: "data_ref",           label: "Data de Referencia", type: "date" }],
-      [{ key: "professor_nome",       label: "Professor(a)"          }, { key: "aluno_nome",          label: "Aluno"                            }],
-      [{ key: "componente_curricular",label: "Componente Curricular" }, { key: "periodo",             label: "Periodo"                          }],
-      [{ key: "mes",                  label: "Mes"                   }, { key: "ano",                 label: "Ano",               type: "number"}],
-    ],
+    pairFields: COMMON_PAIRS,
     sections: [
       { heading: "Conteudo do Mes", fields: [
         { key: "objetivos",  label: "Objetivos de Aprendizagem" },
@@ -124,12 +111,12 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
 
   // ─────────────────────────────────────────────────────────
   // relatorios
-  // Colunas: id, aluno_id, tipo, conteudo, created_at
   // ─────────────────────────────────────────────────────────
   relatorios: {
     title: "Relatorio Individual",
     pairFields: [
-      [{ key: "tipo",      label: "Tipo de Relatorio" }, { key: "created_at", label: "Data de Criacao", type: "date" }],
+      [{ key: "tipo",            label: "Tipo de Relatorio" }, { key: "created_at", label: "Data de Criacao", type: "date" }],
+      [{ key: "aluno_nome",      label: "Aluno"             }, { key: "professor_nome", label: "Professor(a)"          }],
     ],
     sections: [
       { heading: "Conteudo do Relatorio", fields: [
@@ -140,12 +127,12 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
 
   // ─────────────────────────────────────────────────────────
   // diario_reflexoes
-  // Colunas: id, professor_id, aluno_id, titulo, data, percepcoes, created_at
   // ─────────────────────────────────────────────────────────
   diario_reflexoes: {
     title: "Diario de Reflexoes",
     pairFields: [
-      [{ key: "titulo", label: "Titulo" }, { key: "data", label: "Data", type: "date" }],
+      [{ key: "titulo",     label: "Titulo" }, { key: "data",       label: "Data", type: "date" }],
+      [{ key: "aluno_nome", label: "Aluno"  }, { key: "professor_nome", label: "Professor(a)"   }],
     ],
     sections: [
       { heading: "Reflexoes e Percepcoes", fields: [
@@ -156,12 +143,12 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
 
   // ─────────────────────────────────────────────────────────
   // portfolio_digital
-  // Colunas: id, professor_id, aluno_id, titulo_registro, data_ref, descricao, created_at
   // ─────────────────────────────────────────────────────────
   portfolio_digital: {
     title: "Portfolio Digital",
     pairFields: [
-      [{ key: "titulo_registro", label: "Titulo" }, { key: "data_ref", label: "Data", type: "date" }],
+      [{ key: "titulo_registro", label: "Titulo" }, { key: "data_ref",   label: "Data", type: "date" }],
+      [{ key: "aluno_nome",      label: "Aluno"  }, { key: "professor_nome", label: "Professor(a)"   }],
     ],
     sections: [
       { heading: "Descricao", fields: [
@@ -201,25 +188,20 @@ function hasValue(v: unknown): boolean {
 // ============================================================
 function drawHeader(doc: jsPDF, moduleTitle: string) {
   const PW = doc.internal.pageSize.width;
-  // Faixa verde principal
   doc.setFillColor(0, 148, 74);
   doc.rect(0, 0, PW, 50, 'F');
-  // Faixa verde mais escura na parte inferior do cabeçalho
   doc.setFillColor(0, 110, 55);
   doc.rect(0, 40, PW, 10, 'F');
 
-  // Logo / título sistema
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(22);
   doc.text("EduTecProfessor", PW / 2, 20, { align: "center" });
 
-  // Nome do módulo
   doc.setFontSize(13);
   doc.setFont("helvetica", "normal");
   doc.text(moduleTitle.toUpperCase(), PW / 2, 32, { align: "center" });
 
-  // Data de geração
   doc.setFontSize(7.5);
   doc.setTextColor(200, 255, 220);
   doc.text("Gerado em: " + new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }), PW - 14, 45, { align: "right" });
@@ -239,7 +221,6 @@ function drawInfoGrid(
   const COL2_X = 111;
   const PAGE_H = 280;
 
-  // Cabeçalho da seção
   doc.setFillColor(230, 247, 238);
   doc.rect(15, yRef.y - 5, 180, 11, 'F');
   doc.setDrawColor(0, 148, 74);
@@ -254,15 +235,20 @@ function drawInfoGrid(
   pairs.forEach(([left, right]) => {
     let lv = rawToStr(rec[left.key]);
     let rv = rawToStr(rec[right.key]);
+
+    // Fallback: se não achar 'data_ref', tenta 'data' etc.
+    if (!lv && left.key === 'data_ref') lv = rawToStr(rec['data']);
+    if (!rv && right.key === 'data_ref') rv = rawToStr(rec['data']);
+
     if (left.type === 'date')   lv = fmtDate(lv);
     if (right.type === 'date')  rv = fmtDate(rv);
     if (left.type === 'number'  && lv) lv = String(Number(lv));
     if (right.type === 'number' && rv) rv = String(Number(rv));
+    
     if (!lv && !rv) return;
 
     if (yRef.y > PAGE_H - 14) { doc.addPage(); yRef.y = 25; }
 
-    // Fundo + bordas
     doc.setFillColor(252, 252, 252);
     doc.rect(15, yRef.y - 4, 180, 14, 'F');
     doc.setDrawColor(220, 220, 220);
@@ -270,7 +256,6 @@ function drawInfoGrid(
     doc.rect(15, yRef.y - 4, 180, 14);
     doc.line(COL2_X - 6, yRef.y - 4, COL2_X - 6, yRef.y + 10);
 
-    // Coluna esquerda
     if (lv) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
       doc.text(left.label + ":", COL1_X + 3, yRef.y + 1);
@@ -278,7 +263,6 @@ function drawInfoGrid(
       const ls = doc.splitTextToSize(lv, COL_W - 5);
       doc.text(ls[0] ?? '', COL1_X + 3, yRef.y + 7.5);
     }
-    // Coluna direita
     if (rv) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
       doc.text(right.label + ":", COL2_X + 1, yRef.y + 1);
@@ -291,9 +275,6 @@ function drawInfoGrid(
   yRef.y += 6;
 }
 
-// ============================================================
-// LAYOUT: HEADING DE SEÇÃO
-// ============================================================
 function drawHeading(doc: jsPDF, text: string, yRef: { y: number }) {
   if (yRef.y > 272) { doc.addPage(); yRef.y = 25; }
   doc.setFillColor(230, 247, 238);
@@ -308,9 +289,6 @@ function drawHeading(doc: jsPDF, text: string, yRef: { y: number }) {
   yRef.y += 14;
 }
 
-// ============================================================
-// LAYOUT: CAMPO DE TEXTO LONGO (full-width)
-// ============================================================
 function drawField(doc: jsPDF, label: string, value: string, yRef: { y: number }) {
   if (!value || value.trim() === '' || value === '[]') return;
   if (yRef.y > 272) { doc.addPage(); yRef.y = 25; }
@@ -329,12 +307,8 @@ function drawField(doc: jsPDF, label: string, value: string, yRef: { y: number }
   yRef.y += 5;
 }
 
-// ============================================================
-// LAYOUT: GRADE SEMANAL (tabela dinâmica)
-// ============================================================
 function renderGradeTable(doc: jsPDF, grade: Record<string, unknown>, yRef: { y: number }) {
   const DIA_ORDER = ['segunda', 'terca', 'quarta', 'quinta', 'sexta'];
-
   const COLS: Array<{ key: string; label: string; w: number; fb?: string }> = [
     { key: 'turno',                  label: 'Turno',        w: 16 },
     { key: 'horario',                label: 'Horario',      w: 16 },
@@ -356,21 +330,17 @@ function renderGradeTable(doc: jsPDF, grade: Record<string, unknown>, yRef: { y:
   dias.forEach(dia => {
     const info = grade[dia] as Record<string, unknown>;
     if (!info || typeof info !== 'object') return;
-    const hasContent = Object.entries(info).some(([k, v]) =>
-      k !== 'bnccCodes' && hasValue(v)
-    );
+    const hasContent = Object.entries(info).some(([k, v]) => k !== 'bnccCodes' && hasValue(v));
     if (!hasContent) return;
 
     if (yRef.y > 265) { doc.addPage(); yRef.y = 25; }
 
-    // Barra do dia
     doc.setFillColor(0, 128, 64);
     doc.rect(15, yRef.y - 4, 180, 8, 'F');
     doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
     doc.text(dia, 18, yRef.y + 1.5);
     yRef.y += 11;
 
-    // Cabeçalho de colunas
     let x = 15;
     doc.setFillColor(218, 244, 232);
     doc.rect(15, yRef.y - 3.5, 180, 7, 'F');
@@ -378,7 +348,6 @@ function renderGradeTable(doc: jsPDF, grade: Record<string, unknown>, yRef: { y:
     COLS.forEach(col => { doc.text(col.label, x + 1.5, yRef.y + 0.5); x += col.w; });
     yRef.y += 8;
 
-    // Dados
     if (yRef.y > 272) { doc.addPage(); yRef.y = 25; }
     const cells: string[][] = [];
     let maxL = 1;
@@ -411,9 +380,6 @@ function renderGradeTable(doc: jsPDF, grade: Record<string, unknown>, yRef: { y:
   });
 }
 
-// ============================================================
-// LAYOUT: RODAPÉ
-// ============================================================
 function drawFooters(doc: jsPDF) {
   const PW  = doc.internal.pageSize.width;
   const tot = doc.internal.getNumberOfPages();
@@ -447,7 +413,6 @@ serve(async (req) => {
       );
     }
 
-    // Usar service role key para garantir acesso sem RLS
     const sc = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
     const { data: rec, error } = await sc.from(tableName).select('*').eq('id', id).single();
 
@@ -461,23 +426,19 @@ serve(async (req) => {
     const cfg         = MODULE_CONFIG[tableName];
     const moduleTitle = cfg?.title ?? tableName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-    // ── MONTAR PDF ──
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     drawHeader(doc, moduleTitle);
 
     const yRef = { y: 62 };
 
     if (cfg) {
-      // ── INFORMAÇÕES BÁSICAS (2 colunas) ──
       const hasPairsData = cfg.pairFields.some(([l, r]) => hasValue(rec[l.key]) || hasValue(rec[r.key]));
       if (hasPairsData) drawInfoGrid(doc, cfg.pairFields, rec, yRef);
 
-      // ── SEÇÕES DE CONTEÚDO ──
       for (const sec of cfg.sections) {
         const hasData = sec.fields.some(f => hasValue(rec[f.key]));
         if (!hasData) continue;
 
-        // Grade tem cabeçalho próprio — não duplicar
         const isGradeOnlySec = sec.fields.length === 1 && sec.fields[0].type === 'grade';
         if (!isGradeOnlySec) drawHeading(doc, sec.heading, yRef);
 
@@ -485,7 +446,6 @@ serve(async (req) => {
           const raw = rec[f.key];
           if (!hasValue(raw)) continue;
 
-          // Tipo: grade semanal
           if (f.type === 'grade') {
             let g = raw;
             if (typeof g === 'string') { try { g = JSON.parse(g); } catch (_) {} }
@@ -496,7 +456,6 @@ serve(async (req) => {
             continue;
           }
 
-          // Tipo: array de códigos
           if (f.type === 'array') {
             let arr = raw;
             if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (_) {} }
@@ -505,16 +464,14 @@ serve(async (req) => {
             continue;
           }
 
-          // Tipo: data
           const txt = f.type === 'date' ? fmtDate(rawToStr(raw)) : rawToStr(raw);
           drawField(doc, f.label, txt, yRef);
         }
         yRef.y += 4;
       }
 
-      // ── CAMPOS EXTRAS (presentes no banco mas não configurados explicitamente) ──
       const configuredKeys = new Set<string>([
-        'id', 'professor_id', 'aluno_id', 'created_at', 'updated_at',
+        'id', 'professor_id', 'aluno_id', 'created_at', 'updated_at', 'data', 'data_ref',
         ...cfg.pairFields.flatMap(([l, r]) => [l.key, r.key]),
         ...cfg.sections.flatMap(s => s.fields.map(f => f.key)),
       ]);
@@ -527,7 +484,6 @@ serve(async (req) => {
         }
       }
     } else {
-      // ── FALLBACK GENÉRICO (tabela não configurada) ──
       const skip = new Set(['id', 'professor_id', 'aluno_id', 'created_at', 'updated_at']);
       drawHeading(doc, "Dados do Registro", yRef);
       for (const [k, v] of Object.entries(rec)) {
@@ -537,7 +493,6 @@ serve(async (req) => {
       }
     }
 
-    // ── RODAPÉ EM TODAS AS PÁGINAS ──
     drawFooters(doc);
 
     const pdfBuffer = doc.output('arraybuffer');
