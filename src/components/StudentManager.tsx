@@ -503,295 +503,366 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 font-sans">
-                    <div className="bg-white rounded-[24px] w-full max-w-lg overflow-hidden shadow-2xl">
-                        <div className="px-6 py-4 border-b border-black/5 flex justify-between items-center bg-[#FDFCFB]">
-                            <h3 className="font-bold text-lg">{editingStudent ? 'Editar Aluno' : 'Cadastrar Aluno'}</h3>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto pt-10 pb-10">
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        className="bg-white rounded-[32px] w-full max-w-2xl shadow-2xl flex flex-col min-h-fit overflow-hidden"
+                    >
+                        {/* Header Fixo */}
+                        <div className="px-8 py-5 border-b border-black/5 flex justify-between items-center bg-[#FDFCFB] shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-[#00A859]/10 flex items-center justify-center text-[#00A859]">
+                                    <Icons.User size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-xl text-black/80">{editingStudent ? 'Editar Aluno' : 'Novo Aluno'}</h3>
+                                    <p className="text-xs text-black/40 font-medium">Preencha todos os dados pedagógicos</p>
+                                </div>
+                            </div>
                             <button
                                 onClick={() => setIsModalOpen(false)}
-                                className="p-2 hover:bg-black/5 rounded-full transition-colors"
+                                className="p-2.5 hover:bg-black/5 rounded-full transition-colors text-black/40 hover:text-black/80"
                             >
-                                <X size={20} />
+                                <X size={24} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                            <div>
-                                <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Nome Completo *</label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.nome || ''}
-                                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                                    className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Data de Nascimento</label>
-                                    <input
-                                        type="date"
-                                        value={formData.data_nascimento || ''}
-                                        onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium text-black/80"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Status</label>
-                                    <select
-                                        value={formData.status || 'ativo'}
-                                        onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                    >
-                                        <option value="ativo">Ativo</option>
-                                        <option value="inativo">Inativo</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Série/Nível</label>
-                                    <input
-                                        type="text"
-                                        value={formData.serie || ''}
-                                        onChange={(e) => setFormData({ ...formData, serie: e.target.value })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Presença Atual</label>
-                                    <select
-                                        value={formData.presenca || 'Presente'}
-                                        onChange={(e) => setFormData({ ...formData, presenca: e.target.value as any })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-bold text-[#00A859]"
-                                    >
-                                        <option value="Presente">Presente</option>
-                                        <option value="Faltou">Faltou</option>
-                                    </select>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Nota/Observação Curta</label>
-                                <input
-                                    type="text"
-                                    value={formData.nota || ''}
-                                    onChange={(e) => setFormData({ ...formData, nota: e.target.value })}
-                                    className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                    placeholder="Ex: Aluno dedicado, dificuldade em matemática"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Responsável 1</label>
-                                    <input
-                                        type="text"
-                                        value={formData.responsavel1_nome || ''}
-                                        onChange={(e) => setFormData({ ...formData, responsavel1_nome: e.target.value })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                        placeholder="Nome"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Telefone (Resp. 1)</label>
-                                    <input
-                                        type="text"
-                                        value={formData.responsavel1_telefone || ''}
-                                        onChange={(e) => setFormData({ ...formData, responsavel1_telefone: e.target.value })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                        placeholder="(00) 00000-0000"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Responsável 2</label>
-                                    <input
-                                        type="text"
-                                        value={formData.responsavel2_nome || ''}
-                                        onChange={(e) => setFormData({ ...formData, responsavel2_nome: e.target.value })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                        placeholder="Nome"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-semibold text-black/70 mb-1.5 focus-within:text-[#00A859]">Telefone (Resp. 2)</label>
-                                    <input
-                                        type="text"
-                                        value={formData.responsavel2_telefone || ''}
-                                        onChange={(e) => setFormData({ ...formData, responsavel2_telefone: e.target.value })}
-                                        className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-medium"
-                                        placeholder="(00) 00000-0000"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Notas Bimestrais */}
-                            <div className="pt-2">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <ClipboardList size={16} className="text-[#00A859]" />
-                                    <span className="text-sm font-bold text-black/70">Notas Bimestrais</span>
-                                </div>
-                                <div className="grid grid-cols-4 gap-3">
-                                    {([1,2,3,4] as const).map(bim => (
-                                        <div key={bim}>
-                                            <label className="block text-xs font-semibold text-black/50 mb-1.5">{bim}º Bimestre</label>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="10"
-                                                step="0.1"
-                                                value={(formData as any)[`nota_bimestre${bim}`] ?? ''}
-                                                onChange={(e) => setFormData({ ...formData, [`nota_bimestre${bim}`]: e.target.value !== '' ? parseFloat(e.target.value) : null })}
-                                                className="w-full px-3 py-2.5 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all font-bold text-center text-lg"
-                                                placeholder="—"
-                                            />
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="pt-2">
-                                <label className="flex items-center gap-3 p-4 border border-black/10 rounded-xl cursor-pointer hover:bg-black/5 transition-colors">
-                                    <div className={`w-6 h-6 rounded flex items-center justify-center border transition-colors ${formData.necessidades_especiais ? 'bg-[#00A859] border-[#00A859]' : 'border-black/20 bg-white'}`}>
-                                        {formData.necessidades_especiais && <Check size={14} className="text-white" />}
-                                    </div>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.necessidades_especiais || false}
-                                        onChange={(e) => setFormData({ ...formData, necessidades_especiais: e.target.checked })}
-                                        className="hidden"
-                                    />
-                                    <div>
-                                        <span className="font-semibold block">Educação Inclusiva (PCD)</span>
-                                    </div>
-                                </label>
-
-                                {formData.necessidades_especiais && (
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: -10 }} 
-                                        animate={{ opacity: 1, y: 0 }} 
-                                        className="mt-3 space-y-2"
-                                    >
-                                        <label className="text-xs font-bold text-black/50 uppercase tracking-wider pl-1">Limitações do Aluno</label>
-                                        <textarea
-                                            value={formData.limitacoes_pcd || ''}
-                                            onChange={(e) => setFormData({ ...formData, limitacoes_pcd: e.target.value })}
-                                            placeholder="Descreva as limitações ou necessidades específicas do aluno..."
-                                            className="w-full px-4 py-3 bg-black/5 border-none rounded-xl focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all min-h-[100px] resize-none text-sm"
-                                        />
-                                    </motion.div>
-                                )}
-                            </div>
-
-                            {/* Attendance History Section (Only on Edit) */}
-                            {editingStudent && (
-                                <div className="border-t border-black/5 pt-6 space-y-4">
+                        {/* Conteúdo com Scroll Interno - Garantindo visibilidade total */}
+                        <div className="p-0 overflow-y-auto flex-1 custom-scrollbar" style={{ minHeight: '100%' }}>
+                            <form onSubmit={handleSubmit} className="p-8 space-y-8">
+                                
+                                {/* Seção 1: Informações Básicas */}
+                                <section className="space-y-5">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <Icons.History size={16} className="text-[#00A859]" />
-                                        <span className="text-sm font-bold text-black/70 uppercase tracking-widest">Histórico de Presença</span>
+                                        <div className="w-1.5 h-4 bg-[#00A859] rounded-full"></div>
+                                        <h4 className="text-sm font-black text-black/40 uppercase tracking-widest">Informações Básicas</h4>
                                     </div>
-
-                                    {/* Add New Quick Entry */}
-                                    <div className="flex items-end gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                        <div className="flex-1 space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label>
-                                            <input 
-                                                type="date" 
-                                                value={newAttendanceDate}
-                                                onChange={(e) => setNewAttendanceDate(e.target.value)}
-                                                className="w-full bg-white border-none rounded-lg px-3 py-2 text-xs font-bold outline-none focus:ring-1 focus:ring-[#00A859]/20"
+                                    
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Nome Completo do Aluno *</label>
+                                            <input
+                                                type="text"
+                                                required
+                                                value={formData.nome || ''}
+                                                onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                                                className="w-full px-5 py-4 bg-black/5 border-2 border-transparent rounded-2xl focus:border-[#00A859]/20 focus:bg-white focus:ring-0 outline-none transition-all font-bold text-lg"
+                                                placeholder="Digite o nome completo..."
                                             />
                                         </div>
-                                        <div className="flex-1 space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
-                                            <select 
-                                                value={newAttendanceStatus}
-                                                onChange={(e) => setNewAttendanceStatus(e.target.value as any)}
-                                                className="w-full bg-white border-none rounded-lg px-3 py-2 text-xs font-black text-[#00A859] outline-none focus:ring-1 focus:ring-[#00A859]/20"
-                                            >
-                                                <option value="Presente">Presente</option>
-                                                <option value="Faltou">Faltou</option>
-                                            </select>
-                                        </div>
-                                        <button 
-                                            type="button"
-                                            onClick={handleAddHistoryPresence}
-                                            className="bg-[#00A859] text-white p-2.5 rounded-xl hover:bg-[#008F4C] transition-colors shadow-sm"
-                                        >
-                                            <Icons.Plus size={16} />
-                                        </button>
-                                    </div>
 
-                                    {/* History Table */}
-                                    <div className="max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                                        {attendanceHistory.length === 0 ? (
-                                            <p className="text-center py-4 text-xs text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">Sem registros históricos.</p>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {attendanceHistory.map(record => (
-                                                    <div key={record.id} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl hover:border-slate-200 transition-all group">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={cn(
-                                                                "w-2 h-2 rounded-full",
-                                                                record.status === 'Presente' ? "bg-emerald-500" : "bg-red-500"
-                                                            )} />
-                                                            <span className="text-xs font-bold text-slate-600">{new Date(record.data).toLocaleDateString('pt-BR')}</span>
-                                                            <span className={cn(
-                                                                "text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
-                                                                record.status === 'Presente' ? "text-emerald-600 bg-emerald-50" : "text-red-600 bg-red-50"
-                                                            )}>
-                                                                {record.status}
-                                                            </span>
-                                                        </div>
-                                                        <button 
-                                                            type="button"
-                                                            onClick={() => handleDeleteHistoryPresence(record.id)}
-                                                            className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                                                        >
-                                                            <Icons.Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Data de Nascimento</label>
+                                                <input
+                                                    type="date"
+                                                    value={formData.data_nascimento || ''}
+                                                    onChange={(e) => setFormData({ ...formData, data_nascimento: e.target.value })}
+                                                    className="w-full px-5 py-4 bg-black/5 border-2 border-transparent rounded-2xl focus:border-[#00A859]/20 focus:bg-white outline-none transition-all font-medium"
+                                                />
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+                                            <div>
+                                                <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Status no Sistema</label>
+                                                <select
+                                                    value={formData.status || 'ativo'}
+                                                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                                                    className="w-full px-5 py-4 bg-black/5 border-2 border-transparent rounded-2xl focus:border-[#00A859]/20 focus:bg-white outline-none transition-all font-bold"
+                                                >
+                                                    <option value="ativo">✅ Ativo</option>
+                                                    <option value="inativo">❌ Inativo</option>
+                                                </select>
+                                            </div>
+                                        </div>
 
-                            <div className="pt-4 flex gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Série / Nível</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.serie || ''}
+                                                    onChange={(e) => setFormData({ ...formData, serie: e.target.value })}
+                                                    className="w-full px-5 py-4 bg-black/5 border-2 border-transparent rounded-2xl focus:border-[#00A859]/20 focus:bg-white outline-none transition-all font-medium"
+                                                    placeholder="Ex: 5º Ano A"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Presença Hoje</label>
+                                                <select
+                                                    value={formData.presenca || 'Presente'}
+                                                    onChange={(e) => setFormData({ ...formData, presenca: e.target.value as any })}
+                                                    className={cn(
+                                                        "w-full px-5 py-4 border-2 border-transparent rounded-2xl outline-none transition-all font-black",
+                                                        formData.presenca === 'Presente' ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
+                                                    )}
+                                                >
+                                                    <option value="Presente">🟢 Presente</option>
+                                                    <option value="Faltou">🔴 Faltou</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Seção 2: Responsáveis e Contatos */}
+                                <section className="space-y-5">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
+                                        <h4 className="text-sm font-black text-black/40 uppercase tracking-widest">Responsáveis e Contatos</h4>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-[24px] border border-slate-100">
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Responsável Principal</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.responsavel1_nome || ''}
+                                                    onChange={(e) => setFormData({ ...formData, responsavel1_nome: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-blue-500/30 focus:ring-0 outline-none transition-all font-medium"
+                                                    placeholder="Nome do Responsável 1"
+                                                />
+                                            </div>
+                                            <div>
+                                                <input
+                                                    type="text"
+                                                    value={formData.responsavel1_telefone || ''}
+                                                    onChange={(e) => setFormData({ ...formData, responsavel1_telefone: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-blue-500/30 focus:ring-0 outline-none transition-all font-medium"
+                                                    placeholder="(00) 00000-0000"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Responsável Secundário</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.responsavel2_nome || ''}
+                                                    onChange={(e) => setFormData({ ...formData, responsavel2_nome: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-blue-500/30 focus:ring-0 outline-none transition-all font-medium"
+                                                    placeholder="Nome do Responsável 2"
+                                                />
+                                            </div>
+                                            <div>
+                                                <input
+                                                    type="text"
+                                                    value={formData.responsavel2_telefone || ''}
+                                                    onChange={(e) => setFormData({ ...formData, responsavel2_telefone: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl focus:border-blue-500/30 focus:ring-0 outline-none transition-all font-medium"
+                                                    placeholder="(00) 00000-0000"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Seção 3: Desempenho Pedagógico */}
+                                <section className="space-y-5">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="w-1.5 h-4 bg-amber-500 rounded-full"></div>
+                                        <h4 className="text-sm font-black text-black/40 uppercase tracking-widest">Notas e Observações</h4>
+                                    </div>
+
+                                    <div className="bg-amber-50/30 p-6 rounded-[24px] border border-amber-100/50 space-y-6">
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                            {([1,2,3,4] as const).map(bim => (
+                                                <div key={bim}>
+                                                    <label className="block text-[10px] font-black text-amber-600/60 mb-2 uppercase text-center">{bim}º Bimestre</label>
+                                                    <input
+                                                        type="number" min="0" max="10" step="0.1"
+                                                        value={(formData as any)[`nota_bimestre${bim}`] ?? ''}
+                                                        onChange={(e) => setFormData({ ...formData, [`nota_bimestre${bim}`]: e.target.value !== '' ? parseFloat(e.target.value) : null })}
+                                                        className="w-full px-2 py-4 bg-white border-2 border-amber-100 rounded-2xl focus:border-amber-400 outline-none transition-all font-black text-center text-xl shadow-sm"
+                                                        placeholder="—"
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Observações Curtas (Perfil do Aluno)</label>
+                                            <textarea
+                                                value={formData.nota || ''}
+                                                onChange={(e) => setFormData({ ...formData, nota: e.target.value })}
+                                                className="w-full px-5 py-4 bg-white border border-amber-100 rounded-2xl focus:border-amber-400 outline-none transition-all font-medium min-h-[80px] resize-none"
+                                                placeholder="Ex: Aluno dedicado, dificuldade em interpretação de texto..."
+                                            />
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {/* Seção 4: Educação Inclusiva */}
+                                <section className="space-y-5">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <div className="w-1.5 h-4 bg-blue-600 rounded-full"></div>
+                                        <h4 className="text-sm font-black text-black/40 uppercase tracking-widest">Educação Inclusiva</h4>
+                                    </div>
+
+                                    <div className={cn(
+                                        "p-6 rounded-[24px] border-2 transition-all cursor-pointer",
+                                        formData.necessidades_especiais ? "bg-blue-50/50 border-blue-500/20" : "bg-slate-50/50 border-transparent"
+                                    )} onClick={() => setFormData({ ...formData, necessidades_especiais: !formData.necessidades_especiais })}>
+                                        <div className="flex items-center gap-4">
+                                            <div className={cn(
+                                                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-sm",
+                                                formData.necessidades_especiais ? "bg-blue-600 text-white" : "bg-white text-slate-400"
+                                            )}>
+                                                <Accessibility size={24} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h5 className="font-black text-slate-700">Aluno com NEE / PCD</h5>
+                                                <p className="text-xs text-slate-500 font-medium">{formData.necessidades_especiais ? "Recursos de inclusão ativados" : "Clique para ativar recursos de inclusão"}</p>
+                                            </div>
+                                            <div className={cn(
+                                                "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
+                                                formData.necessidades_especiais ? "bg-blue-600 border-blue-600" : "bg-white border-slate-300"
+                                            )}>
+                                                {formData.necessidades_especiais && <Check size={14} className="text-white" />}
+                                            </div>
+                                        </div>
+
+                                        <AnimatePresence>
+                                            {formData.necessidades_especiais && (
+                                                <motion.div 
+                                                    initial={{ height: 0, opacity: 0 }} 
+                                                    animate={{ height: 'auto', opacity: 1 }} 
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="overflow-hidden"
+                                                >
+                                                    <div className="mt-6 space-y-2">
+                                                        <label className="text-[10px] font-black text-blue-600/60 uppercase tracking-widest ml-1">Descrição das Limitações e Adaptações</label>
+                                                        <textarea
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            value={formData.limitacoes_pcd || ''}
+                                                            onChange={(e) => setFormData({ ...formData, limitacoes_pcd: e.target.value })}
+                                                            placeholder="Descreva as adaptações curriculares e limitações..."
+                                                            className="w-full px-5 py-4 bg-white border border-blue-200 rounded-2xl focus:border-blue-400 outline-none transition-all min-h-[120px] resize-none text-sm font-medium"
+                                                        />
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                </section>
+
+                                {/* Seção 5: Histórico de Presença (Apenas na Edição) */}
+                                {editingStudent && (
+                                    <section className="space-y-5">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="w-1.5 h-4 bg-slate-700 rounded-full"></div>
+                                            <h4 className="text-sm font-black text-black/40 uppercase tracking-widest">Histórico de Presença</h4>
+                                        </div>
+
+                                        <div className="bg-slate-50 p-6 rounded-[24px] border border-slate-200 space-y-6">
+                                            {/* Add New Quick Entry */}
+                                            <div className="flex items-end gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                                                <div className="flex-1 space-y-1.5">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label>
+                                                    <input 
+                                                        type="date" 
+                                                        value={newAttendanceDate}
+                                                        onChange={(e) => setNewAttendanceDate(e.target.value)}
+                                                        className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#00A859]/20"
+                                                    />
+                                                </div>
+                                                <div className="flex-1 space-y-1.5">
+                                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
+                                                    <select 
+                                                        value={newAttendanceStatus}
+                                                        onChange={(e) => setNewAttendanceStatus(e.target.value as any)}
+                                                        className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-black text-[#00A859] outline-none focus:ring-2 focus:ring-[#00A859]/20"
+                                                    >
+                                                        <option value="Presente">Presente</option>
+                                                        <option value="Faltou">Faltou</option>
+                                                    </select>
+                                                </div>
+                                                <button 
+                                                    type="button"
+                                                    onClick={handleAddHistoryPresence}
+                                                    className="bg-[#00A859] text-white p-3.5 rounded-xl hover:bg-[#008F4C] transition-colors shadow-lg shadow-[#00A859]/20 flex items-center justify-center active:scale-95"
+                                                >
+                                                    <Plus size={20} />
+                                                </button>
+                                            </div>
+
+                                            {/* History Table */}
+                                            <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                                                {attendanceHistory.length === 0 ? (
+                                                    <div className="text-center py-10 bg-white/50 rounded-2xl border border-dashed border-slate-300">
+                                                        <Icons.History size={32} className="mx-auto text-slate-300 mb-2" />
+                                                        <p className="text-xs font-bold text-slate-400">Nenhum registro histórico.</p>
+                                                    </div>
+                                                ) : (
+                                                    attendanceHistory.map(record => (
+                                                        <div key={record.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-[#00A859]/30 transition-all group shadow-sm">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className={cn(
+                                                                    "w-3 h-3 rounded-full shadow-sm",
+                                                                    record.status === 'Presente' ? "bg-emerald-500" : "bg-red-500"
+                                                                )} />
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-slate-700">{new Date(record.data).toLocaleDateString('pt-BR')}</p>
+                                                                    <span className={cn(
+                                                                        "text-[10px] font-black uppercase tracking-widest",
+                                                                        record.status === 'Presente' ? "text-emerald-500" : "text-red-500"
+                                                                    )}>
+                                                                        {record.status}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => handleDeleteHistoryPresence(record.id)}
+                                                                className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                                                            >
+                                                                <Trash2 size={18} />
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    </section>
+                                )}
+
+                                {/* Espaçador para não grudar no rodapé */}
+                                <div className="h-4"></div>
+                            </form>
+                        </div>
+
+                        {/* Footer Fixo */}
+                        <div className="px-8 py-6 border-t border-black/5 flex flex-wrap gap-4 bg-[#FDFCFB] shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="flex-1 min-w-[120px] py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-2xl transition-all active:scale-95 uppercase tracking-widest text-xs"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSubmit}
+                                className="flex-[2] min-w-[200px] py-4 bg-[#00A859] hover:bg-[#008F4C] text-white font-black rounded-2xl shadow-xl shadow-[#00A859]/30 transition-all active:scale-95 uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                            >
+                                {editingStudent ? 'Salvar Alterações' : 'Confirmar Cadastro'}
+                                <Check size={18} />
+                            </button>
+                            {editingStudent && (
                                 <button
                                     type="button"
-                                    onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 py-3.5 bg-black/5 hover:bg-black/10 text-black font-semibold rounded-full transition-colors"
+                                    onClick={() => exportarPDFAluno(editingStudent)}
+                                    className="w-14 h-14 bg-black text-white rounded-2xl shadow-xl hover:bg-black/80 transition-all flex items-center justify-center active:scale-95 shrink-0"
+                                    title="Exportar Aluno para PDF"
                                 >
-                                    Cancelar
+                                    <FileDown size={24} />
                                 </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-3.5 bg-[#00A859] hover:bg-[#008F4C] text-white font-semibold rounded-full shadow-lg shadow-[#00A859]/20 transition-all"
-                                >
-                                    {editingStudent ? 'Salvar Edição' : 'Cadastrar'}
-                                </button>
-                                {editingStudent && (
-                                    <button
-                                        type="button"
-                                        onClick={() => exportarPDFAluno(editingStudent)}
-                                        className="flex-1 py-3.5 bg-black text-white font-semibold rounded-full shadow-lg hover:bg-black/80 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <FileDown size={18} />
-                                        Exportar PDF
-                                    </button>
-                                )}
-                            </div>
-                        </form>
-                    </div>
+                            )}
+                        </div>
+                    </motion.div>
                 </div>
             )}
+
         </div>
     );
 }

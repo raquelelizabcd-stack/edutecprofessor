@@ -15,7 +15,7 @@ const corsHeaders = {
 // Validado contra o schema atual do Supabase (2026-04-01)
 // ============================================================
 type FieldDef = { key: string; label: string; type?: 'date' | 'array' | 'grade' | 'number' };
-type PairRow  = [FieldDef, FieldDef];
+type PairRow  = [FieldDef, FieldDef?];
 
 interface ModuleConfig {
   title: string;
@@ -36,24 +36,25 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
   // planejamento_diario
   // ─────────────────────────────────────────────────────────
   planejamento_diario: {
-    title: "Planejamento Diario",
+    title: "Planejamento Diário",
     pairFields: [
-      [{ key: "titulo_registro", label: "Titulo do Registro"    }, { key: "data",           label: "Data",             type: "date" }],
-      [{ key: "professor_nome",  label: "Professor(a)"          }, { key: "aluno_nome",      label: "Aluno"                            }],
-      [{ key: "componente",      label: "Componente Curricular" }, { key: "periodo",         label: "Periodo"                          }],
+      [{ key: "titulo_registro", label: "Título"                  }, { key: "data",           label: "Data",             type: "date" }],
+      [{ key: "professor_nome",  label: "Professor(a)"            }, { key: "aluno_nome",      label: "Aluno"                            }],
+      [{ key: "componente",      label: "Componente Curricular"   }, { key: "periodo",         label: "Período"                          }],
+      [{ key: "ano_serie",       label: "Ano / Série"             }],
     ],
     sections: [
-      { heading: "Conteudo Pedagogico", fields: [
+      { heading: "Conteúdo Pedagógico", fields: [
         { key: "objetivos", label: "Objetivos da Aula" },
-        { key: "conteudo",  label: "Conteudo / Atividades Planejadas" },
+        { key: "conteudo",  label: "Conteúdo / Atividades Planejadas" },
       ]},
-      { heading: "Recursos e Avaliacao", fields: [
-        { key: "recursos",  label: "Recursos Didaticos" },
-        { key: "avaliacao", label: "Avaliacao / Observacoes" },
+      { heading: "Recursos e Avaliação", fields: [
+        { key: "recursos",  label: "Recursos Didáticos" },
+        { key: "avaliacao", label: "Avaliação / Observações" },
       ]},
-      { heading: "Codigos BNCC", fields: [
-        { key: "bncc_code_text", label: "Codigo BNCC (Livre)" },
-        { key: "bncc_codes",     label: "Codigos Selecionados", type: "array" },
+      { heading: "Códigos BNCC", fields: [
+        { key: "bncc_code_text", label: "Código BNCC (Escrita Livre)" },
+        { key: "bncc_codes",     label: "Códigos Selecionados (Base de Dados)", type: "array" },
       ]},
     ],
   },
@@ -113,14 +114,16 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
   // relatorios
   // ─────────────────────────────────────────────────────────
   relatorios: {
-    title: "Relatorio Individual",
+    title: "Relatório Individual",
     pairFields: [
-      [{ key: "tipo",            label: "Tipo de Relatorio" }, { key: "created_at", label: "Data de Criacao", type: "date" }],
-      [{ key: "aluno_nome",      label: "Aluno"             }, { key: "professor_nome", label: "Professor(a)"          }],
+      [{ key: "titulo_registro",      label: "Título do Registro"    }, { key: "data_ref",           label: "Data",             type: "date" }],
+      [{ key: "professor_nome",       label: "Professor(a)"          }, { key: "aluno_nome",          label: "Aluno"                            }],
+      [{ key: "componente_curricular",label: "Componente Curricular" }, { key: "periodo",             label: "Período"                          }],
+      [{ key: "tom_texto",            label: "Tom do Texto"          }, { key: "ano_serie",           label: "Ano / Série"                      }],
     ],
     sections: [
-      { heading: "Conteudo do Relatorio", fields: [
-        { key: "conteudo", label: "Conteudo" },
+      { heading: "Observações do Professor", fields: [
+        { key: "conteudo", label: "Relato Pedagógico / Observações" },
       ]},
     ],
   },
@@ -204,7 +207,8 @@ function drawHeader(doc: jsPDF, moduleTitle: string) {
 
   doc.setFontSize(7.5);
   doc.setTextColor(200, 255, 220);
-  doc.text("Gerado em: " + new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }), PW - 14, 45, { align: "right" });
+  const dataGeracao = new Date().toLocaleDateString('pt-BR');
+  doc.text("Gerado em: " + dataGeracao, PW - 14, 45, { align: "right" });
 }
 
 // ============================================================
@@ -234,16 +238,16 @@ function drawInfoGrid(
 
   pairs.forEach(([left, right]) => {
     let lv = rawToStr(rec[left.key]);
-    let rv = rawToStr(rec[right.key]);
+    let rv = right ? rawToStr(rec[right.key]) : "";
 
     // Fallback: se não achar 'data_ref', tenta 'data' etc.
     if (!lv && left.key === 'data_ref') lv = rawToStr(rec['data']);
-    if (!rv && right.key === 'data_ref') rv = rawToStr(rec['data']);
+    if (right && !rv && right.key === 'data_ref') rv = rawToStr(rec['data']);
 
     if (left.type === 'date')   lv = fmtDate(lv);
-    if (right.type === 'date')  rv = fmtDate(rv);
+    if (right?.type === 'date')  rv = fmtDate(rv);
     if (left.type === 'number'  && lv) lv = String(Number(lv));
-    if (right.type === 'number' && rv) rv = String(Number(rv));
+    if (right?.type === 'number' && rv) rv = String(Number(rv));
     
     if (!lv && !rv) return;
 
@@ -254,7 +258,7 @@ function drawInfoGrid(
     doc.setDrawColor(220, 220, 220);
     doc.setLineWidth(0.3);
     doc.rect(15, yRef.y - 4, 180, 14);
-    doc.line(COL2_X - 6, yRef.y - 4, COL2_X - 6, yRef.y + 10);
+    if (rv) doc.line(COL2_X - 6, yRef.y - 4, COL2_X - 6, yRef.y + 10);
 
     if (lv) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
@@ -263,7 +267,7 @@ function drawInfoGrid(
       const ls = doc.splitTextToSize(lv, COL_W - 5);
       doc.text(ls[0] ?? '', COL1_X + 3, yRef.y + 7.5);
     }
-    if (rv) {
+    if (right && rv) {
       doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(120, 120, 120);
       doc.text(right.label + ":", COL2_X + 1, yRef.y + 1);
       doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(20, 20, 20);
@@ -414,13 +418,28 @@ serve(async (req) => {
     }
 
     const sc = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-    const { data: rec, error } = await sc.from(tableName).select('*').eq('id', id).single();
+    const { data: rawRec, error } = await sc.from(tableName).select('*').eq('id', id).single();
 
-    if (error || !rec) {
+    if (error || !rawRec) {
       return new Response(
         JSON.stringify({ error: `Registro nao encontrado: ${error?.message}` }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Processamento de Fallbacks (Garantir que registros antigos não fiquem em branco)
+    const rec = { ...rawRec };
+    if (!rec.titulo_registro) {
+      if (tableName === 'relatorios') rec.titulo_registro = `Relatório Individual - ${rec.aluno_nome || ''}`;
+      else if (rec.titulo)          rec.titulo_registro = rec.titulo;
+      else                        rec.titulo_registro = tableName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+    if (!rec.data_ref) {
+      rec.data_ref = rec.data || rec.created_at?.split('T')[0];
+    }
+    if (!rec.professor_nome && rec.professor_id) {
+       const { data: prof } = await sc.from('users').select('nome').eq('id', rec.professor_id).single();
+       if (prof?.nome) rec.professor_nome = prof.nome;
     }
 
     const cfg         = MODULE_CONFIG[tableName];
@@ -432,7 +451,7 @@ serve(async (req) => {
     const yRef = { y: 62 };
 
     if (cfg) {
-      const hasPairsData = cfg.pairFields.some(([l, r]) => hasValue(rec[l.key]) || hasValue(rec[r.key]));
+      const hasPairsData = cfg.pairFields.some(([l, r]) => hasValue(rec[l.key]) || (r && hasValue(rec[r.key])));
       if (hasPairsData) drawInfoGrid(doc, cfg.pairFields, rec, yRef);
 
       for (const sec of cfg.sections) {
@@ -471,8 +490,10 @@ serve(async (req) => {
       }
 
       const configuredKeys = new Set<string>([
-        'id', 'professor_id', 'aluno_id', 'created_at', 'updated_at', 'data', 'data_ref',
-        ...cfg.pairFields.flatMap(([l, r]) => [l.key, r.key]),
+        'id', 'professor_id', 'aluno_id', 'created_at', 'updated_at', 'data', 'data_ref', 'tipo',
+        'titulo', 'titulo_registro', 'professor_nome', 'aluno_nome', 'componente_curricular',
+        'periodo', 'tom_texto', 'ano_serie', 'conteudo',
+        ...cfg.pairFields.flatMap(([l, r]) => r ? [l.key, r.key] : [l.key]),
         ...cfg.sections.flatMap(s => s.fields.map(f => f.key)),
       ]);
       const extraEntries = Object.entries(rec).filter(([k, v]) => !configuredKeys.has(k) && hasValue(v));

@@ -248,6 +248,7 @@ export default function Dashboard({
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
           period: r.periodo || '',
+          yearGrade: r.ano_serie || '',
           createdAt: r.created_at
         })),
         ...(semanal || []).map(r => ({
@@ -266,6 +267,7 @@ export default function Dashboard({
           period: r.periodo || '',
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
+          yearGrade: r.ano_serie || '',
           weeklyData: r.grade_semanal_json || {},
           createdAt: r.created_at
         })),
@@ -285,15 +287,21 @@ export default function Dashboard({
           professorName: r.professor_nome || professorNome,
           bnccCodes: r.bncc_codes || [],
           bnccCodeText: r.bncc_code_text || '',
+          yearGrade: r.ano_serie || '',
           createdAt: r.created_at
         })),
         ...(relatorios || []).map(r => ({
           id: r.id,
           moduleId: r.tipo || 'relatorio-individual',
-          title: r.titulo || `Relatório Individual - ${r.aluno_nome || ''}`,
-          date: r.data || r.created_at?.split('T')[0],
+          title: r.titulo_registro || `Relatório Individual - ${r.aluno_nome || ''}`,
+          date: r.data_ref || r.created_at?.split('T')[0],
           description: r.conteudo || '',
           alunoNome: r.aluno_nome || '',
+          professorName: r.professor_nome || professorNome,
+          curricularComponent: r.componente_curricular || '',
+          period: r.periodo || '',
+          tone: r.tom_texto || 'Formal',
+          yearGrade: r.ano_serie || '',
           createdAt: r.created_at
         })),
         ...(reflexoes || []).map(r => ({
@@ -579,6 +587,7 @@ export default function Dashboard({
           bncc_codes: formData.bnccCodes || [],
           componente: formData.curricularComponent,
           periodo: formData.period,
+          ano_serie: formData.yearGrade,
           objetivos: formData.objectives,
           conteudo: formData.content,
           recursos: formData.resources,
@@ -595,6 +604,7 @@ export default function Dashboard({
           aluno_nome: formData.alunoNome || '',
           componentes_curriculares: formData.curricularComponent,
           periodo: formData.period,
+          ano_serie: formData.yearGrade,
           recursos_didaticos: formData.resources,
           avaliacao_acompanhamento: formData.evaluation,
           observacoes_adicionais: formData.description,
@@ -610,8 +620,15 @@ export default function Dashboard({
         recordData = {
           ...recordData,
           tipo: activeTab,
+          titulo_registro: formData.title,
+          data_ref: formData.date || new Date().toISOString().split('T')[0],
+          professor_nome: formData.professorName || professorNome,
           conteudo: bundledContent,
-          aluno_nome: formData.alunoNome || ''
+          aluno_nome: formData.alunoNome || '',
+          componente_curricular: formData.curricularComponent || '',
+          periodo: formData.period || '',
+          tom_texto: formData.tone || 'Formal',
+          ano_serie: formData.yearGrade || ''
         };
       } else if (activeTab === 'planejamento-mensal') {
         targetTable = 'planejamento_mensal';
@@ -628,6 +645,7 @@ export default function Dashboard({
           bncc_codes: formData.bnccCodes || [],
           componente_curricular: formData.curricularComponent || '',
           periodo: formData.period || '',
+          ano_serie: formData.yearGrade || '',
           objetivos: formData.objectives || '',
           atividades: formData.atividades || '',
           recursos: formData.resources || '',
