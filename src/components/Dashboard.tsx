@@ -307,11 +307,12 @@ export default function Dashboard({
         ...(reflexoes || []).map(r => ({
           id: r.id,
           moduleId: 'reflexoes',
-          title: r.titulo,
+          title: r.titulo || `Reflexão - ${r.data ? new Date(r.data).toLocaleDateString('pt-BR') : ''}`,
           date: r.data?.split('T')[0],
-          description: r.percepcoes || '',
+          description: r.reflexao || (r.percepcoes ? r.percepcoes.split('REFLEXÃO:')[1]?.split('FOCO/METAS:')[0]?.trim() : ''),
+          objectives: r.foco_proximo_ciclo || (r.percepcoes ? r.percepcoes.split('FOCO/METAS:')[1]?.split('CONQUISTAS:')[0]?.trim() : ''),
+          conquistas: r.conquistas || (r.percepcoes ? r.percepcoes.split('CONQUISTAS:')[1]?.trim() : ''),
           alunoNome: r.aluno_nome || '',
-          bnccCodes: [],
           createdAt: r.created_at
         })),
         ...(portf_digital || []).map(r => ({
@@ -321,6 +322,10 @@ export default function Dashboard({
           date: r.data_ref || r.created_at?.split('T')[0],
           description: r.descricao || '',
           alunoNome: r.aluno_nome || '',
+          professorName: r.professor_nome || professorNome,
+          curricularComponent: r.componente_curricular || '',
+          period: r.periodo || '',
+          yearGrade: r.ano_serie || '',
           createdAt: r.created_at
         }))
       ];
@@ -533,8 +538,9 @@ export default function Dashboard({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Basic and Mandatory Validation
-    if (!formData.title || !formData.date) {
+    // 1. Validação de obrigatoriedade — Ignorar módulos que geram títulos automáticos (Reflexões, Portfólio, Relatórios)
+    const canSkipTitle = ['reflexoes', 'portfolio', 'relatorio-individual'].includes(activeTab);
+    if ((!formData.title || !formData.date) && !canSkipTitle) {
       alert("Por favor, preencha os campos obrigatórios (Título e Data).");
       return;
     }
@@ -663,6 +669,10 @@ export default function Dashboard({
           titulo: autoTitle,
           data: autoDate,
           aluno_nome: formData.alunoNome || '',
+          reflexao: formData.description || '',
+          foco_proximo_ciclo: formData.objectives || '',
+          conquistas: formData.conquistas || '',
+          // Para retrocompatibilidade no PDF, manter o percepcoes concatenado por enquanto
           percepcoes: `
             REFLEXÃO: ${formData.description || ''}
             FOCO/METAS: ${formData.objectives || ''}
@@ -679,6 +689,10 @@ export default function Dashboard({
           data_ref: formData.date || new Date().toISOString().split('T')[0],
           descricao: formData.description || '',
           aluno_nome: formData.alunoNome || '',
+          professor_nome: formData.professorName || professorNome,
+          componente_curricular: formData.curricularComponent || '',
+          periodo: formData.period || '',
+          ano_serie: formData.yearGrade || '',
           created_at: new Date().toISOString()
         };
       }

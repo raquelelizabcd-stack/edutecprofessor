@@ -148,14 +148,16 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
   // portfolio_digital
   // ─────────────────────────────────────────────────────────
   portfolio_digital: {
-    title: "Portfolio Digital",
+    title: "Currículo Pedagógico Consolidado – Portfólio",
     pairFields: [
-      [{ key: "titulo_registro", label: "Titulo" }, { key: "data_ref",   label: "Data", type: "date" }],
-      [{ key: "aluno_nome",      label: "Aluno"  }, { key: "professor_nome", label: "Professor(a)"   }],
+      [{ key: "titulo_registro",      label: "Título do Registro"    }, { key: "data_ref",           label: "Data",             type: "date" }],
+      [{ key: "professor_nome",       label: "Professor(a)"          }, { key: "aluno_nome",          label: "Aluno"                            }],
+      [{ key: "componente_curricular",label: "Componente Curricular" }, { key: "periodo",             label: "Período"                          }],
+      [{ key: "ano_serie",           label: "Ano / Série"           }],
     ],
     sections: [
-      { heading: "Descricao", fields: [
-        { key: "descricao", label: "Descricao do Registro" },
+      { heading: "Resumo de Atividades Consolidado", fields: [
+        { key: "descricao", label: "Visão Geral / Objetivos do Portfólio" },
       ]},
     ],
   },
@@ -384,6 +386,89 @@ function renderGradeTable(doc: jsPDF, grade: Record<string, unknown>, yRef: { y:
   });
 }
 
+async function renderConsolidatedTimeline(doc: jsPDF, pId: string, sc: any, yRef: { y: number }) {
+  if (yRef.y > 250) { doc.addPage(); yRef.y = 25; }
+  
+  // 1. Fetch data from all relevant tables
+  const [diarios, semanais, mensais, relatorios, reflexoes] = await Promise.all([
+    sc.from('planejamento_diario').select('titulo_registro, data, aluno_nome, conteudo').eq('professor_id', pId).order('data', { ascending: false }),
+    sc.from('planejamento_semanal').select('titulo_registro, data_ref, aluno_nome, atividade').eq('professor_id', pId).order('data_ref', { ascending: false }),
+    sc.from('planejamento_mensal').select('titulo_registro, data_ref, aluno_nome, atividades').eq('professor_id', pId).order('data_ref', { ascending: false }),
+    sc.from('relatorios').select('titulo_registro, data_ref, aluno_nome, conteudo, created_at').eq('professor_id', pId).order('created_at', { ascending: false }),
+    sc.from('diario_reflexoes').select('titulo, data, aluno_nome, percepcoes').eq('professor_id', pId).order('data', { ascending: false }),
+  ]);
+
+  const totals = {
+    diario: diarios.data?.length || 0,
+    semanal: semanais.data?.length || 0,
+    mensal: mensais.data?.length || 0,
+    relatorios: relatorios.data?.length || 0,
+    reflexoes: reflexoes.data?.length || 0,
+  };
+
+  // 2. Render Summary Totals
+  doc.setFillColor(245, 245, 245);
+  doc.rect(15, yRef.y, 180, 20, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(15, yRef.y, 180, 20);
+  
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
+  doc.text("TOTAL DE REGISTROS POR CATEGORIA:", 20, yRef.y + 6);
+  
+  doc.setFontSize(9); doc.setTextColor(0, 100, 50);
+  const summaryStr = `Diários: ${totals.diario}  |  Semanais: ${totals.semanal}  |  Mensais: ${totals.mensal}  |  Relatórios: ${totals.relatorios}  |  Reflexões: ${totals.reflexoes}`;
+  doc.text(summaryStr, 20, yRef.y + 13);
+  yRef.y += 28;
+
+  // 3. Build Timeline Array
+  const timeline: any[] = [];
+  (diarios.data || []).forEach(r => timeline.push({ date: r.data, mod: 'Diário', title: r.titulo_registro, aluno: r.aluno_nome, desc: r.conteudo }));
+  (semanais.data || []).forEach(r => timeline.push({ date: r.data_ref, mod: 'Semanal', title: r.titulo_registro, aluno: r.aluno_nome, desc: r.atividade }));
+  (mensais.data || []).forEach(r => timeline.push({ date: r.data_ref, mod: 'Mensal', title: r.titulo_registro, aluno: r.aluno_nome, desc: r.atividades }));
+  (relatorios.data || []).forEach(r => timeline.push({ date: r.data_ref || r.created_at?.split('T')[0], mod: 'Relatório', title: r.titulo_registro, aluno: r.aluno_nome, desc: r.conteudo }));
+  (reflexoes.data || []).forEach(r => timeline.push({ date: r.data, mod: 'Reflexão', title: r.titulo, aluno: r.aluno_nome, desc: r.percepcoes }));
+
+  timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // 4. Render Table
+  drawHeading(doc, "Linha do Tempo de Atividades", yRef);
+  
+  const COLS = [
+    { label: 'Data',   w: 22 },
+    { label: 'Módulo', w: 22 },
+    { label: 'Aluno',  w: 30 },
+    { label: 'Título / Conteúdo Resumido', w: 106 }
+  ];
+
+  let x = 15;
+  doc.setFillColor(0, 128, 64);
+  doc.rect(15, yRef.y - 4, 180, 8, 'F');
+  doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
+  COLS.forEach(col => { doc.text(col.label, x + 2, yRef.y + 1); x += col.w; });
+  yRef.y += 8;
+
+  timeline.forEach(item => {
+    const dStr = item.date ? fmtDate(item.date) : '--';
+    const cStr = `${item.title || ''} - ${item.desc || ''}`.slice(0, 140) + '...';
+    
+    const lines = doc.splitTextToSize(cStr, 102);
+    const h = Math.max(lines.length * 4.5, 8);
+
+    if (yRef.y + h > 280) { doc.addPage(); yRef.y = 25; }
+
+    doc.setDrawColor(230, 230, 230);
+    doc.line(15, yRef.y + h, 195, yRef.y + h);
+    
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(40, 40, 40);
+    doc.text(dStr, 17, yRef.y + 5);
+    doc.text(item.mod, 39, yRef.y + 5);
+    doc.text(String(item.aluno || '--').slice(0, 18), 61, yRef.y + 5);
+    doc.text(lines, 93, yRef.y + 5);
+    
+    yRef.y += h + 2;
+  });
+}
+
 function drawFooters(doc: jsPDF) {
   const PW  = doc.internal.pageSize.width;
   const tot = doc.internal.getNumberOfPages();
@@ -483,10 +568,65 @@ serve(async (req) => {
             continue;
           }
 
+          if (tableName === 'diario_reflexoes' && f.key === 'percepcoes') {
+            renderSmartReflection(doc, rawToStr(raw), yRef);
+            continue;
+          }
+
           const txt = f.type === 'date' ? fmtDate(rawToStr(raw)) : rawToStr(raw);
           drawField(doc, f.label, txt, yRef);
         }
         yRef.y += 4;
+      }
+
+// ─────────────────────────────────────────────────────────
+// UTILS DE RENDERIZAÇÃO ESPECIALIZADA
+// ─────────────────────────────────────────────────────────
+
+function renderSmartReflection(doc: jsPDF, text: string, yRef: { y: number }) {
+  const blocks = text.split(/(REFLEXÃO:|FOCO\/METAS:|CONQUISTAS:)/g);
+  let currentLabel = "";
+  
+  for (let i = 0; i < blocks.length; i++) {
+    const part = blocks[i].trim();
+    if (!part) continue;
+    
+    if (part === "REFLEXÃO:" || part === "FOCO/METAS:" || part === "CONQUISTAS:") {
+      currentLabel = part;
+      continue;
+    }
+    
+    // Mapeamento de cores premium
+    const labelMap: Record<string, { t: string, c: [number, number, number] }> = {
+      "REFLEXÃO:":   { t: "INSIGHTS E APRENDIZADOS", c: [0, 100, 50] }, // Verde
+      "FOCO/METAS:": { t: "FOCO NO PRÓXIMO CICLO",   c: [230, 80, 0] }, // Laranja
+      "CONQUISTAS:": { t: "MINHAS CONQUISTAS",       c: [0, 80, 150] }  // Azul
+    };
+    
+    const info = labelMap[currentLabel] || { t: "DETALHAMENTO", c: [60, 60, 60] };
+    
+    // Mini-header do bloco
+    doc.setDrawColor(info.c[0], info.c[1], info.c[2]);
+    doc.setFillColor(info.c[0], info.c[1], info.c[2]);
+    doc.rect(15, yRef.y, 180, 5, 'F');
+    
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(255, 255, 255);
+    doc.text(info.t, 18, yRef.y + 3.5);
+    yRef.y += 6;
+    
+    // Conteúdo formatado
+    const lines = doc.splitTextToSize(part, 175);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(40, 40, 40);
+    doc.text(lines, 17, yRef.y + 2.5);
+    yRef.y += (lines.length * 4.5) + 6;
+    
+    if (yRef.y > 270) { doc.addPage(); yRef.y = 25; }
+  }
+}
+
+      // NOVO: Gatilho para o Curriculo Consolidado (Portfolio)
+      if (tableName === 'portfolio_digital') {
+        await renderConsolidatedTimeline(doc, rec.professor_id, sc, yRef);
       }
 
       const configuredKeys = new Set<string>([
