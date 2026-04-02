@@ -64,23 +64,52 @@ app.post('/create-stripe-session', createStripeSessionHandler);
  * Endpoints for Stripe Customer Portal
  */
 const createPortalSessionHandler = async (req, res) => {
-    const { email } = req.body;
+    const { email, userId } = req.body;
 
-    if (!email) {
-        return res.status(400).json({ error: 'O e-mail é obrigatório para abrir o portal.' });
+    if (!email && !userId) {
+        return res.status(400).json({ error: 'E-mail ou ID do usuário é obrigatório para abrir o portal.' });
     }
 
     try {
-        // Busca o cliente pelo e-mail no Stripe
-        const customers = await stripe.customers.list({ email: email, limit: 1 });
+        let stripeCustomerId = null;
 
-        if (customers.data.length === 0) {
-            return res.status(404).json({ error: 'Não encontramos uma assinatura ativa no Stripe para este e-mail.' });
+        // 1. Tenta buscar o cliente no banco de dados primeiro
+        if (userId) {
+            const { data: user } = await supabase
+                .from('users')
+                .select('stripe_customer_id')
+                .eq('id', userId)
+                .maybeSingle();
+
+            if (user?.stripe_customer_id) {
+                stripeCustomerId = user.stripe_customer_id;
+            }
+        }
+
+        // 2. Fallback: Busca o cliente pelo e-mail no Stripe caso o ID não esteja no banco
+        if (!stripeCustomerId && email) {
+            const customers = await stripe.customers.list({ email: email, limit: 1 });
+
+            if (customers.data.length > 0) {
+                stripeCustomerId = customers.data[0].id;
+
+                // Sincroniza o ID no banco para futuras requisições mais rápidas
+                if (userId) {
+                    await supabase
+                        .from('users')
+                        .update({ stripe_customer_id: stripeCustomerId })
+                        .eq('id', userId);
+                }
+            }
+        }
+
+        if (!stripeCustomerId) {
+            return res.status(404).json({ error: 'Não encontramos uma conta de faturamento ativa para este usuário no Stripe.' });
         }
 
         const session = await stripe.billingPortal.sessions.create({
-            customer: customers.data[0].id,
-            return_url: process.env.SUCCESS_URL || process.env.URL_DE_SUCESSO || 'http://localhost:5173/dashboard',
+            customer: stripeCustomerId,
+            return_url: process.env.SUCCESS_URL || process.env.URL_DE_SUCESSO || 'http://localhost:3000/dashboard',
         });
 
         res.json({ url: session.url });
@@ -106,7 +135,7 @@ const stripeWebhookHandler = async (req, res) => {
             const customerEmail = session.customer_details?.email;
 
             if (userId) {
-                // Atualiza status do usuário para PRO e renova data de expiração (ex: +30 dias)
+                // Atualiza status do usuário para PRO e salva o ID do Stripe
                 const dataExpiracao = new Date();
                 dataExpiracao.setDate(dataExpiracao.getDate() + 30);
 
@@ -115,6 +144,7 @@ const stripeWebhookHandler = async (req, res) => {
                     .update({
                         plano: 'pro',
                         status_pagamento: 'ativo',
+                        stripe_customer_id: session.customer,
                         data_expiracao: dataExpiracao.toISOString().split('T')[0]
                     })
                     .eq('id', userId);

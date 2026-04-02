@@ -106,8 +106,12 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
     const handleManageBilling = async () => {
         setIsCreatingSession(true); // Reutilizando o loading
         try {
-            if (!userEmail) {
-                alert('E-mail não identificado. Recarregue a página.');
+            // Busca o ID do usuário logado na sessão autêntica do Supabase
+            const { data: { session } } = await supabase.auth.getSession();
+            const currentUserId = session?.user?.id;
+
+            if (!userEmail && !currentUserId) {
+                alert('E-mail ou Sessão não identificados. Recarregue a página.');
                 return;
             }
 
@@ -119,7 +123,10 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: userEmail })
+                body: JSON.stringify({
+                    email: userEmail,
+                    userId: currentUserId
+                })
             });
 
             if (!response.ok) {
