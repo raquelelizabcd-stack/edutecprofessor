@@ -61,6 +61,39 @@ app.post('/api/create-stripe-session', createStripeSessionHandler);
 app.post('/create-stripe-session', createStripeSessionHandler);
 
 /**
+ * Endpoints for Stripe Customer Portal
+ */
+const createPortalSessionHandler = async (req, res) => {
+    const { email } = req.body;
+
+    if (!email) {
+        return res.status(400).json({ error: 'O e-mail é obrigatório para abrir o portal.' });
+    }
+
+    try {
+        // Busca o cliente pelo e-mail no Stripe
+        const customers = await stripe.customers.list({ email: email, limit: 1 });
+
+        if (customers.data.length === 0) {
+            return res.status(404).json({ error: 'Não encontramos uma assinatura ativa no Stripe para este e-mail.' });
+        }
+
+        const session = await stripe.billingPortal.sessions.create({
+            customer: customers.data[0].id,
+            return_url: process.env.SUCCESS_URL || process.env.URL_DE_SUCESSO || 'http://localhost:5173/dashboard',
+        });
+
+        res.json({ url: session.url });
+    } catch (error) {
+        console.error('Erro ao criar sessão do portal:', error);
+        res.status(500).json({ error: error.message || 'Erro ao conectar com o portal Stripe' });
+    }
+};
+
+app.post('/api/create-portal-session', createPortalSessionHandler);
+app.post('/create-portal-session', createPortalSessionHandler);
+
+/**
  * Webhook do Stripe
  */
 const stripeWebhookHandler = async (req, res) => {
@@ -71,7 +104,7 @@ const stripeWebhookHandler = async (req, res) => {
             const session = event.data.object;
             const userId = session.client_reference_id;
             const customerEmail = session.customer_details?.email;
-            
+
             if (userId) {
                 // Atualiza status do usuário para PRO e renova data de expiração (ex: +30 dias)
                 const dataExpiracao = new Date();
@@ -96,7 +129,7 @@ const stripeWebhookHandler = async (req, res) => {
                         status: 'authorized',
                         plano: 'pro_pago'
                     });
-                
+
                 console.log(`[Stripe Webhook] Conta PRO ativada para usuário: ${userId} (${customerEmail})`);
             }
         }

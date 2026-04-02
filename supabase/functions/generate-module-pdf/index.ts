@@ -15,7 +15,7 @@ const corsHeaders = {
 // Validado contra o schema atual do Supabase (2026-04-01)
 // ============================================================
 type FieldDef = { key: string; label: string; type?: 'date' | 'array' | 'grade' | 'number' };
-type PairRow  = [FieldDef, FieldDef?];
+type PairRow = [FieldDef, FieldDef?];
 
 interface ModuleConfig {
   title: string;
@@ -25,10 +25,10 @@ interface ModuleConfig {
 
 // Campos comuns de cabeçalho para todos os planejamentos (Basic Info)
 const COMMON_PAIRS: PairRow[] = [
-  [{ key: "titulo_registro",      label: "Titulo do Registro"    }, { key: "data_ref",           label: "Data",             type: "date" }],
-  [{ key: "professor_nome",       label: "Professor(a)"          }, { key: "aluno_nome",          label: "Aluno"                            }],
-  [{ key: "componente_curricular",label: "Componente Curricular" }, { key: "periodo",             label: "Periodo"                          }],
-  [{ key: "mes",                  label: "Mes"                   }, { key: "ano",                 label: "Ano",               type: "number"}],
+  [{ key: "titulo_registro", label: "Titulo do Registro" }, { key: "data_ref", label: "Data", type: "date" }],
+  [{ key: "professor_nome", label: "Professor(a)" }, { key: "aluno_nome", label: "Aluno" }],
+  [{ key: "componente_curricular", label: "Componente Curricular" }, { key: "periodo", label: "Periodo" }],
+  [{ key: "mes", label: "Mes" }, { key: "ano", label: "Ano", type: "number" }],
 ];
 
 const MODULE_CONFIG: Record<string, ModuleConfig> = {
@@ -38,24 +38,30 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
   planejamento_diario: {
     title: "Planejamento Diário",
     pairFields: [
-      [{ key: "titulo_registro", label: "Título"                  }, { key: "data",           label: "Data",             type: "date" }],
-      [{ key: "professor_nome",  label: "Professor(a)"            }, { key: "aluno_nome",      label: "Aluno"                            }],
-      [{ key: "componente",      label: "Componente Curricular"   }, { key: "periodo",         label: "Período"                          }],
-      [{ key: "ano_serie",       label: "Ano / Série"             }],
+      [{ key: "titulo_registro", label: "Título" }, { key: "data", label: "Data", type: "date" }],
+      [{ key: "professor_nome", label: "Professor(a)" }, { key: "aluno_nome", label: "Aluno" }],
+      [{ key: "componente", label: "Componente Curricular" }, { key: "periodo", label: "Período" }],
+      [{ key: "ano_serie", label: "Ano / Série" }],
     ],
     sections: [
-      { heading: "Conteúdo Pedagógico", fields: [
-        { key: "objetivos", label: "Objetivos da Aula" },
-        { key: "conteudo",  label: "Conteúdo / Atividades Planejadas" },
-      ]},
-      { heading: "Recursos e Avaliação", fields: [
-        { key: "recursos",  label: "Recursos Didáticos" },
-        { key: "avaliacao", label: "Avaliação / Observações" },
-      ]},
-      { heading: "Códigos BNCC", fields: [
-        { key: "bncc_code_text", label: "Código BNCC (Escrita Livre)" },
-        { key: "bncc_codes",     label: "Códigos Selecionados (Base de Dados)", type: "array" },
-      ]},
+      {
+        heading: "Conteúdo Pedagógico", fields: [
+          { key: "objetivos", label: "Objetivos da Aula" },
+          { key: "conteudo", label: "Conteúdo / Atividades Planejadas" },
+        ]
+      },
+      {
+        heading: "Recursos e Avaliação", fields: [
+          { key: "recursos", label: "Recursos Didáticos" },
+          { key: "avaliacao", label: "Avaliação / Observações" },
+        ]
+      },
+      {
+        heading: "Códigos BNCC", fields: [
+          { key: "bncc_code_text", label: "Código BNCC (Escrita Livre)" },
+          { key: "bncc_codes", label: "Códigos Selecionados (Base de Dados)", type: "array" },
+        ]
+      },
     ],
   },
 
@@ -65,25 +71,31 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
   planejamento_semanal: {
     title: "Planejamento Semanal",
     pairFields: [
-      [{ key: "titulo_registro",         label: "Titulo do Registro"    }, { key: "data_ref",         label: "Data de Referencia", type: "date" }],
-      [{ key: "professor_nome",          label: "Professor(a)"          }, { key: "aluno_nome",        label: "Aluno"                            }],
-      [{ key: "componentes_curriculares",label: "Componente Curricular" }, { key: "periodo",           label: "Periodo"                          }],
+      [{ key: "titulo_registro", label: "Titulo do Registro" }, { key: "data_ref", label: "Data de Referencia", type: "date" }],
+      [{ key: "professor_nome", label: "Professor(a)" }, { key: "aluno_nome", label: "Aluno" }],
+      [{ key: "componentes_curriculares", label: "Componente Curricular" }, { key: "periodo", label: "Periodo" }],
     ],
     sections: [
-      { heading: "Conteudo da Semana", fields: [
-        { key: "objetivo_aprendizagem",   label: "Objetivos de Aprendizagem" },
-        { key: "atividade",               label: "Atividades Planejadas"     },
-        { key: "recursos_didaticos",      label: "Recursos Didaticos"        },
-        { key: "avaliacao_acompanhamento",label: "Avaliacao e Acompanhamento"},
-        { key: "observacoes_adicionais",  label: "Observacoes Adicionais"    },
-      ]},
-      { heading: "Codigos BNCC", fields: [
-        { key: "bncc_code_text", label: "Codigo BNCC (Livre)" },
-        { key: "bncc_codes",     label: "Codigos Selecionados", type: "array" },
-      ]},
-      { heading: "Grade Semanal Detalhada", fields: [
-        { key: "grade_semanal_json", label: "Grade", type: "grade" },
-      ]},
+      {
+        heading: "Conteudo da Semana", fields: [
+          { key: "objetivo_aprendizagem", label: "Objetivos de Aprendizagem" },
+          { key: "atividade", label: "Atividades Planejadas" },
+          { key: "recursos_didaticos", label: "Recursos Didaticos" },
+          { key: "avaliacao_acompanhamento", label: "Avaliacao e Acompanhamento" },
+          { key: "observacoes_adicionais", label: "Observacoes Adicionais" },
+        ]
+      },
+      {
+        heading: "Codigos BNCC", fields: [
+          { key: "bncc_code_text", label: "Codigo BNCC (Livre)" },
+          { key: "bncc_codes", label: "Codigos Selecionados", type: "array" },
+        ]
+      },
+      {
+        heading: "Grade Semanal Detalhada", fields: [
+          { key: "grade_semanal_json", label: "Grade", type: "grade" },
+        ]
+      },
     ],
   },
 
@@ -94,19 +106,25 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
     title: "Planejamento Mensal",
     pairFields: COMMON_PAIRS,
     sections: [
-      { heading: "Conteudo do Mes", fields: [
-        { key: "objetivos",  label: "Objetivos de Aprendizagem" },
-        { key: "atividades", label: "Atividades Planejadas"     },
-      ]},
-      { heading: "Recursos e Avaliacao", fields: [
-        { key: "recursos",   label: "Recursos Didaticos"         },
-        { key: "avaliacao",  label: "Avaliacao e Acompanhamento" },
-        { key: "observacoes",label: "Observacoes Adicionais"     },
-      ]},
-      { heading: "Codigos BNCC", fields: [
-        { key: "bncc_code_text", label: "Codigo BNCC (Livre)" },
-        { key: "bncc_codes",     label: "Codigos Selecionados", type: "array" },
-      ]},
+      {
+        heading: "Conteudo do Mes", fields: [
+          { key: "objetivos", label: "Objetivos de Aprendizagem" },
+          { key: "atividades", label: "Atividades Planejadas" },
+        ]
+      },
+      {
+        heading: "Recursos e Avaliacao", fields: [
+          { key: "recursos", label: "Recursos Didaticos" },
+          { key: "avaliacao", label: "Avaliacao e Acompanhamento" },
+          { key: "observacoes", label: "Observacoes Adicionais" },
+        ]
+      },
+      {
+        heading: "Codigos BNCC", fields: [
+          { key: "bncc_code_text", label: "Codigo BNCC (Livre)" },
+          { key: "bncc_codes", label: "Codigos Selecionados", type: "array" },
+        ]
+      },
     ],
   },
 
@@ -116,15 +134,17 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
   relatorios: {
     title: "Relatório Individual",
     pairFields: [
-      [{ key: "titulo_registro",      label: "Título do Registro"    }, { key: "data_ref",           label: "Data",             type: "date" }],
-      [{ key: "professor_nome",       label: "Professor(a)"          }, { key: "aluno_nome",          label: "Aluno"                            }],
-      [{ key: "componente_curricular",label: "Componente Curricular" }, { key: "periodo",             label: "Período"                          }],
-      [{ key: "tom_texto",            label: "Tom do Texto"          }, { key: "ano_serie",           label: "Ano / Série"                      }],
+      [{ key: "titulo_registro", label: "Título do Registro" }, { key: "data_ref", label: "Data", type: "date" }],
+      [{ key: "professor_nome", label: "Professor(a)" }, { key: "aluno_nome", label: "Aluno" }],
+      [{ key: "componente_curricular", label: "Componente Curricular" }, { key: "periodo", label: "Período" }],
+      [{ key: "tom_texto", label: "Tom do Texto" }, { key: "ano_serie", label: "Ano / Série" }],
     ],
     sections: [
-      { heading: "Observações do Professor", fields: [
-        { key: "conteudo", label: "Relato Pedagógico / Observações" },
-      ]},
+      {
+        heading: "Observações do Professor", fields: [
+          { key: "conteudo", label: "Relato Pedagógico / Observações" },
+        ]
+      },
     ],
   },
 
@@ -134,13 +154,15 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
   diario_reflexoes: {
     title: "Diario de Reflexoes",
     pairFields: [
-      [{ key: "titulo",     label: "Titulo" }, { key: "data",       label: "Data", type: "date" }],
-      [{ key: "aluno_nome", label: "Aluno"  }, { key: "professor_nome", label: "Professor(a)"   }],
+      [{ key: "titulo", label: "Titulo" }, { key: "data", label: "Data", type: "date" }],
+      [{ key: "aluno_nome", label: "Aluno" }, { key: "professor_nome", label: "Professor(a)" }],
     ],
     sections: [
-      { heading: "Reflexoes e Percepcoes", fields: [
-        { key: "percepcoes", label: "Percepcoes e Reflexoes" },
-      ]},
+      {
+        heading: "Reflexoes e Percepcoes", fields: [
+          { key: "percepcoes", label: "Percepcoes e Reflexoes" },
+        ]
+      },
     ],
   },
 
@@ -150,15 +172,17 @@ const MODULE_CONFIG: Record<string, ModuleConfig> = {
   portfolio_digital: {
     title: "Currículo Pedagógico Consolidado – Portfólio",
     pairFields: [
-      [{ key: "titulo_registro",      label: "Título do Registro"    }, { key: "data_ref",           label: "Data",             type: "date" }],
-      [{ key: "professor_nome",       label: "Professor(a)"          }, { key: "aluno_nome",          label: "Aluno"                            }],
-      [{ key: "componente_curricular",label: "Componente Curricular" }, { key: "periodo",             label: "Período"                          }],
-      [{ key: "ano_serie",           label: "Ano / Série"           }],
+      [{ key: "titulo_registro", label: "Título do Registro" }, { key: "data_ref", label: "Data", type: "date" }],
+      [{ key: "professor_nome", label: "Professor(a)" }, { key: "aluno_nome", label: "Aluno" }],
+      [{ key: "componente_curricular", label: "Componente Curricular" }, { key: "periodo", label: "Período" }],
+      [{ key: "ano_serie", label: "Ano / Série" }],
     ],
     sections: [
-      { heading: "Resumo de Atividades Consolidado", fields: [
-        { key: "descricao", label: "Visão Geral / Objetivos do Portfólio" },
-      ]},
+      {
+        heading: "Resumo de Atividades Consolidado", fields: [
+          { key: "descricao", label: "Visão Geral / Objetivos do Portfólio" },
+        ]
+      },
     ],
   },
 };
@@ -222,7 +246,7 @@ function drawInfoGrid(
   rec: Record<string, unknown>,
   yRef: { y: number }
 ) {
-  const COL_W  = 84;
+  const COL_W = 84;
   const COL1_X = 15;
   const COL2_X = 111;
   const PAGE_H = 280;
@@ -246,11 +270,11 @@ function drawInfoGrid(
     if (!lv && left.key === 'data_ref') lv = rawToStr(rec['data']);
     if (right && !rv && right.key === 'data_ref') rv = rawToStr(rec['data']);
 
-    if (left.type === 'date')   lv = fmtDate(lv);
-    if (right?.type === 'date')  rv = fmtDate(rv);
-    if (left.type === 'number'  && lv) lv = String(Number(lv));
+    if (left.type === 'date') lv = fmtDate(lv);
+    if (right?.type === 'date') rv = fmtDate(rv);
+    if (left.type === 'number' && lv) lv = String(Number(lv));
     if (right?.type === 'number' && rv) rv = String(Number(rv));
-    
+
     if (!lv && !rv) return;
 
     if (yRef.y > PAGE_H - 14) { doc.addPage(); yRef.y = 25; }
@@ -316,14 +340,14 @@ function drawField(doc: jsPDF, label: string, value: string, yRef: { y: number }
 function renderGradeTable(doc: jsPDF, grade: Record<string, unknown>, yRef: { y: number }) {
   const DIA_ORDER = ['segunda', 'terca', 'quarta', 'quinta', 'sexta'];
   const COLS: Array<{ key: string; label: string; w: number; fb?: string }> = [
-    { key: 'turno',                  label: 'Turno',        w: 16 },
-    { key: 'horario',                label: 'Horario',      w: 16 },
-    { key: 'componenteCurricular',   label: 'Disciplina',   w: 26, fb: 'campoExperiencia' },
-    { key: 'bncc_code_text',         label: 'BNCC',         w: 20 },
-    { key: 'atividade',              label: 'Atividade',    w: 26 },
-    { key: 'objetivo_aprendizagem',  label: 'Objetivo',     w: 26 },
-    { key: 'acompanhamento',         label: 'Acomp.',       w: 26 },
-    { key: 'observacoes',            label: 'Obs.',         w: 24 },
+    { key: 'turno', label: 'Turno', w: 16 },
+    { key: 'horario', label: 'Horario', w: 16 },
+    { key: 'componenteCurricular', label: 'Disciplina', w: 26, fb: 'campoExperiencia' },
+    { key: 'bncc_code_text', label: 'BNCC', w: 20 },
+    { key: 'atividade', label: 'Atividade', w: 26 },
+    { key: 'objetivo_aprendizagem', label: 'Objetivo', w: 26 },
+    { key: 'acompanhamento', label: 'Acomp.', w: 26 },
+    { key: 'observacoes', label: 'Obs.', w: 24 },
   ];
 
   const dias = Object.keys(grade).sort((a, b) => {
@@ -388,7 +412,7 @@ function renderGradeTable(doc: jsPDF, grade: Record<string, unknown>, yRef: { y:
 
 async function renderConsolidatedTimeline(doc: jsPDF, pId: string, sc: any, yRef: { y: number }) {
   if (yRef.y > 250) { doc.addPage(); yRef.y = 25; }
-  
+
   // 1. Fetch data from all relevant tables
   const [diarios, semanais, mensais, relatorios, reflexoes] = await Promise.all([
     sc.from('planejamento_diario').select('titulo_registro, data, aluno_nome, conteudo').eq('professor_id', pId).order('data', { ascending: false }),
@@ -411,10 +435,10 @@ async function renderConsolidatedTimeline(doc: jsPDF, pId: string, sc: any, yRef
   doc.rect(15, yRef.y, 180, 20, 'F');
   doc.setDrawColor(200, 200, 200);
   doc.rect(15, yRef.y, 180, 20);
-  
+
   doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(100, 100, 100);
   doc.text("TOTAL DE REGISTROS POR CATEGORIA:", 20, yRef.y + 6);
-  
+
   doc.setFontSize(9); doc.setTextColor(0, 100, 50);
   const summaryStr = `Diários: ${totals.diario}  |  Semanais: ${totals.semanal}  |  Mensais: ${totals.mensal}  |  Relatórios: ${totals.relatorios}  |  Reflexões: ${totals.reflexoes}`;
   doc.text(summaryStr, 20, yRef.y + 13);
@@ -432,11 +456,11 @@ async function renderConsolidatedTimeline(doc: jsPDF, pId: string, sc: any, yRef
 
   // 4. Render Table
   drawHeading(doc, "Linha do Tempo de Atividades", yRef);
-  
+
   const COLS = [
-    { label: 'Data',   w: 22 },
+    { label: 'Data', w: 22 },
     { label: 'Módulo', w: 22 },
-    { label: 'Aluno',  w: 30 },
+    { label: 'Aluno', w: 30 },
     { label: 'Título / Conteúdo Resumido', w: 106 }
   ];
 
@@ -450,7 +474,7 @@ async function renderConsolidatedTimeline(doc: jsPDF, pId: string, sc: any, yRef
   timeline.forEach(item => {
     const dStr = item.date ? fmtDate(item.date) : '--';
     const cStr = `${item.title || ''} - ${item.desc || ''}`.slice(0, 140) + '...';
-    
+
     const lines = doc.splitTextToSize(cStr, 102);
     const h = Math.max(lines.length * 4.5, 8);
 
@@ -458,19 +482,19 @@ async function renderConsolidatedTimeline(doc: jsPDF, pId: string, sc: any, yRef
 
     doc.setDrawColor(230, 230, 230);
     doc.line(15, yRef.y + h, 195, yRef.y + h);
-    
+
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(40, 40, 40);
     doc.text(dStr, 17, yRef.y + 5);
     doc.text(item.mod, 39, yRef.y + 5);
     doc.text(String(item.aluno || '--').slice(0, 18), 61, yRef.y + 5);
     doc.text(lines, 93, yRef.y + 5);
-    
+
     yRef.y += h + 2;
   });
 }
 
 function drawFooters(doc: jsPDF) {
-  const PW  = doc.internal.pageSize.width;
+  const PW = doc.internal.pageSize.width;
   const tot = doc.internal.getNumberOfPages();
   for (let i = 1; i <= tot; i++) {
     doc.setPage(i);
@@ -493,7 +517,7 @@ serve(async (req) => {
   try {
     const body = await req.json();
     const tableName: string = body.tableName;
-    const id: string        = body.id;
+    const id: string = body.id;
 
     if (!tableName || !id) {
       return new Response(
@@ -516,18 +540,18 @@ serve(async (req) => {
     const rec = { ...rawRec };
     if (!rec.titulo_registro) {
       if (tableName === 'relatorios') rec.titulo_registro = `Relatório Individual - ${rec.aluno_nome || ''}`;
-      else if (rec.titulo)          rec.titulo_registro = rec.titulo;
-      else                        rec.titulo_registro = tableName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      else if (rec.titulo) rec.titulo_registro = rec.titulo;
+      else rec.titulo_registro = tableName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     }
     if (!rec.data_ref) {
       rec.data_ref = rec.data || rec.created_at?.split('T')[0];
     }
     if (!rec.professor_nome && rec.professor_id) {
-       const { data: prof } = await sc.from('users').select('nome').eq('id', rec.professor_id).single();
-       if (prof?.nome) rec.professor_nome = prof.nome;
+      const { data: prof } = await sc.from('users').select('nome').eq('id', rec.professor_id).single();
+      if (prof?.nome) rec.professor_nome = prof.nome;
     }
 
-    const cfg         = MODULE_CONFIG[tableName];
+    const cfg = MODULE_CONFIG[tableName];
     const moduleTitle = cfg?.title ?? tableName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -552,7 +576,7 @@ serve(async (req) => {
 
           if (f.type === 'grade') {
             let g = raw;
-            if (typeof g === 'string') { try { g = JSON.parse(g); } catch (_) {} }
+            if (typeof g === 'string') { try { g = JSON.parse(g); } catch (_) { } }
             if (g && typeof g === 'object' && !Array.isArray(g) && Object.keys(g as object).length > 0) {
               drawHeading(doc, "Grade Semanal Detalhada", yRef);
               renderGradeTable(doc, g as Record<string, unknown>, yRef);
@@ -562,7 +586,7 @@ serve(async (req) => {
 
           if (f.type === 'array') {
             let arr = raw;
-            if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (_) {} }
+            if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch (_) { } }
             if (!Array.isArray(arr) || arr.length === 0) continue;
             drawField(doc, f.label, (arr as unknown[]).map(String).join(', '), yRef);
             continue;
@@ -579,50 +603,50 @@ serve(async (req) => {
         yRef.y += 4;
       }
 
-// ─────────────────────────────────────────────────────────
-// UTILS DE RENDERIZAÇÃO ESPECIALIZADA
-// ─────────────────────────────────────────────────────────
+      // ─────────────────────────────────────────────────────────
+      // UTILS DE RENDERIZAÇÃO ESPECIALIZADA
+      // ─────────────────────────────────────────────────────────
 
-function renderSmartReflection(doc: jsPDF, text: string, yRef: { y: number }) {
-  const blocks = text.split(/(REFLEXÃO:|FOCO\/METAS:|CONQUISTAS:)/g);
-  let currentLabel = "";
-  
-  for (let i = 0; i < blocks.length; i++) {
-    const part = blocks[i].trim();
-    if (!part) continue;
-    
-    if (part === "REFLEXÃO:" || part === "FOCO/METAS:" || part === "CONQUISTAS:") {
-      currentLabel = part;
-      continue;
-    }
-    
-    // Mapeamento de cores premium
-    const labelMap: Record<string, { t: string, c: [number, number, number] }> = {
-      "REFLEXÃO:":   { t: "INSIGHTS E APRENDIZADOS", c: [0, 100, 50] }, // Verde
-      "FOCO/METAS:": { t: "FOCO NO PRÓXIMO CICLO",   c: [230, 80, 0] }, // Laranja
-      "CONQUISTAS:": { t: "MINHAS CONQUISTAS",       c: [0, 80, 150] }  // Azul
-    };
-    
-    const info = labelMap[currentLabel] || { t: "DETALHAMENTO", c: [60, 60, 60] };
-    
-    // Mini-header do bloco
-    doc.setDrawColor(info.c[0], info.c[1], info.c[2]);
-    doc.setFillColor(info.c[0], info.c[1], info.c[2]);
-    doc.rect(15, yRef.y, 180, 5, 'F');
-    
-    doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(255, 255, 255);
-    doc.text(info.t, 18, yRef.y + 3.5);
-    yRef.y += 6;
-    
-    // Conteúdo formatado
-    const lines = doc.splitTextToSize(part, 175);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(40, 40, 40);
-    doc.text(lines, 17, yRef.y + 2.5);
-    yRef.y += (lines.length * 4.5) + 6;
-    
-    if (yRef.y > 270) { doc.addPage(); yRef.y = 25; }
-  }
-}
+      function renderSmartReflection(doc: jsPDF, text: string, yRef: { y: number }) {
+        const blocks = text.split(/(REFLEXÃO:|FOCO\/METAS:|CONQUISTAS:)/g);
+        let currentLabel = "";
+
+        for (let i = 0; i < blocks.length; i++) {
+          const part = blocks[i].trim();
+          if (!part) continue;
+
+          if (part === "REFLEXÃO:" || part === "FOCO/METAS:" || part === "CONQUISTAS:") {
+            currentLabel = part;
+            continue;
+          }
+
+          // Mapeamento de cores premium
+          const labelMap: Record<string, { t: string, c: [number, number, number] }> = {
+            "REFLEXÃO:": { t: "INSIGHTS E APRENDIZADOS", c: [0, 100, 50] }, // Verde
+            "FOCO/METAS:": { t: "FOCO NO PRÓXIMO CICLO", c: [230, 80, 0] }, // Laranja
+            "CONQUISTAS:": { t: "MINHAS CONQUISTAS", c: [0, 80, 150] }  // Azul
+          };
+
+          const info = labelMap[currentLabel] || { t: "DETALHAMENTO", c: [60, 60, 60] };
+
+          // Mini-header do bloco
+          doc.setDrawColor(info.c[0], info.c[1], info.c[2]);
+          doc.setFillColor(info.c[0], info.c[1], info.c[2]);
+          doc.rect(15, yRef.y, 180, 5, 'F');
+
+          doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(255, 255, 255);
+          doc.text(info.t, 18, yRef.y + 3.5);
+          yRef.y += 6;
+
+          // Conteúdo formatado
+          const lines = doc.splitTextToSize(part, 175);
+          doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(40, 40, 40);
+          doc.text(lines, 17, yRef.y + 2.5);
+          yRef.y += (lines.length * 4.5) + 6;
+
+          if (yRef.y > 270) { doc.addPage(); yRef.y = 25; }
+        }
+      }
 
       // NOVO: Gatilho para o Curriculo Consolidado (Portfolio)
       if (tableName === 'portfolio_digital') {
@@ -633,6 +657,7 @@ function renderSmartReflection(doc: jsPDF, text: string, yRef: { y: number }) {
         'id', 'professor_id', 'aluno_id', 'created_at', 'updated_at', 'data', 'data_ref', 'tipo',
         'titulo', 'titulo_registro', 'professor_nome', 'aluno_nome', 'componente_curricular',
         'periodo', 'tom_texto', 'ano_serie', 'conteudo',
+        'reflexao', 'foco_proximo_ciclo', 'conquistas',
         ...cfg.pairFields.flatMap(([l, r]) => r ? [l.key, r.key] : [l.key]),
         ...cfg.sections.flatMap(s => s.fields.map(f => f.key)),
       ]);

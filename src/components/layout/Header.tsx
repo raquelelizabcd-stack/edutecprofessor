@@ -27,7 +27,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isCreatingSession, setIsCreatingSession] = useState(false);
-    
+
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     const getDaysRemaining = () => {
@@ -74,7 +74,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
 
             // Use '/api' for Vercel production and 'http://localhost:3001/api' for local dev
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const apiUrl = isLocal 
+            const apiUrl = isLocal
                 ? 'http://localhost:3001/api/create-stripe-session'
                 : '/api/create-stripe-session';
 
@@ -98,6 +98,42 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
         } catch (err) {
             console.error('Erro no checkout:', err);
             alert('Não foi possível iniciar o checkout. Tente novamente mais tarde.');
+        } finally {
+            setIsCreatingSession(false);
+        }
+    };
+
+    const handleManageBilling = async () => {
+        setIsCreatingSession(true); // Reutilizando o loading
+        try {
+            if (!userEmail) {
+                alert('E-mail não identificado. Recarregue a página.');
+                return;
+            }
+
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const apiUrl = isLocal
+                ? 'http://localhost:3001/api/create-portal-session'
+                : '/api/create-portal-session';
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: userEmail })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Erro ao abrir o portal de faturamento');
+            }
+
+            const result = await response.json();
+            if (result.url) {
+                window.location.href = result.url;
+            }
+        } catch (err: any) {
+            console.error('Erro no portal de faturamento:', err);
+            alert(err?.message || 'Não foi possível acessar o portal de faturamento agora.');
         } finally {
             setIsCreatingSession(false);
         }
@@ -160,10 +196,10 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             </div>
 
             <div className="flex items-center gap-2 md:gap-4">
-                <button 
-                  onClick={onStartTour}
-                  className="p-2 md:p-2.5 bg-black/5 rounded-full text-black/40 hover:text-[#00A859] hover:bg-[#00A859]/10 transition-colors"
-                  title="Centro de Ajuda e Dicas"
+                <button
+                    onClick={onStartTour}
+                    className="p-2 md:p-2.5 bg-black/5 rounded-full text-black/40 hover:text-[#00A859] hover:bg-[#00A859]/10 transition-colors"
+                    title="Centro de Ajuda e Dicas"
                 >
                     <Icons.HelpCircle size={20} />
                 </button>
@@ -173,7 +209,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                 </button>
                 <div className="h-8 w-[1px] bg-black/5 mx-1 md:mx-2" />
                 <div className="relative" ref={dropdownRef}>
-                    <button 
+                    <button
                         onClick={() => setIsProfileOpen(!isProfileOpen)}
                         className="flex items-center gap-2 md:gap-3 p-1.5 hover:bg-black/5 rounded-2xl transition-all"
                     >
@@ -198,7 +234,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                             ) : 'CONTA FREE'}
                                         </span>
                                         {role === 'free' && (
-                                            <button 
+                                            <button
                                                 onClick={(e) => { e.stopPropagation(); setIsUpgradeModalOpen(true); }}
                                                 className="mt-1 px-2.5 py-1 bg-gradient-to-r from-teal-500 to-[#00A859] hover:from-teal-400 hover:to-[#00A859] text-white rounded text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-[#00A859]/20 flex items-center gap-1.5 ml-1 transform hover:scale-105"
                                             >
@@ -306,7 +342,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                     {/* Dados de Pagamento Section */}
                     <div className="space-y-4">
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Dados de Pagamento</h4>
-                        <PaymentSection />
+                        <PaymentSection handleManageBilling={handleManageBilling} isCreatingSession={isCreatingSession} />
                     </div>
 
                     {/* Segurança e Notificações Section */}
@@ -380,9 +416,9 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                             </div>
                         </div>
                     </div>
-                    
+
                     <div className="pt-6 border-t border-black/5 mt-2">
-                        <button 
+                        <button
                             onClick={handleCreateStripeSession}
                             disabled={isCreatingSession}
                             className="w-full relative group overflow-hidden py-4 bg-gradient-to-r from-zinc-900 to-black text-white rounded-2xl font-black text-[15px] hover:shadow-2xl hover:shadow-black/20 transition-all disabled:opacity-70 disabled:cursor-not-allowed transform hover:-translate-y-0.5"
@@ -402,7 +438,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                 )}
                             </div>
                         </button>
-                        
+
                         <div className="flex items-center justify-center gap-2 mt-4">
                             <Icons.ShieldCheck size={16} className="text-[#00A859]" />
                             <p className="text-xs text-black/40 font-bold uppercase tracking-wider">
@@ -423,7 +459,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
 }
 
 // Sub-componente para gerenciar a lógica de pagamento dentro do modal
-function PaymentSection() {
+function PaymentSection({ handleManageBilling, isCreatingSession }: { handleManageBilling: () => Promise<void>, isCreatingSession: boolean }) {
     const [card, setCard] = useState<{ number: string, name: string, expiry: string } | null>({
         number: '4532111122221234',
         name: 'RAQUEL DUARTE',
@@ -454,10 +490,10 @@ function PaymentSection() {
 
     if (isEditing) {
         return (
-            <motion.form 
+            <motion.form
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
-                onSubmit={handleSaveCard} 
+                onSubmit={handleSaveCard}
                 className="p-5 bg-black/5 border border-[#00A859]/20 rounded-[24px] space-y-4 shadow-inner"
             >
                 <div className="flex items-center justify-between mb-2">
@@ -467,45 +503,45 @@ function PaymentSection() {
                 <div className="space-y-3">
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-black/40 uppercase px-1">Número do Cartão</label>
-                        <input 
+                        <input
                             required
                             placeholder="0000 0000 0000 0000"
                             className="w-full px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#00A859] outline-none text-sm font-medium"
                             value={tempFormData.number}
-                            onChange={(e) => setTempFormData({...tempFormData, number: e.target.value.replace(/\D/g, '')})}
+                            onChange={(e) => setTempFormData({ ...tempFormData, number: e.target.value.replace(/\D/g, '') })}
                             maxLength={16}
                         />
                     </div>
                     <div className="space-y-1">
                         <label className="text-[10px] font-bold text-black/40 uppercase px-1">Nome do Titular</label>
-                        <input 
+                        <input
                             required
                             placeholder="COMO IMPRESSO NO CARTÃO"
                             className="w-full px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#00A859] outline-none text-sm font-medium"
                             value={tempFormData.name}
-                            onChange={(e) => setTempFormData({...tempFormData, name: e.target.value})}
+                            onChange={(e) => setTempFormData({ ...tempFormData, name: e.target.value })}
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-black/40 uppercase px-1">Validade (MM/AA)</label>
-                            <input 
+                            <input
                                 required
                                 placeholder="MM/AA"
                                 className="w-full px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#00A859] outline-none text-sm font-medium"
                                 value={tempFormData.expiry}
-                                onChange={(e) => setTempFormData({...tempFormData, expiry: e.target.value})}
+                                onChange={(e) => setTempFormData({ ...tempFormData, expiry: e.target.value })}
                                 maxLength={5}
                             />
                         </div>
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-black/40 uppercase px-1">CVV</label>
-                            <input 
+                            <input
                                 required
                                 placeholder="000"
                                 className="w-full px-4 py-2.5 rounded-xl border border-black/5 focus:border-[#00A859] outline-none text-sm font-medium"
                                 value={tempFormData.cvv}
-                                onChange={(e) => setTempFormData({...tempFormData, cvv: e.target.value.replace(/\D/g, '')})}
+                                onChange={(e) => setTempFormData({ ...tempFormData, cvv: e.target.value.replace(/\D/g, '') })}
                                 maxLength={4}
                             />
                         </div>
@@ -520,52 +556,69 @@ function PaymentSection() {
 
     if (card) {
         return (
-            <div className="relative overflow-hidden p-5 bg-gradient-to-br from-black to-zinc-800 rounded-[24px] shadow-lg border border-white/10 group">
-                <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                    <Icons.CreditCard size={120} className="text-white rotate-[-15deg] translate-x-12 translate-y-[-24px]" />
-                </div>
-                <div className="relative z-10 flex flex-col h-full justify-between gap-6">
-                    <div className="flex items-center justify-between">
-                        <div className="w-10 h-7 bg-amber-400/20 rounded border border-amber-400/30" /> {/* Chip mock */}
-                        <Icons.CreditCard size={24} className="text-white/60" />
+            <div className="space-y-4">
+                {/* Billing Summary Card */}
+                <div className="p-6 bg-gradient-to-br from-slate-900 to-slate-800 rounded-[24px] shadow-xl border border-white/5 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-8 opacity-5">
+                        <Icons.Zap size={140} className="transform rotate-12 translate-x-12 translate-y-[-20px]" />
                     </div>
-                    <div className="space-y-4">
-                        <p className="text-lg font-mono text-white tracking-[0.2em]">{maskCardNumber(card.number)}</p>
+
+                    <div className="relative z-10 space-y-5">
                         <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-[9px] uppercase font-bold text-white/40 tracking-wider">Titular</p>
-                                <p className="text-sm font-bold text-white/90">{card.name}</p>
+                            <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-500/30">
+                                Assinatura Ativa
+                            </span>
+                            <Icons.ShieldCheck className="text-emerald-400" size={20} />
+                        </div>
+
+                        <div>
+                            <p className="text-[10px] text-white/40 font-black uppercase tracking-tighter mb-1">Próxima Renovação</p>
+                            <p className="text-lg font-bold text-white">15 de Maio, 2026</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
+                            <div className="flex items-center gap-2 text-white/70">
+                                <Icons.Check size={14} className="text-emerald-400" />
+                                <span className="text-xs font-medium">Relatórios e PDFs Ilimitados</span>
                             </div>
-                            <div className="text-right">
-                                <p className="text-[9px] uppercase font-bold text-white/40 tracking-wider">Validade</p>
-                                <p className="text-sm font-bold text-white/90">{card.expiry}</p>
+                            <div className="flex items-center gap-2 text-white/70">
+                                <Icons.Check size={14} className="text-emerald-400" />
+                                <span className="text-xs font-medium">Suporte Pedagógico Prioritário</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-white/70">
+                                <Icons.Check size={14} className="text-emerald-400" />
+                                <span className="text-xs font-medium">Inteligência Artificial EduBot</span>
                             </div>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2 pt-4 border-t border-white/10">
-                        <button 
-                            onClick={() => {
-                                setTempFormData({ number: card.number, name: card.name, expiry: card.expiry, cvv: '' });
-                                setIsEditing(true);
-                            }}
-                            className="flex-1 py-2 bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold rounded-lg transition-all"
-                        >
-                            Editar Dados
-                        </button>
-                        <button 
-                            onClick={handleRemoveCard}
-                            className="p-2 border border-red-500/30 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-all"
-                        >
-                            <Icons.Trash2 size={14} />
-                        </button>
+
+                        <div className="flex items-center gap-2 mt-2">
+                            <button
+                                onClick={handleManageBilling}
+                                disabled={isCreatingSession}
+                                className="flex-1 py-3 bg-white text-black text-[12px] font-black rounded-xl transition-all hover:bg-emerald-50 dynamic-shadow active:scale-95 disabled:opacity-50"
+                            >
+                                {isCreatingSession ? 'Conectando...' : 'Gerenciar Pagamentos'}
+                            </button>
+                            <button
+                                onClick={handleRemoveCard}
+                                className="p-3 bg-white/10 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
+                                title="Cancelar Renovação"
+                            >
+                                <Icons.Power size={18} />
+                            </button>
+                        </div>
                     </div>
                 </div>
+
+                <p className="text-[10px] text-center text-black/30 font-bold px-4">
+                    Suas transações são protegidas por criptografia de ponta a ponta via Stripe.
+                </p>
             </div>
         );
     }
 
     return (
-        <button 
+        <button
             onClick={() => setIsEditing(true)}
             className="w-full p-8 border-2 border-dashed border-black/10 rounded-[24px] text-black/40 font-bold flex flex-col items-center justify-center gap-3 hover:border-[#00A859] hover:bg-[#00A859]/5 hover:text-[#00A859] transition-all group"
         >

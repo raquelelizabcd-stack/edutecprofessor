@@ -27,6 +27,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
     const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
     const [newAttendanceDate, setNewAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
     const [newAttendanceStatus, setNewAttendanceStatus] = useState<'Presente' | 'Faltou'>('Presente');
+    const [isPresenceModalOpen, setIsPresenceModalOpen] = useState(false);
 
 
     useEffect(() => {
@@ -73,7 +74,6 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                 nota_bimestre3: toNumeric(formData.nota_bimestre3),
                 nota_bimestre4: toNumeric(formData.nota_bimestre4),
                 limitacoes_pcd: formData.necessidades_especiais ? (formData.limitacoes_pcd || null) : null,
-                presenca: formData.presenca || 'Presente',
                 professor_id: professorId,
             };
 
@@ -154,6 +154,13 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
         setIsModalOpen(true);
     };
 
+    const openPresenceModal = async (student: Student) => {
+        setEditingStudent(student);
+        setFormData(student);
+        fetchAttendanceHistory(student.id);
+        setIsPresenceModalOpen(true);
+    };
+
     const fetchAttendanceHistory = async (alunoId: string) => {
         try {
             const { data, error } = await supabase
@@ -180,6 +187,17 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                     status: newAttendanceStatus
                 }]);
             if (error) throw error;
+
+            // Sincronizar o status principal do aluno se a data for hoje
+            const hoje = new Date().toISOString().split('T')[0];
+            if (newAttendanceDate === hoje) {
+                await supabase
+                    .from('alunos')
+                    .update({ presenca: newAttendanceStatus })
+                    .eq('id', editingStudent.id);
+                fetchStudents(); // Atualiza a lista principal
+            }
+
             fetchAttendanceHistory(editingStudent.id);
         } catch (error) {
             console.error('Erro ao adicionar presença:', error);
@@ -203,7 +221,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
     const gerarPDFAlunos = () => {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.width;
-        
+
         // Header do PDF
         doc.setFillColor(0, 168, 89);
         doc.rect(0, 0, pageWidth, 40, 'F');
@@ -211,13 +229,13 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
         doc.setFontSize(22);
         doc.setFont("helvetica", "bold");
         doc.text("Relatório de Alunos — EduTecPro", 14, 25);
-        
+
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.text(`Data de Geração: ${new Date().toLocaleString('pt-BR')}`, 14, 50);
         doc.text(`Total de Alunos: ${filteredStudents.length}`, 14, 56);
-        
+
         const headers = [['Nome', 'Série/Nível', '1º Bim', '2º Bim', '3º Bim', '4º Bim', 'Status', 'Recursos']];
         const data = filteredStudents.map(s => [
             s.nome,
@@ -253,7 +271,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
     const exportarPDFAluno = async (student?: Student) => {
         const doc = new jsPDF();
         const pageWidth = doc.internal.pageSize.width;
-        
+
         const data = student || formData;
 
         // Header
@@ -263,12 +281,12 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
         doc.setFontSize(22);
         doc.setFont("helvetica", "bold");
         doc.text("Ficha do Aluno — EduTecPro", 14, 25);
-        
+
         doc.setTextColor(0, 0, 0);
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         doc.text(data.nome || 'Aluno Sem Nome', 14, 55);
-        
+
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
         doc.text(`Data de Nascimento: ${data.data_nascimento ? new Date(data.data_nascimento).toLocaleDateString('pt-BR') : '-'}`, 14, 65);
@@ -315,7 +333,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
 
             doc.setFont("helvetica", "bold");
             doc.text("Histórico de Presença Permanente:", 14, nextY);
-            
+
             if (attendData && attendData.length > 0) {
                 autoTable(doc, {
                     startY: nextY + 5,
@@ -430,14 +448,14 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                         <td className="py-4 px-4 font-medium text-black/80">{student.nome}</td>
                                         <td className="py-4 px-4 text-black/60">{student.serie || '-'}</td>
                                         {/* Notas bimestrais */}
-                                        {(['nota_bimestre1','nota_bimestre2','nota_bimestre3','nota_bimestre4'] as const).map((campo, idx) => {
-                                          const nota = (student as any)[campo];
-                                          const cor = nota == null ? 'text-black/30' : nota >= 7 ? 'text-emerald-600 font-bold' : nota >= 5 ? 'text-amber-600 font-bold' : 'text-red-500 font-bold';
-                                          return (
-                                            <td key={campo} className={`py-4 px-4 text-center text-sm ${cor}`}>
-                                              {nota != null ? Number(nota).toFixed(1) : <span className="text-black/20">—</span>}
-                                            </td>
-                                          );
+                                        {(['nota_bimestre1', 'nota_bimestre2', 'nota_bimestre3', 'nota_bimestre4'] as const).map((campo, idx) => {
+                                            const nota = (student as any)[campo];
+                                            const cor = nota == null ? 'text-black/30' : nota >= 7 ? 'text-emerald-600 font-bold' : nota >= 5 ? 'text-amber-600 font-bold' : 'text-red-500 font-bold';
+                                            return (
+                                                <td key={campo} className={`py-4 px-4 text-center text-sm ${cor}`}>
+                                                    {nota != null ? Number(nota).toFixed(1) : <span className="text-black/20">—</span>}
+                                                </td>
+                                            );
                                         })}
                                         <td className="py-4 px-4 text-center">
                                             <span className={`inline-flex px-2 !py-1 text-xs font-semibold rounded-full ${student.status === 'ativo' ? 'bg-[#00A859]/10 text-[#00A859]' : 'bg-red-100 text-red-600'}`}>
@@ -445,9 +463,13 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                             </span>
                                         </td>
                                         <td className="py-4 px-4 text-center">
-                                            <span className={`inline-flex px-2 !py-1 text-xs font-bold rounded-full ${student.presenca === 'Presente' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                                            <button
+                                                onClick={() => openPresenceModal(student)}
+                                                className={`inline-flex px-3 py-1 text-xs font-bold rounded-full transition-all hover:scale-110 active:scale-95 cursor-pointer shadow-sm hover:shadow-md ${student.presenca === 'Presente' ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                                                title="Clique para abrir o Histórico de Presença / Calendário"
+                                            >
                                                 {student.presenca || 'Presente'}
-                                            </span>
+                                            </button>
                                         </td>
                                         <td className="py-4 px-4 text-center">
                                             {student.necessidades_especiais ? (
@@ -504,7 +526,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
             {/* Modal */}
             {isModalOpen && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center z-50 p-4 overflow-y-auto pt-10 pb-10">
-                    <motion.div 
+                    <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         className="bg-white rounded-[32px] w-full max-w-2xl shadow-2xl flex flex-col min-h-fit overflow-hidden"
@@ -531,14 +553,14 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                         {/* Conteúdo com Scroll Interno - Garantindo visibilidade total */}
                         <div className="p-0 overflow-y-auto flex-1 custom-scrollbar" style={{ minHeight: '100%' }}>
                             <form onSubmit={handleSubmit} className="p-8 space-y-8">
-                                
+
                                 {/* Seção 1: Informações Básicas */}
                                 <section className="space-y-5">
                                     <div className="flex items-center gap-2 mb-2">
                                         <div className="w-1.5 h-4 bg-[#00A859] rounded-full"></div>
                                         <h4 className="text-sm font-black text-black/40 uppercase tracking-widest">Informações Básicas</h4>
                                     </div>
-                                    
+
                                     <div className="space-y-4">
                                         <div>
                                             <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Nome Completo do Aluno *</label>
@@ -575,31 +597,15 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Série / Nível</label>
-                                                <input
-                                                    type="text"
-                                                    value={formData.serie || ''}
-                                                    onChange={(e) => setFormData({ ...formData, serie: e.target.value })}
-                                                    className="w-full px-5 py-4 bg-black/5 border-2 border-transparent rounded-2xl focus:border-[#00A859]/20 focus:bg-white outline-none transition-all font-medium"
-                                                    placeholder="Ex: 5º Ano A"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Presença Hoje</label>
-                                                <select
-                                                    value={formData.presenca || 'Presente'}
-                                                    onChange={(e) => setFormData({ ...formData, presenca: e.target.value as any })}
-                                                    className={cn(
-                                                        "w-full px-5 py-4 border-2 border-transparent rounded-2xl outline-none transition-all font-black",
-                                                        formData.presenca === 'Presente' ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
-                                                    )}
-                                                >
-                                                    <option value="Presente">🟢 Presente</option>
-                                                    <option value="Faltou">🔴 Faltou</option>
-                                                </select>
-                                            </div>
+                                        <div>
+                                            <label className="block text-xs font-black text-black/50 mb-2 uppercase tracking-tighter">Série / Nível</label>
+                                            <input
+                                                type="text"
+                                                value={formData.serie || ''}
+                                                onChange={(e) => setFormData({ ...formData, serie: e.target.value })}
+                                                className="w-full px-5 py-4 bg-black/5 border-2 border-transparent rounded-2xl focus:border-[#00A859]/20 focus:bg-white outline-none transition-all font-medium"
+                                                placeholder="Ex: 5º Ano A"
+                                            />
                                         </div>
                                     </div>
                                 </section>
@@ -610,7 +616,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                         <div className="w-1.5 h-4 bg-blue-500 rounded-full"></div>
                                         <h4 className="text-sm font-black text-black/40 uppercase tracking-widest">Responsáveis e Contatos</h4>
                                     </div>
-                                    
+
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-[24px] border border-slate-100">
                                         <div className="space-y-4">
                                             <div>
@@ -667,7 +673,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
 
                                     <div className="bg-amber-50/30 p-6 rounded-[24px] border border-amber-100/50 space-y-6">
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                            {([1,2,3,4] as const).map(bim => (
+                                            {([1, 2, 3, 4] as const).map(bim => (
                                                 <div key={bim}>
                                                     <label className="block text-[10px] font-black text-amber-600/60 mb-2 uppercase text-center">{bim}º Bimestre</label>
                                                     <input
@@ -725,9 +731,9 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
 
                                         <AnimatePresence>
                                             {formData.necessidades_especiais && (
-                                                <motion.div 
-                                                    initial={{ height: 0, opacity: 0 }} 
-                                                    animate={{ height: 'auto', opacity: 1 }} 
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
                                                     exit={{ height: 0, opacity: 0 }}
                                                     className="overflow-hidden"
                                                 >
@@ -760,8 +766,8 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                             <div className="flex items-end gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                                                 <div className="flex-1 space-y-1.5">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Data</label>
-                                                    <input 
-                                                        type="date" 
+                                                    <input
+                                                        type="date"
                                                         value={newAttendanceDate}
                                                         onChange={(e) => setNewAttendanceDate(e.target.value)}
                                                         className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-[#00A859]/20"
@@ -769,7 +775,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                                 </div>
                                                 <div className="flex-1 space-y-1.5">
                                                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</label>
-                                                    <select 
+                                                    <select
                                                         value={newAttendanceStatus}
                                                         onChange={(e) => setNewAttendanceStatus(e.target.value as any)}
                                                         className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 text-sm font-black text-[#00A859] outline-none focus:ring-2 focus:ring-[#00A859]/20"
@@ -778,7 +784,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                                         <option value="Faltou">Faltou</option>
                                                     </select>
                                                 </div>
-                                                <button 
+                                                <button
                                                     type="button"
                                                     onClick={handleAddHistoryPresence}
                                                     className="bg-[#00A859] text-white p-3.5 rounded-xl hover:bg-[#008F4C] transition-colors shadow-lg shadow-[#00A859]/20 flex items-center justify-center active:scale-95"
@@ -812,7 +818,7 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                                                                     </span>
                                                                 </div>
                                                             </div>
-                                                            <button 
+                                                            <button
                                                                 type="button"
                                                                 onClick={() => handleDeleteHistoryPresence(record.id)}
                                                                 className="w-10 h-10 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
@@ -862,6 +868,121 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                     </motion.div>
                 </div>
             )}
+
+            {/* NOVO: Modal de Presença Rápida (Apenas Calendário e Histórico) */}
+            <AnimatePresence>
+                {isPresenceModalOpen && editingStudent && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsPresenceModalOpen(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            className="bg-white w-full max-w-md rounded-[32px] shadow-2xl relative z-10 overflow-hidden"
+                        >
+                            <div className="p-8">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center shadow-sm">
+                                            <Icons.Calendar size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-black text-slate-800 leading-tight">{editingStudent.nome}</h3>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Frequência e Calendário</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => setIsPresenceModalOpen(false)}
+                                        className="w-10 h-10 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center hover:bg-slate-200 hover:text-slate-600 transition-all"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {/* Marcador de Nova Presença */}
+                                    <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>
+                                                <input
+                                                    type="date"
+                                                    value={newAttendanceDate}
+                                                    onChange={(e) => setNewAttendanceDate(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Status</label>
+                                                <select
+                                                    value={newAttendanceStatus}
+                                                    onChange={(e) => setNewAttendanceStatus(e.target.value as any)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-black text-emerald-600 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                                                >
+                                                    <option value="Presente">Presente</option>
+                                                    <option value="Faltou">Faltou</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={handleAddHistoryPresence}
+                                            className="w-full bg-emerald-500 text-white font-black py-4 rounded-xl hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95"
+                                        >
+                                            <Plus size={20} />
+                                            Registrar Frequência
+                                        </button>
+                                    </div>
+
+                                    {/* Lista Histórica */}
+                                    <div className="space-y-3">
+                                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Histórico Recente</h4>
+                                        <div className="max-h-[280px] overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                                            {attendanceHistory.length === 0 ? (
+                                                <div className="text-center py-10 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
+                                                    <p className="text-xs font-bold text-slate-400">Nenhuma data marcada.</p>
+                                                </div>
+                                            ) : (
+                                                attendanceHistory.map(record => (
+                                                    <div key={record.id} className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-emerald-500/30 transition-all group shadow-sm">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={cn(
+                                                                "w-3 h-3 rounded-full",
+                                                                record.status === 'Presente' ? "bg-emerald-500" : "bg-red-500"
+                                                            )} />
+                                                            <div>
+                                                                <p className="text-sm font-bold text-slate-700">{new Date(record.data).toLocaleDateString('pt-BR')}</p>
+                                                                <span className={cn(
+                                                                    "text-[10px] font-black uppercase tracking-widest",
+                                                                    record.status === 'Presente' ? "text-emerald-500" : "text-red-500"
+                                                                )}>
+                                                                    {record.status}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={() => handleDeleteHistoryPresence(record.id)}
+                                                            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
         </div>
     );
