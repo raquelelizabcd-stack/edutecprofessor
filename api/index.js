@@ -8,10 +8,16 @@ const app = express();
 
 // Configuração Supabase
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+// IMPORTANTE: Para Webhooks no backend, SEMPRE use a SERVICE_ROLE_KEY para ignorar RLS.
+// Se usar a ANON_KEY, o webhook pode falhar ao tentar atualizar tabelas protegidas.
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-    console.error("ERRO: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY faltando no .env");
+    console.error("❌ ERRO CRÍTICO: SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY faltando no arquivo .env");
+}
+
+if (supabaseKey && supabaseKey.includes('anon')) {
+    console.warn("⚠️ AVISO: Você está usando a ANON_KEY no backend. Isso pode causar erro de RLS nos webhooks. Recomenda-se usar a SERVICE_ROLE_KEY.");
 }
 
 const supabase = createClient(supabaseUrl || "", supabaseKey || "");
@@ -262,15 +268,15 @@ const stripeWebhookHandler = async (req, res) => {
                 console.log(`[Stripe Webhook] Checkout concluído para usuário: ${userId}`);
 
                 if (userId) {
-                    // 1. Vincula o customer_id ao usuário se ainda não estiver vinculado
-                    await supabase
+                    // 1. Vincula o customer_id ao usuário
+                    const { error: err1 } = await supabase
                         .from('users')
                         .update({ stripe_customer_id: customerId })
                         .eq('id', userId);
+                    if (err1) console.error('[Supabase Error] Falha ao vincular customer_id:', err1.message);
 
-                    // 2. Cria/Atualiza a assinatura imediatamente com os dados básicos recebidos na sessão
-                    // Isso garante a ativação instantânea mesmo que a busca de detalhes falhe
-                    await supabase
+                    // 2. Cria/Atualiza a assinatura
+                    const { error: err2 } = await supabase
                         .from('assinaturas')
                         .upsert({
                             user_id: userId,
@@ -280,17 +286,19 @@ const stripeWebhookHandler = async (req, res) => {
                             stripe_subscription_id: subscriptionId || null,
                             data_atualizacao: new Date().toISOString()
                         }, { onConflict: 'user_id' });
+                    if (err2) console.error('[Supabase Error] Falha ao upsert na tabela assinaturas:', err2.message);
 
                     // 3. Atualiza os campos principais do usuário
-                    await supabase
+                    const { error: err3 } = await supabase
                         .from('users')
                         .update({ 
                             plano: 'pro', 
                             status_pagamento: 'ativo' 
                         })
                         .eq('id', userId);
+                    if (err3) console.error('[Supabase Error] Falha ao atualizar plano do usuário:', err3.message);
 
-                    // 4. Se houver assinatura, tenta buscar detalhes extras (como data exata de renovação e método)
+                    // 4. Se houver assinatura, tenta buscar detalhes extras
                     if (subscriptionId) {
                         try {
                             await updateSubscriptionInDB(subscriptionId);
