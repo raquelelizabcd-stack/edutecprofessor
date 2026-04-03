@@ -3,6 +3,7 @@ import LandingPage from './LandingPage';
 import Dashboard from './components/Dashboard';
 import LoginPage from './components/LoginPage';
 import PaymentPage from './components/PaymentPage';
+import PrivacyModal from './components/layout/PrivacyModal';
 import { UserProfile } from './types';
 import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -28,13 +29,13 @@ export default function App() {
   const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
   const [userDataExpiracao, setUserDataExpiracao] = useState<string | null>(null);
   const [userStatusPagamento, setUserStatusPagamento] = useState<string | null>(null);
-
+  const [aceitouPrivacidade, setAceitouPrivacidade] = useState<boolean>(true); // Padrão true para não piscar antes de carregar
   const fetchUserProfile = async (userId: string) => {
     setIsInitializing(true);
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('plano, status_pagamento, created_at, data_expiracao')
+        .select('plano, status_pagamento, created_at, data_expiracao, aceitou_privacidade')
         .eq('id', userId)
         .maybeSingle();
 
@@ -69,6 +70,7 @@ export default function App() {
         setUserCreatedAt(data.created_at);
         setUserDataExpiracao(data.data_expiracao);
         setUserStatusPagamento(data.status_pagamento);
+        setAceitouPrivacidade(data.aceitou_privacidade || false);
 
         const today = new Date().toISOString().split('T')[0];
         const isExpired = data.data_expiracao && data.data_expiracao < today;

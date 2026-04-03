@@ -39,6 +39,49 @@ app.use(express.json({
     }
 }));
 
+// ENDPOINT: CRIAR SESSÃO DO CUSTOMER PORTAL (Stripe Management)
+app.post('/api/create-portal-session', async (req, res) => {
+    try {
+        const { userId, email } = req.body;
+        
+        let customerId;
+
+        // 1. Busca o customer_id na tabela users do Supabase
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('stripe_customer_id')
+            .eq('id', userId)
+            .single();
+
+        if (user?.stripe_customer_id) {
+            customerId = user.stripe_customer_id;
+        } else if (email) {
+            // 2. Fallback: Busca no Stripe por email
+            const customers = await stripe.customers.list({ email, limit: 1 });
+            if (customers.data.length > 0) {
+                customerId = customers.data[0].id;
+                // Salva no banco para futuras consultas
+                await supabase.from('users').update({ stripe_customer_id: customerId }).eq('id', userId);
+            }
+        }
+
+        if (!customerId) {
+            return res.status(404).json({ error: 'Você ainda não possui um histórico de pagamentos no Stripe. Assine o plano Pro primeiro!' });
+        }
+
+        // 3. Cria a sessão do portal
+        const session = await stripe.billingPortal.sessions.create({
+            customer: customerId,
+            return_url: `${req.headers.origin || 'http://localhost:3000'}/`,
+        });
+
+        res.json({ url: session.url });
+    } catch (err) {
+        console.error('[Stripe Portal Error]', err.message);
+        res.status(500).json({ error: 'Falha ao abrir portal de faturamento.' });
+    }
+});
+
 app.get('/api/status', (req, res) => {
     res.json({ status: 'online', service: 'EduTec-API', timestamp: new Date() });
 });
@@ -195,38 +238,45 @@ const createPortalSessionHandler = async (req, res) => {
     try {
         let stripeCustomerId = null;
 
-        if (userId) {
-            const { data: user } = await supabase
-                .from('users')
-                .select('stripe_customer_id')
-                .eq('id', userId)
-                .maybeSingle();
+        // 1. Busca dados no banco
+        const { data: user } = await supabase
+            .from('users')
+            .select('stripe_customer_id, status_pagamento')
+            .eq('id', userId)
+            .maybeSingle();
 
-            if (user?.stripe_customer_id) {
-                stripeCustomerId = user.stripe_customer_id;
-            }
+        // Se o usuário está em modo TESTE de 7 dias, ele não tem portal no Stripe ainda
+        if (user?.status_pagamento === 'teste' || user?.status_pagamento === 'trial') {
+            return res.status(403).json({ error: 'Você está no período de 7 dias de teste grátis. Para gerenciar pagamentos, conclua o upgrade para o plano Pro primeiro!' });
         }
 
+        if (user?.stripe_customer_id) {
+            stripeCustomerId = user.stripe_customer_id;
+        }
+
+        // 2. Busca no Stripe por email (caso não esteja no banco)
         if (!stripeCustomerId && email) {
             const customers = await stripe.customers.list({ email: email, limit: 1 });
             if (customers.data.length > 0) {
                 stripeCustomerId = customers.data[0].id;
+                // Atualiza o banco para agilizar na próxima
+                await supabase.from('users').update({ stripe_customer_id: stripeCustomerId }).eq('id', userId);
             }
         }
 
         if (!stripeCustomerId) {
-            return res.status(404).json({ error: 'Nenhuma conta de faturamento ativa encontrada.' });
+            return res.status(404).json({ error: 'Você ainda não possui um histórico de faturamento no Stripe. Assine o plano Pro para ativar o portal!' });
         }
 
         const session = await stripe.billingPortal.sessions.create({
             customer: stripeCustomerId,
-            return_url: `${process.env.APP_URL || 'https://edutechprofe.vercel.app'}/dashboard`,
+            return_url: `${req.headers.origin || 'http://localhost:3000'}/dashboard`,
         });
 
         res.json({ url: session.url });
     } catch (error) {
-        console.error('Erro ao criar sessão do portal:', error);
-        res.status(500).json({ error: 'Erro ao conectar com o portal Stripe' });
+        console.error('Erro ao abrir portal Stripe:', error.message);
+        res.status(500).json({ error: 'Não foi possível acessar o portal de faturamento agora.' });
     }
 };
 

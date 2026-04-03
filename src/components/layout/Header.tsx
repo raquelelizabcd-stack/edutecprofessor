@@ -349,7 +349,12 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                     {/* Dados de Pagamento Section */}
                     <div className="space-y-4">
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Dados de Pagamento</h4>
-                        <PaymentSection handleManageBilling={handleManageBilling} isCreatingSession={isCreatingSession} />
+                        <PaymentSection 
+                            handleManageBilling={handleManageBilling} 
+                            isCreatingSession={isCreatingSession}
+                            statusPagamento={statusPagamento}
+                            userDataExpiracao={userDataExpiracao}
+                        />
                     </div>
 
                     {/* Segurança e Notificações Section */}
@@ -465,12 +470,8 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
 }
 
 // Sub-componente para gerenciar a lógica de pagamento dentro do modal
-function PaymentSection({ handleManageBilling, isCreatingSession }: { handleManageBilling: () => Promise<void>, isCreatingSession: boolean }) {
-    const [card, setCard] = useState<{ number: string, name: string, expiry: string } | null>({
-        number: '4532111122221234',
-        name: 'RAQUEL DUARTE',
-        expiry: '12/28'
-    });
+function PaymentSection({ handleManageBilling, isCreatingSession, statusPagamento, userDataExpiracao }: { handleManageBilling: () => Promise<void>, isCreatingSession: boolean, statusPagamento?: string | null, userDataExpiracao?: string | null }) {
+    const [card, setCard] = useState<{ number: string, name: string, expiry: string } | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [tempFormData, setTempFormData] = useState({ number: '', name: '', expiry: '', cvv: '' });
 
@@ -560,7 +561,7 @@ function PaymentSection({ handleManageBilling, isCreatingSession }: { handleMana
         );
     }
 
-    if (card) {
+    if (statusPagamento === 'ativo' || statusPagamento === 'teste' || card) {
         return (
             <div className="space-y-4">
                 {/* Billing Summary Card */}
@@ -571,15 +572,27 @@ function PaymentSection({ handleManageBilling, isCreatingSession }: { handleMana
 
                     <div className="relative z-10 space-y-5">
                         <div className="flex items-center justify-between">
-                            <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-500/30">
-                                Assinatura Ativa
+                            <span className={cn(
+                                "px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full border",
+                                statusPagamento === 'teste' 
+                                    ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                                    : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                            )}>
+                                {statusPagamento === 'teste' ? 'Período de Teste (7 dias)' : 'Assinatura Ativa'}
                             </span>
-                            <Icons.ShieldCheck className="text-emerald-400" size={20} />
+                            {statusPagamento === 'ativo' && <Icons.ShieldCheck className="text-emerald-400" size={20} />}
+                            {statusPagamento === 'teste' && <Icons.Zap className="text-amber-400" size={20} />}
                         </div>
 
                         <div>
-                            <p className="text-[10px] text-white/40 font-black uppercase tracking-tighter mb-1">Próxima Renovação</p>
-                            <p className="text-lg font-bold text-white">15 de Maio, 2026</p>
+                            <p className="text-[10px] text-white/40 font-black uppercase tracking-tighter mb-1">
+                                {statusPagamento === 'teste' ? 'Data de Expiração' : 'Próxima Renovação'}
+                            </p>
+                            <p className="text-lg font-bold text-white">
+                                {userDataExpiracao 
+                                    ? new Date(userDataExpiracao).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+                                    : 'Aguardando Confirmação'}
+                            </p>
                         </div>
 
                         <div className="grid grid-cols-1 gap-2 border-t border-white/10 pt-4">
