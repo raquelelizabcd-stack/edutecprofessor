@@ -454,7 +454,6 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         </div>
                         <div className="flex justify-center gap-2 mt-2 opacity-50">
                             {/* Ícones de pagamento puramente visuais */}
-                            <div className="px-2 py-0.5 border border-black/20 rounded text-[10px] font-bold">PIX</div>
                             <div className="px-2 py-0.5 border border-black/20 rounded text-[10px] font-bold">CARTÃO</div>
                             <div className="px-2 py-0.5 border border-black/20 rounded text-[10px] font-bold">BOLETO</div>
                         </div>

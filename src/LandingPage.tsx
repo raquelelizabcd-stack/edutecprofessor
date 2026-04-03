@@ -59,13 +59,13 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      if (!userRecord || (userRecord.status_pagamento !== 'ativo' && userRecord.status_pagamento !== 'aprovado' && userRecord.status_pagamento !== 'trial')) {
+      if (!userRecord || (userRecord.status_pagamento !== 'ativo' && userRecord.status_pagamento !== 'aprovado' && userRecord.status_pagamento !== 'teste' && userRecord.status_pagamento !== 'trial')) {
         const trialEnd = new Date();
         trialEnd.setDate(trialEnd.getDate() + 7);
         await supabase.from('users').upsert({
           id: session.user.id,
           plano: 'pro',
-          status_pagamento: 'trial',
+          status_pagamento: 'teste',
           data_expiracao: trialEnd.toISOString().split('T')[0]
         });
       }
@@ -176,7 +176,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
               </button>
               {!isFree && (
                 <p className="mt-6 text-black/40 text-sm">
-                  Pagamento seguro via cartão de crédito ou PIX.
+                  Pagamento seguro via cartão de crédito ou boleto.
                 </p>
               )}
             </div>
@@ -373,7 +373,14 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 ))}
               </ul>
               <button
-                onClick={() => setSelectedPlanView('free')}
+                onClick={async () => {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) {
+                    onGoToLogin('dashboard');
+                  } else {
+                    onGoToDashboard();
+                  }
+                }}
                 className="w-full py-3.5 md:py-4 border border-black/10 rounded-full font-semibold hover:bg-black hover:text-white transition-all"
               >
                 Começar agora

@@ -275,7 +275,19 @@ const stripeWebhookHandler = async (req, res) => {
                         .eq('id', userId);
                     if (err1) console.error('[Supabase Error] Falha ao vincular customer_id:', err1.message);
 
-                    // 2. Cria/Atualiza a assinatura
+                    // 2. Busca detalhes da assinatura no Stripe para pegar a data de renovação real
+                    let currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+                    
+                    if (subscriptionId) {
+                        try {
+                            const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                            currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+                        } catch (subErr) {
+                            console.error('[Stripe Error] Erro ao buscar assinatura:', subErr.message);
+                        }
+                    }
+
+                    // 3. Cria/Atualiza a assinatura na tabela específica
                     const { error: err2 } = await supabase
                         .from('assinaturas')
                         .upsert({
@@ -284,16 +296,18 @@ const stripeWebhookHandler = async (req, res) => {
                             status: 'ativo',
                             stripe_customer_id: customerId,
                             stripe_subscription_id: subscriptionId || null,
+                            proxima_renovacao: currentPeriodEnd,
                             data_atualizacao: new Date().toISOString()
                         }, { onConflict: 'user_id' });
                     if (err2) console.error('[Supabase Error] Falha ao upsert na tabela assinaturas:', err2.message);
 
-                    // 3. Atualiza os campos principais do usuário
+                    // 4. Atualiza o status principal do usuário (Gatilho para o App)
                     const { error: err3 } = await supabase
                         .from('users')
                         .update({ 
                             plano: 'pro', 
-                            status_pagamento: 'ativo' 
+                            status_pagamento: 'ativo',
+                            data_expiracao: currentPeriodEnd.split('T')[0] // Formato YYYY-MM-DD
                         })
                         .eq('id', userId);
                     if (err3) console.error('[Supabase Error] Falha ao atualizar plano do usuário:', err3.message);
@@ -401,7 +415,7 @@ app.get('/api/status-assinatura/:userId', statusAssinaturaHandler);
 // Inicialização Local
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const PORT = process.env.PORT || 3001;
-    app.listen(PORT, () => console.log(`🚀 API EduTec rodando localmente na porta ${PORT}`));
+    app.listen(PORT, '0.0.0.0', () => console.log(`🚀 API EduTec rodando localmente na porta ${PORT}`));
 }
 
 export default app;

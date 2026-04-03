@@ -41,26 +41,21 @@ export default function App() {
       if (error) throw error;
 
       if (!data) {
-        // Novo cadastro: recebe automaticamente 7 dias de Plano Pro (Trial)
-        const trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 7);
-        const expiracao = trialEnd.toISOString().split('T')[0];
-
+        // Novo cadastro: Agora o padrão é Plano Free (Sem validade de 7 dias forçada)
         try {
           await supabase.from('users').upsert({
             id: userId,
-            plano: 'pro',
-            status_pagamento: 'trial',
-            data_expiracao: expiracao
+            plano: 'free',
+            status_pagamento: 'gratis'
           });
         } catch (e) {
-          console.error('Erro ao criar perfil trial:', e);
+          console.error('Erro ao criar perfil gratuito:', e);
         }
 
-        setCurrentProfile('pro');
+        setCurrentProfile('free');
         setUserCreatedAt(new Date().toISOString());
-        setUserDataExpiracao(expiracao);
-        setUserStatusPagamento('trial');
+        setUserDataExpiracao(null);
+        setUserStatusPagamento('gratis');
 
         if (intendedViewRef.current) {
           setView(intendedViewRef.current);
@@ -80,21 +75,24 @@ export default function App() {
 
         if (matchedPlano === 'pro') {
           const isPaid = data.status_pagamento === 'ativo' || data.status_pagamento === 'aprovado';
-          const isTrial = data.status_pagamento === 'trial';
+          const isTrial = data.status_pagamento === 'teste' || data.status_pagamento === 'trial';
           
           if (!isPaid && isExpired) {
-            // Trial ou Assinatura expirou e não foi paga
+            // Teste terminou e não foi pago
             if (isTrial) {
               alert("Seu período de teste grátis de 7 dias terminou. Para continuar acessando as ferramentas Pro, escolha uma forma de pagamento.");
               
-              // REVERSÃO AUTOMÁTICA NO BANCO: Se o trial acabou e não pagou, volta para Free
+              // REVERSÃO AUTOMÁTICA NO BANCO: Se o teste acabou e não pagou, volta para Free e marca como expirado
               const { error: updateError } = await supabase
                 .from('users')
-                .update({ plano: 'free' })
+                .update({ 
+                  plano: 'free',
+                  status_pagamento: 'expirado'
+                })
                 .eq('id', userId);
               
               if (updateError) console.error("Erro ao reverter plano:", updateError);
-            } else {
+            } else if (data.status_pagamento !== 'expirado') {
               alert("Sua assinatura Pro expirou. Por favor, regularize seu pagamento para continuar.");
             }
             setView('payment');

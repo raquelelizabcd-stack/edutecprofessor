@@ -75,9 +75,8 @@ export default function LoginPage({ onLogin, onBack }: LoginPageProps) {
               id: data.user.id,
               nome: name || email.split('@')[0],
               email: email,
-              senha: 'auth_managed_by_supabase',
               plano: 'pro',
-              status_pagamento: 'trial',
+              status_pagamento: 'teste',
               data_expiracao: trialExpiration.toISOString().split('T')[0],
               created_at: new Date().toISOString()
             }, {
