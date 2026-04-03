@@ -109,6 +109,29 @@ export default function Dashboard({
   const [robotName, setRobotName] = useState<string>('EduBot');
   const [userPassword, setUserPassword] = useState<string>('');
   const [isTourActive, setIsTourActive] = useState(false);
+  const [paymentFeedback, setPaymentFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+  // Efeito para tratar os parâmetros de retorno do Stripe
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get('payment_success');
+    const canceled = params.get('payment_canceled');
+
+    if (success === 'true') {
+      setPaymentFeedback({
+        type: 'success',
+        message: '¡Pagaimento concluído com sucesso! Sua conta Pro está sendo ativada.'
+      });
+      // Limpa os parâmetros da URL sem recarregar a página
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (canceled === 'true') {
+      setPaymentFeedback({
+        type: 'error',
+        message: 'O checkout foi cancelado. Se tiver dúvidas, entre em contato com o suporte.'
+      });
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
 
   useEffect(() => {
     const hasSeen = localStorage.getItem('hasSeenTour');
@@ -1028,6 +1051,36 @@ export default function Dashboard({
         transition={{ duration: 0.3 }}
         className="max-w-6xl mx-auto"
       >
+        {paymentFeedback && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 24 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            className={cn(
+              "p-4 rounded-2xl flex items-center justify-between border shadow-sm",
+              paymentFeedback.type === 'success' 
+                ? "bg-emerald-50 border-emerald-100 text-emerald-800" 
+                : "bg-red-50 border-red-100 text-red-800"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "p-2 rounded-xl",
+                paymentFeedback.type === 'success' ? "bg-emerald-500 text-white" : "bg-red-500 text-white"
+              )}>
+                {paymentFeedback.type === 'success' ? <Icons.Check size={18} /> : <Icons.AlertCircle size={18} />}
+              </div>
+              <p className="text-sm font-bold">{paymentFeedback.message}</p>
+            </div>
+            <button 
+              onClick={() => setPaymentFeedback(null)}
+              className="p-1 hover:bg-black/5 rounded-full transition-all"
+            >
+              <Icons.X size={18} />
+            </button>
+          </motion.div>
+        )}
+
         <DataRetentionBanner
           role={role}
           userCreatedAt={userCreatedAt || null}
