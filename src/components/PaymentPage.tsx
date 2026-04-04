@@ -62,19 +62,19 @@ export default function PaymentPage({
                 activeEmail = session.user.email || userEmail;
             }
 
-            // Link de teste fornecido pela usuária
-            const testLink = "https://buy.stripe.com/test_eVq7sLa4f3hj1Ih57V6EU00";
+            // Link oficial de produção
+            const stripeLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
             
             // Adicionamos parâmetros para o Stripe reconhecer o usuário no Webhook
-            const separator = testLink.includes('?') ? '&' : '?';
-            const finalUrl = `${testLink}${separator}client_reference_id=${activeUserId || ''}${activeEmail ? `&prefilled_email=${encodeURIComponent(activeEmail)}` : ''}`;
+            const separator = stripeLink.includes('?') ? '&' : '?';
+            const finalUrl = `${stripeLink}${separator}client_reference_id=${activeUserId || ''}${activeEmail ? `&prefilled_email=${encodeURIComponent(activeEmail)}` : ''}`;
             
             window.location.href = finalUrl;
 
         } catch (err: any) {
             console.error('Checkout error:', err);
             // Fallback para o link puro em caso de erro crítico
-            window.location.href = "https://buy.stripe.com/test_eVq7sLa4f3hj1Ih57V6EU00";
+            window.location.href = import.meta.env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
         } finally {
             setIsProcessing(false);
         }

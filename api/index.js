@@ -357,7 +357,7 @@ const stripeWebhookHandler = async (req, res) => {
                         .insert({
                             user_id: userId,
                             valor: 29.90,
-                            forma_pagamento: 'cartao_teste',
+                            forma_pagamento: 'cartao_credito',
                             status: 'pago',
                             data_pagamento: new Date().toISOString(),
                             plano: 'pro_pago' // Usando 'pro_pago' pois 'Pro' falharia no check constraint atual
@@ -380,10 +380,52 @@ const stripeWebhookHandler = async (req, res) => {
                 break;
             }
 
+            case 'customer.subscription.updated':
+            case 'customer.subscription.deleted': {
+                const subscription = event.data.object;
+                const status = subscription.status;
+                const customerId = subscription.customer;
+
+                // Busca o usuário pelo customerId
+                const { data: user } = await supabase
+                    .from('users')
+                    .select('id')
+                    .eq('stripe_customer_id', customerId)
+                    .maybeSingle();
+
+                if (user) {
+                    const isOrderActive = ['active', 'trialing'].includes(status);
+                    const currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+
+                    // Atualiza tabela de assinaturas
+                    await supabase
+                        .from('assinaturas')
+                        .update({
+                            status: isOrderActive ? 'ativo' : 'expirado',
+                            proxima_renovacao: currentPeriodEnd,
+                            data_atualizacao: new Date().toISOString()
+                        })
+                        .eq('user_id', user.id);
+
+                    // Atualiza status do usuário
+                    await supabase
+                        .from('users')
+                        .update({
+                            plano: isOrderActive ? 'pro' : 'free',
+                            status_pagamento: isOrderActive ? 'ativo' : 'expirado',
+                            data_expiracao: currentPeriodEnd.split('T')[0]
+                        })
+                        .eq('id', user.id);
+                    
+                    console.log(`[Stripe Webhook] Assinatura atualizada para usuário ${user.id}: ${status}`);
+                }
+                break;
+            }
+
             case 'invoice.payment_succeeded': {
                 const invoice = event.data.object;
                 if (invoice.subscription) {
-                    await updateSubscriptionInDB(invoice.subscription);
+                    // Opcional: registrar novo pagamento no histórico se não for o primeiro
                 }
                 break;
             }
