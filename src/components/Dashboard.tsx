@@ -120,7 +120,7 @@ export default function Dashboard({
     if (success === 'true') {
       setPaymentFeedback({
         type: 'success',
-        message: '¡Pagaimento concluído com sucesso! Sua conta Pro está sendo ativada.'
+        message: 'Pagamento concluído com sucesso! Sua conta Pro está sendo ativada.'
       });
       // Limpa os parâmetros da URL sem recarregar a página
       window.history.replaceState({}, '', window.location.pathname);

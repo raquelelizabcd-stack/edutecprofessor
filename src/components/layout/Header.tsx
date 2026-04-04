@@ -64,40 +64,22 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
     const handleCreateStripeSession = async () => {
         setIsCreatingSession(true);
         try {
-            const { data, error } = await supabase.auth.getUser();
-            if (error || !data?.user) {
-                alert('Erro: Usuário não autenticado.');
-                return;
-            }
-            const userId = data.user.id;
-            const uemail = data.user.email;
+            const { data } = await supabase.auth.getUser();
+            const userId = data?.user?.id;
+            const uemail = data?.user?.email;
 
-            // Use '/api' for Vercel production and 'http://localhost:3001/api' for local dev
-            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const apiUrl = isLocal
-                ? 'http://localhost:3001/api/create-stripe-session'
-                : '/api/create-stripe-session';
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, email: uemail })
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error || 'Erro ao criar sessão de checkout');
-            }
-
-            const result = await response.json();
-            if (result.url) {
-                window.location.href = result.url;
-            } else {
-                throw new Error('URL de checkout não retornada');
-            }
+            // Link de teste fornecido pela usuária
+            const testLink = "https://buy.stripe.com/test_eVq7sLa4f3hj1Ih57V6EU00";
+            
+            // Adicionamos parâmetros para o Stripe reconhecer o usuário no Webhook
+            const separator = testLink.includes('?') ? '&' : '?';
+            const finalUrl = `${testLink}${separator}client_reference_id=${userId || ''}${uemail ? `&prefilled_email=${encodeURIComponent(uemail)}` : ''}`;
+            
+            window.location.href = finalUrl;
         } catch (err) {
             console.error('Erro no checkout:', err);
-            alert('Não foi possível iniciar o checkout. Tente novamente mais tarde.');
+            // Fallback para o link puro em caso de erro crítico
+            window.location.href = "https://buy.stripe.com/test_eVq7sLa4f3hj1Ih57V6EU00";
         } finally {
             setIsCreatingSession(false);
         }

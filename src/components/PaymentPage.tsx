@@ -62,33 +62,20 @@ export default function PaymentPage({
                 activeEmail = session.user.email || userEmail;
             }
 
-            // Chama API para criar sessão do Stripe
-            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const apiUrl = isLocal
-                ? 'http://localhost:3001/api/create-stripe-session'
-                : '/api/create-stripe-session';
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: activeUserId, email: activeEmail })
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error || 'Erro ao conectar com o servidor de pagamentos');
-            }
-
-            const result = await response.json();
-            if (result.url) {
-                window.location.href = result.url;
-            } else {
-                throw new Error('URL de checkout não retornada');
-            }
+            // Link de teste fornecido pela usuária
+            const testLink = "https://buy.stripe.com/test_eVq7sLa4f3hj1Ih57V6EU00";
+            
+            // Adicionamos parâmetros para o Stripe reconhecer o usuário no Webhook
+            const separator = testLink.includes('?') ? '&' : '?';
+            const finalUrl = `${testLink}${separator}client_reference_id=${activeUserId || ''}${activeEmail ? `&prefilled_email=${encodeURIComponent(activeEmail)}` : ''}`;
+            
+            window.location.href = finalUrl;
 
         } catch (err: any) {
             console.error('Checkout error:', err);
-            alert(err.message || 'Erro ao iniciar o checkout. Tente novamente.');
+            // Fallback para o link puro em caso de erro crítico
+            window.location.href = "https://buy.stripe.com/test_eVq7sLa4f3hj1Ih57V6EU00";
+        } finally {
             setIsProcessing(false);
         }
     };

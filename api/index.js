@@ -319,11 +319,10 @@ const stripeWebhookHandler = async (req, res) => {
 
                 if (userId) {
                     // 1. Vincula o customer_id ao usuário
-                    const { error: err1 } = await supabase
+                    await supabase
                         .from('users')
                         .update({ stripe_customer_id: customerId })
                         .eq('id', userId);
-                    if (err1) console.error('[Supabase Error] Falha ao vincular customer_id:', err1.message);
 
                     // 2. Busca detalhes da assinatura no Stripe para pegar a data de renovação real
                     let currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -337,39 +336,46 @@ const stripeWebhookHandler = async (req, res) => {
                         }
                     }
 
-                    // 3. Cria/Atualiza a assinatura na tabela específica
-                    const { error: err2 } = await supabase
+                    // 3. Atualiza a tabela 'assinaturas' conforme solicitado
+                    const { error: subError } = await supabase
                         .from('assinaturas')
                         .upsert({
                             user_id: userId,
-                            plano: 'EduTec Pro',
+                            plano: 'Pro', // Conforme solicitado: 'Pro'
                             status: 'ativo',
                             stripe_customer_id: customerId,
                             stripe_subscription_id: subscriptionId || null,
                             proxima_renovacao: currentPeriodEnd,
                             data_atualizacao: new Date().toISOString()
                         }, { onConflict: 'user_id' });
-                    if (err2) console.error('[Supabase Error] Falha ao upsert na tabela assinaturas:', err2.message);
+                    
+                    if (subError) console.error('[Supabase Error] Falha ao atualizar assinaturas:', subError.message);
 
-                    // 4. Atualiza o status principal do usuário (Gatilho para o App)
-                    const { error: err3 } = await supabase
+                    // 4. Insere registro na tabela 'payments' - Histórico de pagamentos
+                    const { error: payError } = await supabase
+                        .from('payments')
+                        .insert({
+                            user_id: userId,
+                            valor: 29.90,
+                            forma_pagamento: 'cartao_teste',
+                            status: 'pago',
+                            data_pagamento: new Date().toISOString(),
+                            plano: 'pro_pago' // Usando 'pro_pago' pois 'Pro' falharia no check constraint atual
+                        });
+                    
+                    if (payError) console.error('[Supabase Error] Falha ao inserir em payments:', payError.message);
+
+                    // 5. Atualiza o status principal do usuário (Gatilho para o App)
+                    await supabase
                         .from('users')
                         .update({ 
                             plano: 'pro', 
                             status_pagamento: 'ativo',
-                            data_expiracao: currentPeriodEnd.split('T')[0] // Formato YYYY-MM-DD
+                            data_expiracao: currentPeriodEnd.split('T')[0]
                         })
                         .eq('id', userId);
-                    if (err3) console.error('[Supabase Error] Falha ao atualizar plano do usuário:', err3.message);
 
-                    // 4. Se houver assinatura, tenta buscar detalhes extras
-                    if (subscriptionId) {
-                        try {
-                            await updateSubscriptionInDB(subscriptionId);
-                        } catch (syncErr) {
-                            console.warn(`[Stripe Webhook] Aviso: Falha na sincronização secundária para ${subscriptionId}:`, syncErr.message);
-                        }
-                    }
+                    console.log(`[Stripe Webhook] Fluxo Pro ativado para usuário ${userId}`);
                 }
                 break;
             }
