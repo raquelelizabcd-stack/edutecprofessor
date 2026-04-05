@@ -246,6 +246,8 @@ export default function App() {
       onSuccess={handlePaymentSuccess}
       onUnauthenticated={() => handleGoToLogin('payment')}
       userEmail={session?.user.email || ''}
+      statusPagamento={userStatusPagamento}
+      role={currentProfile}
     />;
   }
 

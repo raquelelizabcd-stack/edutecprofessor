@@ -11,6 +11,8 @@ interface PaymentPageProps {
     userEmail: string;
     monthlyPrice?: number;
     trialDays?: number;
+    statusPagamento?: string | null;
+    role?: string;
 }
 
 export default function PaymentPage({
@@ -19,10 +21,15 @@ export default function PaymentPage({
     onUnauthenticated,
     userEmail,
     monthlyPrice = 29.90,
-    trialDays = 7
+    trialDays = 7,
+    statusPagamento,
+    role
 }: PaymentPageProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    
+    // Verificamos se o usuário já é um "experimental" ou já está no trial para esconder as frases de teste
+    const isAlreadyInTrial = statusPagamento === 'teste' || statusPagamento === 'trial';
     
     // Auth states for non-authenticated users
     const [email, setEmail] = useState('');
@@ -62,8 +69,8 @@ export default function PaymentPage({
                 activeEmail = session.user.email || userEmail;
             }
 
-            // Link oficial de produção
-            const stripeLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
+            // Link oficial de produção — se já estava em trial, o Stripe deve processar conforme link padrão, mas a UI foca no pagamento agora
+            const stripeLink = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
             
             // Adicionamos parâmetros para o Stripe reconhecer o usuário no Webhook
             const separator = stripeLink.includes('?') ? '&' : '?';
@@ -74,7 +81,7 @@ export default function PaymentPage({
         } catch (err: any) {
             console.error('Checkout error:', err);
             // Fallback para o link puro em caso de erro crítico
-            window.location.href = import.meta.env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
+            window.location.href = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
         } finally {
             setIsProcessing(false);
         }
@@ -181,13 +188,17 @@ export default function PaymentPage({
                                 </div>
 
                                 <div className="bg-[#00A859]/[0.02] border border-[#00A859]/10 rounded-3xl p-6 md:p-8 text-center">
-                                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#00A859] text-white text-[10px] font-black uppercase tracking-widest rounded-full mb-4">
-                                        <Clock size={10} fill="currentColor" />
-                                        7 Dias de Teste Grátis Incluso
-                                    </div>
+                                    {!isAlreadyInTrial && (
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#00A859] text-white text-[10px] font-black uppercase tracking-widest rounded-full mb-4">
+                                            <Clock size={10} fill="currentColor" />
+                                            7 Dias de Teste Grátis Incluso
+                                        </div>
+                                    )}
                                     <h4 className="text-xl font-bold text-black mb-4">Ambiente 100% Seguro</h4>
                                     <p className="text-sm text-black/50 leading-relaxed max-w-md mx-auto mb-8">
-                                        Você será redirecionado para o checkout oficial do Stripe. Não cobraremos nada durante os primeiros 7 dias. Você pode cancelar a qualquer momento.
+                                        {isAlreadyInTrial 
+                                            ? "Você será redirecionado para o checkout oficial do Stripe para ativar sua assinatura mensal ilimitada."
+                                            : "Você será redirecionado para o checkout oficial do Stripe. Não cobraremos nada durante os primeiros 7 dias. Você pode cancelar a qualquer momento."}
                                     </p>
                                     
                                     <button
@@ -232,21 +243,25 @@ export default function PaymentPage({
                                     <div className="flex items-center justify-between">
                                         <div className="space-y-0.5">
                                             <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Total Hoje</span>
-                                            <p className="text-[#00A859] text-xs font-semibold">Início do Teste Grátis</p>
+                                            <p className={isAlreadyInTrial ? "text-white text-xs font-semibold" : "text-[#00A859] text-xs font-semibold"}>
+                                                {isAlreadyInTrial ? "Ativação Instantânea Pro" : "Início do Teste Grátis"}
+                                            </p>
                                         </div>
-                                        <span className="text-3xl font-bold">R$ 0,00</span>
+                                        <span className="text-3xl font-bold">R$ {isAlreadyInTrial ? monthlyPrice.toFixed(2).replace('.', ',') : '0,00'}</span>
                                     </div>
 
-                                    <div className="pt-4 border-t border-white/5 flex items-center justify-between">
-                                        <div className="space-y-0.5">
-                                            <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Após {trialDays} dias</span>
-                                            <p className="text-white/60 text-xs">Mensalidade Recorrente</p>
+                                    {!isAlreadyInTrial && (
+                                        <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+                                            <div className="space-y-0.5">
+                                                <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Após {trialDays} dias</span>
+                                                <p className="text-white/60 text-xs">Mensalidade Recorrente</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-xl font-bold">R$ {monthlyPrice.toFixed(2).replace('.', ',')}</span>
+                                                <span className="text-white/40 text-[10px] block">/mês</span>
+                                            </div>
                                         </div>
-                                        <div className="text-right">
-                                            <span className="text-xl font-bold">R$ {monthlyPrice.toFixed(2).replace('.', ',')}</span>
-                                            <span className="text-white/40 text-[10px] block">/mês</span>
-                                        </div>
-                                    </div>
+                                    )}
                                 </div>
                             </div>
 
