@@ -516,6 +516,10 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                             <div className="px-2 py-0.5 border border-black/20 rounded text-[10px] font-bold">CARTÃO</div>
                             <div className="px-2 py-0.5 border border-black/20 rounded text-[10px] font-bold">BOLETO</div>
                         </div>
+                        <p className="text-[10px] text-center text-black/30 font-bold mt-2 leading-tight uppercase tracking-widest">
+                            Cartão: Liberação imediata<br />
+                            Boleto: 1 a 3 dias úteis para compensação
+                        </p>
                     </div>
                 </div>
             </Modal>
