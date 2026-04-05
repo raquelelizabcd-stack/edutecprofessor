@@ -29,6 +29,7 @@ export default function App() {
   const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
   const [userDataExpiracao, setUserDataExpiracao] = useState<string | null>(null);
   const [userStatusPagamento, setUserStatusPagamento] = useState<string | null>(null);
+  const [userIntent, setUserIntent] = useState<'free' | 'pro'>('free'); // Default to free
   const [aceitouPrivacidade, setAceitouPrivacidade] = useState<boolean>(true); // Padrão true para não piscar antes de carregar
   const fetchUserProfile = async (userId: string) => {
     setIsInitializing(true);
@@ -42,21 +43,29 @@ export default function App() {
       if (error) throw error;
 
       if (!data) {
-        // Novo cadastro: Agora o padrão é Plano Free (Sem validade de 7 dias forçada)
+        // Novo cadastro via fallback: Respeita a intenção do usuário (Free ou Pro Teste)
+        const isPro = userIntent === 'pro';
+        const trialDate = isPro ? new Date() : null;
+        if (isPro && trialDate) trialDate.setDate(trialDate.getDate() + 7);
+        const expIso = trialDate ? trialDate.toISOString().split('T')[0] : null;
+
         try {
           await supabase.from('users').upsert({
             id: userId,
-            plano: 'free',
-            status_pagamento: 'gratis'
+            plano: isPro ? 'pro' : 'free',
+            status_pagamento: isPro ? 'teste' : 'gratis',
+            data_expiracao: expIso,
+            created_at: new Date().toISOString()
           });
         } catch (e) {
-          console.error('Erro ao criar perfil gratuito:', e);
+          console.error('Erro ao criar perfil inicial:', e);
         }
 
-        setCurrentProfile('free');
+        setCurrentProfile(isPro ? 'pro' : 'free');
         setUserCreatedAt(new Date().toISOString());
-        setUserDataExpiracao(null);
-        setUserStatusPagamento('gratis');
+        setUserDataExpiracao(expIso);
+        setUserStatusPagamento(isPro ? 'teste' : 'gratis');
+        setAceitouPrivacidade(false); // Mostra o modal de privacidade para novos usuários
 
         if (intendedViewRef.current) {
           setView(intendedViewRef.current);
@@ -183,9 +192,12 @@ export default function App() {
   };
 
   // We map the outer login redirection to save intention if an explicit string is passed
-  const handleGoToLogin = (intent?: View) => {
+  const handleGoToLogin = (intent?: View, planIntent?: 'free' | 'pro') => {
     if (intent) {
       intendedViewRef.current = intent;
+    }
+    if (planIntent) {
+      setUserIntent(planIntent);
     }
     setView('login');
   };
@@ -225,7 +237,7 @@ export default function App() {
   }
 
   if (view === 'login') {
-    return <LoginPage onLogin={handleLogin} onBack={handleBackToLanding} />;
+    return <LoginPage onLogin={handleLogin} onBack={handleBackToLanding} initialIntent={userIntent} />;
   }
 
   if (view === 'payment') {

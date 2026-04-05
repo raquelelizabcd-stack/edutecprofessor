@@ -27,7 +27,7 @@ import { supabase } from './lib/supabase';
 
 interface LandingPageProps {
   onLogin: (role: UserProfile) => void;
-  onGoToLogin: (intent?: 'payment' | 'dashboard') => void;
+  onGoToLogin: (intent?: 'payment' | 'dashboard', planIntent?: 'free' | 'pro') => void;
   onGoToPayment: () => void;
   onGoToDashboard: () => void;
 }
@@ -47,7 +47,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        onGoToLogin('dashboard');
+        onGoToLogin('dashboard', 'pro');
         return;
       }
 
@@ -376,7 +376,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 onClick={async () => {
                   const { data: { session } } = await supabase.auth.getSession();
                   if (!session) {
-                    onGoToLogin('dashboard');
+                    onGoToLogin('dashboard', 'free');
                   } else {
                     onGoToDashboard();
                   }

@@ -7,9 +7,10 @@ import { supabase } from '../lib/supabase';
 interface LoginPageProps {
   onLogin: (role: UserProfile) => void;
   onBack: () => void;
+  initialIntent?: 'free' | 'pro';
 }
 
-export default function LoginPage({ onLogin, onBack }: LoginPageProps) {
+export default function LoginPage({ onLogin, onBack, initialIntent = 'free' }: LoginPageProps) {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -46,11 +47,7 @@ export default function LoginPage({ onLogin, onBack }: LoginPageProps) {
           .single();
 
         if (!userError && userData) {
-          if (userData.plano === 'pro' && (userData.status_pagamento === 'aprovado' || userData.status_pagamento === 'ativo')) {
-            alert('Bem-vindo ao Pro 🚀');
-          } else {
-            alert('Bem-vindo ao Free');
-          }
+          // O Dashboard informará o plano no Header
         }
       } else {
         // Sign Up
@@ -65,9 +62,11 @@ export default function LoginPage({ onLogin, onBack }: LoginPageProps) {
           setError("Este email já está cadastrado. Faça login.");
           setIsLoginMode(true);
         } else if (data.user) {
-          // Sync with public.users table automatically with 7-day PRO trial
-          const trialExpiration = new Date();
-          trialExpiration.setDate(trialExpiration.getDate() + 7);
+          const isProIntent = initialIntent === 'pro';
+          const trialExpiration = isProIntent ? new Date() : null;
+          if (isProIntent && trialExpiration) {
+            trialExpiration.setDate(trialExpiration.getDate() + 7);
+          }
 
           const { error: upsertError } = await supabase
             .from('users')
@@ -75,9 +74,9 @@ export default function LoginPage({ onLogin, onBack }: LoginPageProps) {
               id: data.user.id,
               nome: name || email.split('@')[0],
               email: email,
-              plano: 'pro',
-              status_pagamento: 'teste',
-              data_expiracao: trialExpiration.toISOString().split('T')[0],
+              plano: isProIntent ? 'pro' : 'free',
+              status_pagamento: isProIntent ? 'teste' : 'gratis',
+              data_expiracao: trialExpiration ? trialExpiration.toISOString().split('T')[0] : null,
               created_at: new Date().toISOString()
             }, {
               onConflict: 'id'

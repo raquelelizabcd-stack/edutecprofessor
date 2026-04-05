@@ -284,6 +284,55 @@ app.post('/api/create-portal-session', createPortalSessionHandler);
 app.post('/create-portal-session', createPortalSessionHandler);
 
 /**
+ * Endpoint para Cancelar Assinatura (Agendar cancelamento para o fim do período)
+ */
+app.post('/api/cancelar-assinatura', async (req, res) => {
+    const { userId } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'ID do usuário não fornecido.' });
+    }
+
+    try {
+        // 1. Busca o ID da assinatura no banco
+        const { data: sub, error } = await supabase
+            .from('assinaturas')
+            .select('stripe_subscription_id, proxima_renovacao')
+            .eq('user_id', userId)
+            .single();
+
+        if (error || !sub?.stripe_subscription_id) {
+            return res.status(404).json({ error: 'Assinatura ativa não encontrada.' });
+        }
+
+        // 2. Cancela no Stripe ao final do período (mantém o acesso)
+        await stripe.subscriptions.update(sub.stripe_subscription_id, {
+            cancel_at_period_end: true
+        });
+
+        // 3. Atualiza o status no banco para refletir o cancelamento agendado
+        await supabase
+            .from('users')
+            .update({ status_pagamento: 'cancelado' })
+            .eq('id', userId);
+
+        await supabase
+            .from('assinaturas')
+            .update({ status: 'cancelado' })
+            .eq('user_id', userId);
+
+        res.json({ 
+            success: true, 
+            message: 'Assinatura cancelada com sucesso.',
+            expiracao: sub.proxima_renovacao
+        });
+    } catch (err) {
+        console.error('[Stripe Cancel Error]', err.message);
+        res.status(500).json({ error: 'Erro ao processar cancelamento: ' + err.message });
+    }
+});
+
+/**
  * Webhook do Stripe (Tratamento Completo)
  */
 const stripeWebhookHandler = async (req, res) => {
@@ -385,6 +434,7 @@ const stripeWebhookHandler = async (req, res) => {
                 const subscription = event.data.object;
                 const status = subscription.status;
                 const customerId = subscription.customer;
+                const cancelAtPeriodEnd = subscription.cancel_at_period_end;
 
                 // Busca o usuário pelo customerId
                 const { data: user } = await supabase
@@ -394,14 +444,18 @@ const stripeWebhookHandler = async (req, res) => {
                     .maybeSingle();
 
                 if (user) {
-                    const isOrderActive = ['active', 'trialing'].includes(status);
+                    const isStillActive = ['active', 'trialing'].includes(status);
                     const currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+
+                    // Se estiver marcado para cancelar mas ainda ativo, status é 'cancelado' (conforme regra de negócio)
+                    // Se o status do Stripe for realmente cancelado ou expirado, vira 'expirado' ou 'cancelado'
+                    let finalStatus = isStillActive ? (cancelAtPeriodEnd ? 'cancelado' : 'ativo') : 'expirado';
 
                     // Atualiza tabela de assinaturas
                     await supabase
                         .from('assinaturas')
                         .update({
-                            status: isOrderActive ? 'ativo' : 'expirado',
+                            status: finalStatus,
                             proxima_renovacao: currentPeriodEnd,
                             data_atualizacao: new Date().toISOString()
                         })
@@ -411,13 +465,13 @@ const stripeWebhookHandler = async (req, res) => {
                     await supabase
                         .from('users')
                         .update({
-                            plano: isOrderActive ? 'pro' : 'free',
-                            status_pagamento: isOrderActive ? 'ativo' : 'expirado',
+                            plano: isStillActive ? 'pro' : 'free',
+                            status_pagamento: finalStatus,
                             data_expiracao: currentPeriodEnd.split('T')[0]
                         })
                         .eq('id', user.id);
                     
-                    console.log(`[Stripe Webhook] Assinatura atualizada para usuário ${user.id}: ${status}`);
+                    console.log(`[Stripe Webhook] Assinatura ${event.type} para usuário ${user.id}: ${status} (CancelAtEnd: ${cancelAtPeriodEnd})`);
                 }
                 break;
             }

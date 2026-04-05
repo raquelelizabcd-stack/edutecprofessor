@@ -69,7 +69,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             const uemail = data?.user?.email;
 
             // Link oficial de produção
-            const stripeLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
+            const stripeLink = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
             
             // Adicionamos parâmetros para o Stripe reconhecer o usuário no Webhook
             const separator = stripeLink.includes('?') ? '&' : '?';
@@ -79,7 +79,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
         } catch (err) {
             console.error('Erro no checkout:', err);
             // Fallback para o link puro em caso de erro crítico
-            window.location.href = import.meta.env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
+            window.location.href = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
         } finally {
             setIsCreatingSession(false);
         }
@@ -94,6 +94,12 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
 
             if (!userEmail && !currentUserId) {
                 alert('E-mail ou Sessão não identificados. Recarregue a página.');
+                return;
+            }
+
+            // [NOVO] Se o usuário está em teste, mandamos para o pagamento direto para assinar já
+            if ((statusPagamento === 'teste' || statusPagamento === 'trial') && onGoToPayment) {
+                onGoToPayment();
                 return;
             }
 
@@ -123,6 +129,44 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
         } catch (err: any) {
             console.error('Erro no portal de faturamento:', err);
             alert(err?.message || 'Não foi possível acessar o portal de faturamento agora.');
+        } finally {
+            setIsCreatingSession(false);
+        }
+    };
+
+    const handleCancelSubscription = async () => {
+        if (!window.confirm('Tem certeza que deseja cancelar sua assinatura Pro? Você manterá o acesso até o fim do período atual, mas a renovação será interrompida.')) {
+            return;
+        }
+
+        setIsCreatingSession(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const currentUserId = session?.user?.id;
+
+            if (!currentUserId) throw new Error('Sessão expirada. Faça login novamente.');
+
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const apiUrl = isLocal
+                ? 'http://localhost:3001/api/cancelar-assinatura'
+                : '/api/cancelar-assinatura';
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: currentUserId })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Erro ao cancelar assinatura');
+            }
+
+            alert('Assinatura cancelada com sucesso! Você continuará com acesso Pro até o final do período vigente.');
+            window.location.reload(); 
+        } catch (err: any) {
+            console.error('Erro ao cancelar:', err);
+            alert(err?.message || 'Erro ao processar cancelamento.');
         } finally {
             setIsCreatingSession(false);
         }
@@ -318,7 +362,12 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                             <p className="text-xs font-bold text-black/40 uppercase tracking-wider">Plano Atual</p>
                             <p className="font-bold flex items-center gap-2">
                                 {role === 'pro' ? 'EduTec Pro Platinum' : 'EduTec Gratuito'}
-                                <span className="px-2 py-0.5 bg-[#00A859] text-white text-[10px] rounded animate-pulse">Ativo</span>
+                                <span className={cn(
+                                    "px-2 py-0.5 text-white text-[10px] rounded animate-pulse",
+                                    (statusPagamento === 'teste' || statusPagamento === 'trial') ? "bg-amber-500" : "bg-[#00A859]"
+                                )}>
+                                    {(statusPagamento === 'teste' || statusPagamento === 'trial') ? 'Teste Grátis' : 'Ativo'}
+                                </span>
                             </p>
                         </div>
                         {role === 'free' && (
@@ -333,9 +382,11 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Dados de Pagamento</h4>
                         <PaymentSection 
                             handleManageBilling={handleManageBilling} 
+                            handleCancelSubscription={handleCancelSubscription}
                             isCreatingSession={isCreatingSession}
                             statusPagamento={statusPagamento}
                             userDataExpiracao={userDataExpiracao}
+                            role={role}
                         />
                     </div>
 
@@ -452,7 +503,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
 }
 
 // Sub-componente para gerenciar a lógica de pagamento dentro do modal
-function PaymentSection({ handleManageBilling, isCreatingSession, statusPagamento, userDataExpiracao }: { handleManageBilling: () => Promise<void>, isCreatingSession: boolean, statusPagamento?: string | null, userDataExpiracao?: string | null }) {
+function PaymentSection({ handleManageBilling, handleCancelSubscription, isCreatingSession, statusPagamento, userDataExpiracao, role }: { handleManageBilling: () => Promise<void>, handleCancelSubscription: () => Promise<void>, isCreatingSession: boolean, statusPagamento?: string | null, userDataExpiracao?: string | null, role: string }) {
     const [card, setCard] = useState<{ number: string, name: string, expiry: string } | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [tempFormData, setTempFormData] = useState({ number: '', name: '', expiry: '', cvv: '' });
@@ -471,10 +522,7 @@ function PaymentSection({ handleManageBilling, isCreatingSession, statusPagament
     };
 
     const handleRemoveCard = () => {
-        if (window.confirm('Tem certeza que deseja remover este cartão?')) {
-            setCard(null);
-            setIsEditing(false);
-        }
+        handleCancelSubscription();
     };
 
     if (isEditing) {
@@ -543,7 +591,7 @@ function PaymentSection({ handleManageBilling, isCreatingSession, statusPagament
         );
     }
 
-    if (statusPagamento === 'ativo' || statusPagamento === 'teste' || card) {
+    if (statusPagamento === 'ativo' || statusPagamento === 'teste' || statusPagamento === 'trial' || card) {
         return (
             <div className="space-y-4">
                 {/* Billing Summary Card */}
@@ -554,16 +602,19 @@ function PaymentSection({ handleManageBilling, isCreatingSession, statusPagament
 
                     <div className="relative z-10 space-y-5">
                         <div className="flex items-center justify-between">
-                            <span className={cn(
-                                "px-3 py-1 text-[10px] font-black uppercase tracking-widest rounded-full border",
-                                statusPagamento === 'teste' 
+                             <span className={cn(
+                                "px-3 py-1.5 border rounded-full text-[10px] font-black uppercase tracking-tight flex items-center gap-2",
+                                (statusPagamento === 'teste' || statusPagamento === 'trial' || statusPagamento === 'cancelado')
                                     ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
                                     : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                             )}>
-                                {statusPagamento === 'teste' ? 'Período de Teste (7 dias)' : 'Assinatura Ativa'}
+                                {(statusPagamento === 'teste' || statusPagamento === 'trial') ? 'Período de Teste (7 dias)' : 
+                                 statusPagamento === 'cancelado' ? 'Assinatura Cancelada' : 'Assinatura Pro Ativa'}
+                                
+                                {statusPagamento === 'ativo' && <Icons.ShieldCheck size={14} className="text-emerald-400" />}
+                                {(statusPagamento === 'teste' || statusPagamento === 'trial') && <Icons.Zap size={14} className="text-amber-400" />}
+                                {statusPagamento === 'cancelado' && <Icons.AlertCircle size={14} className="text-amber-400" />}
                             </span>
-                            {statusPagamento === 'ativo' && <Icons.ShieldCheck className="text-emerald-400" size={20} />}
-                            {statusPagamento === 'teste' && <Icons.Zap className="text-amber-400" size={20} />}
                         </div>
 
                         <div>
@@ -598,18 +649,31 @@ function PaymentSection({ handleManageBilling, isCreatingSession, statusPagament
                                 disabled={isCreatingSession}
                                 className="flex-1 py-3 bg-white text-black text-[12px] font-black rounded-xl transition-all hover:bg-emerald-50 dynamic-shadow active:scale-95 disabled:opacity-50"
                             >
-                                {isCreatingSession ? 'Conectando...' : 'Gerenciar Pagamentos'}
+                                {isCreatingSession ? 'Conectando...' : (statusPagamento === 'teste' || statusPagamento === 'trial' ? 'Assinar Pro Agora' : 'Portal de Faturamento')}
                             </button>
-                            <button
-                                onClick={handleRemoveCard}
-                                className="p-3 bg-white/10 text-white/40 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
-                                title="Cancelar Renovação"
-                            >
-                                <Icons.Power size={18} />
-                            </button>
+                            {statusPagamento !== 'cancelado' && role === 'pro' && (
+                                <button
+                                    onClick={handleCancelSubscription}
+                                    disabled={isCreatingSession}
+                                    className="px-4 py-3 bg-white/10 text-white text-[12px] font-black rounded-xl hover:bg-red-500/20 hover:text-red-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                                    title="Cancelar Renovação"
+                                >
+                                    <Icons.Power size={18} />
+                                    <span>Cancelar</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
+
+                {statusPagamento === 'cancelado' && userDataExpiracao && (
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex gap-3">
+                        <Icons.AlertCircle className="text-amber-600 shrink-0" size={20} />
+                        <p className="text-xs text-amber-800 leading-relaxed">
+                            <strong>Assinatura Cancelada:</strong> Você cancelou sua assinatura. Seu acesso ao Plano Pro continuará até o dia <strong>{new Date(userDataExpiracao).toLocaleDateString('pt-BR')}</strong>. Após esta data, sua conta retornará ao Plano Gratuito.
+                        </p>
+                    </div>
+                )}
 
                 <p className="text-[10px] text-center text-black/30 font-bold px-4">
                     Suas transações são protegidas por criptografia de ponta a ponta via Stripe.
