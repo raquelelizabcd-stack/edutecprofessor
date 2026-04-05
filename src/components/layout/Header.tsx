@@ -97,8 +97,10 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                 return;
             }
 
-            // [NOVO] Se o usuário está em teste, mandamos para o pagamento direto para assinar já
-            if ((statusPagamento === 'teste' || statusPagamento === 'trial') && onGoToPayment) {
+            // [NOVO] Se o usuário está em teste ou é Pro sem assinatura recorrente ativa no Stripe, mandamos para o pagamento
+            const isTrialOrNewPro = statusPagamento === 'teste' || statusPagamento === 'trial' || (role === 'pro' && statusPagamento !== 'ativo' && statusPagamento !== 'aprovado');
+            
+            if (isTrialOrNewPro && onGoToPayment) {
                 onGoToPayment();
                 return;
             }
