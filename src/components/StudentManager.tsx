@@ -10,9 +10,11 @@ import autoTable from 'jspdf-autotable';
 
 interface StudentManagerProps {
     professorId: string;
+    role: string;
+    statusPagamento: string;
 }
 
-export default function StudentManager({ professorId }: StudentManagerProps) {
+export default function StudentManager({ professorId, role, statusPagamento }: StudentManagerProps) {
     const [students, setStudents] = useState<Student[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -76,6 +78,25 @@ export default function StudentManager({ professorId }: StudentManagerProps) {
                 limitacoes_pcd: formData.necessidades_especiais ? (formData.limitacoes_pcd || null) : null,
                 professor_id: professorId,
             };
+
+            const isFree = role === 'free';
+            const isTrial = statusPagamento === 'trial';
+            const isPro = role === 'pro' && statusPagamento === 'paid';
+
+            if (!editingStudent) {
+                if (isFree) {
+                    alert("Atenção: O cadastro de alunos está disponível apenas para os planos Trial (5 alunos) ou Pro Pago (170 alunos). Faça o upgrade para prosseguir!");
+                    return;
+                }
+                if (isTrial && students.length >= 5) {
+                    alert("Limite de Alunos atingido para o Período de Teste (Máximo 5). Assine o Plano Pro Pago para cadastrar até 170 alunos!");
+                    return;
+                }
+                if (isPro && students.length >= 170) {
+                    alert("Atenção: O limite máximo de 170 alunos para o Plano Pro Pago foi atingido.");
+                    return;
+                }
+            }
 
             let savedStudentId = editingStudent?.id;
 

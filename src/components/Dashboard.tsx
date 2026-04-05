@@ -493,42 +493,83 @@ export default function Dashboard({
         weeklyData: null as any,
         exportFormat: 'pdf' as 'pdf' | 'csv'
       });
-      // Check limits for Free and Trial plans
-      if (role === 'free' || statusPagamento === 'trial') {
-        const moduleRecords = records.filter(r => r.moduleId === activeTab);
-        const isTrial = statusPagamento === 'trial';
-        const limit = isTrial ? 3 : 1; // 3 para Trial, 1 para Free (regras anteriores mantidas para Free)
+      // --- SISTEMA DE LIMITES E TRAVAS (FREE / TRIAL / PRO) ---
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).getTime();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+      
+      const moduleRecords = records.filter(r => r.moduleId === activeTab);
+      const isFree = role === 'free';
+      const isTrial = statusPagamento === 'trial';
+      const isPro = role === 'pro' && statusPagamento === 'paid';
 
-        if (isTrial) {
-             if (moduleRecords.length >= limit) {
-                alert(`Limite do Período de Teste: Máximo ${limit} registros por módulo. Assine o Pro para liberar o uso ilimitado!`);
-                return;
-             }
-        } else {
-            // Lógica existente para Free (foi solicitada manutenção dos limites 1/dia etc)
-            const now = new Date();
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-            const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).getTime();
+      // 1. Lógica para Plano Free
+      if (isFree) {
+          if (activeTab === 'relatorio-individual' || activeTab === 'planejamento-diario') {
+              const todayCount = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfDay).length;
+              if (todayCount >= 1) {
+                  alert("Limite Plano Free: 1 registro por dia. Mude para o Pro!");
+                  return;
+              }
+          } else if (activeTab === 'planejamento-semanal') {
+              const weekCount = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfWeek).length;
+              if (weekCount >= 1) {
+                  alert("Limite Plano Free: 1 planejamento semanal por semana. Mude para o Pro!");
+                  return;
+              }
+          } else if (activeTab === 'planejamento-mensal') {
+              const monthCount = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfMonth).length;
+              if (monthCount >= 1) {
+                  alert("Limite Plano Free: 1 planejamento mensal por mês. Mude para o Pro!");
+                  return;
+              }
+          } else {
+              if (moduleRecords.length >= 1) {
+                  alert("Limite Plano Free atingido para este módulo. Mude para o Pro!");
+                  return;
+              }
+          }
+      }
 
-            if (activeTab === 'relatorio-individual' || activeTab === 'planejamento-diario') {
-                const todayRecords = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfDay);
-                if (todayRecords.length >= 1) {
-                    alert(`Limite do Plano Free: 1 ${activeItem?.label} por dia. Mude para o Pro para ilimitado!`);
-                    return;
-                }
-            } else if (['planejamento-semanal', 'planejamento-mensal', 'relatorios-aluno'].includes(activeTab)) {
-                const weekRecords = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfWeek);
-                if (weekRecords.length >= 1) {
-                    alert("Limite do Plano Free: 1 registro por semana neste módulo. Mude para o Pro para ilimitado!");
-                    return;
-                }
-            } else {
-                if (moduleRecords.length >= 1) {
-                    alert("Limite do Plano Free atingido para este módulo. Mude para o Pro para ilimitado!");
-                    return;
-                }
-            }
-        }
+      // 2. Lógica para Teste Pro (Trial 7 dias)
+      if (isTrial) {
+          if (activeTab === 'relatorio-individual' || activeTab === 'relatorios-aluno') {
+              const todayCount = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfDay).length;
+              if (todayCount >= 1) {
+                  alert("Teste Pro: 1 relatório/parecer por dia no período de teste. Assine o Pro Pago!");
+                  return;
+              }
+          } else if (activeTab === 'planejamento-semanal' || activeTab === 'planejamento-mensal') {
+              if (moduleRecords.length >= 1) {
+                  alert(`Teste Pro: Apenas 1 ${activeItem?.label} permitido no teste. Assine o Pro Pago!`);
+                  return;
+              }
+          } else if (activeTab === 'portfolio') {
+              if (moduleRecords.length >= 10) {
+                  alert("Teste Pro: Limite de 10 portfólios no período de teste. Assine o Pro Pago!");
+                  return;
+              }
+          } else if (activeTab === 'reflexoes') {
+              if (moduleRecords.length >= 5) {
+                  alert("Teste Pro: Limite de 5 reflexões no período de teste. Assine o Pro Pago!");
+                  return;
+              }
+          } else {
+              if (moduleRecords.length >= 3) {
+                  alert("Teste Pro: Limite de 3 registros neste módulo. Assine o Pro Pago!");
+                  return;
+              }
+          }
+      }
+
+      // 3. Lógica para Pro Pago (Anti-compartilhamento: 3-4 registros por dia)
+      if (isPro) {
+          const todayTotal = records.filter(r => new Date(r.createdAt || 0).getTime() >= startOfDay).length;
+          if (todayTotal >= 4) {
+              alert("Segurança Pro: Limite diário de 4 novos registros atingido. O uso abusivo ou compartilhamento de conta é monitorado.");
+              return;
+          }
       }
 
       setEditingRecord(null);
@@ -803,20 +844,36 @@ export default function Dashboard({
   };
 
   const handleExport = async (recordToExport?: PedagogicalRecord) => {
-    // Bloqueio Plano Free
+    // --- LIMITES DE EXPORTAÇÃO PDF ---
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).getTime();
+
     if (role === 'free') {
-      alert("⚠️ Exportação em PDF bloqueada no Plano Free. Faça upgrade para o Pro para baixar seus arquivos!");
-      return;
+        const lastExport = localStorage.getItem('last_free_export') || '0';
+        if (parseInt(lastExport) >= startOfWeek) {
+            alert("Limite Plano Free: 1 PDF por semana. Faça upgrade para o Pro Pago para baixar sem limites!");
+            return;
+        }
+        localStorage.setItem('last_free_export', Date.now().toString());
     }
 
-    // Limite Plano Pro Trial (7 dias)
     if (statusPagamento === 'trial') {
       const exportCount = parseInt(localStorage.getItem('trial_exports') || '0');
-      if (exportCount >= 3) {
-        alert("⚠️ Limite de exportação atingido no período de teste (máximo 3 PDFs). Assine o Plano Pro Pago para exportações ilimitadas!");
+      if (exportCount >= 4) {
+        alert("Teste Pro: Limite de 4 PDFs atingido no teste. Assine o Pro Pago para baixar ilimitado!");
         return;
       }
       localStorage.setItem('trial_exports', (exportCount + 1).toString());
+    }
+
+    if (role === 'pro' && statusPagamento === 'paid') {
+        const dailyExports = parseInt(localStorage.getItem(`pro_exports_${new Date().toDateString()}`) || '0');
+        if (dailyExports >= 4) {
+            alert("Segurança Pro: Limite de 4 exportações diárias atingido para garantir a integridade da sua conta.");
+            return;
+        }
+        localStorage.setItem(`pro_exports_${new Date().toDateString()}`, (dailyExports + 1).toString());
     }
 
     // Se não for um registro específico, mantemos a lógica local de exportação em lote (ou alertamos)
@@ -871,20 +928,36 @@ export default function Dashboard({
   };
 
   const exportarPDFPortfolio = () => {
-    // Bloqueio Plano Free
+    // --- LIMITES DE EXPORTAÇÃO PDF PORTFÓLIO ---
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).getTime();
+
     if (role === 'free') {
-      alert("⚠️ Exportação em PDF bloqueada no Plano Free. Faça upgrade para o Pro para baixar seu portfólio!");
-      return;
+        const lastExport = localStorage.getItem('last_free_export') || '0';
+        if (parseInt(lastExport) >= startOfWeek) {
+            alert("Limite Plano Free: 1 PDF por semana. Faça upgrade para o Pro Pago!");
+            return;
+        }
+        localStorage.setItem('last_free_export', Date.now().toString());
     }
 
-    // Limite Plano Pro Trial
     if (statusPagamento === 'trial') {
       const exportCount = parseInt(localStorage.getItem('trial_exports') || '0');
-      if (exportCount >= 3) {
-        alert("⚠️ Limite de exportação atingido no período de teste. Assine o Plano Pro Pago para exportações ilimitadas!");
+      if (exportCount >= 4) {
+        alert("Teste Pro: Limite de 4 PDFs atingido no teste. Assine o Pro Pago!");
         return;
       }
       localStorage.setItem('trial_exports', (exportCount + 1).toString());
+    }
+
+    if (role === 'pro' && statusPagamento === 'paid') {
+        const dailyExports = parseInt(localStorage.getItem(`pro_exports_${new Date().toDateString()}`) || '0');
+        if (dailyExports >= 4) {
+            alert("Segurança Pro: Limite de 4 exportações diárias atingido.");
+            return;
+        }
+        localStorage.setItem(`pro_exports_${new Date().toDateString()}`, (dailyExports + 1).toString());
     }
 
     const doc = new jsPDF();
@@ -1093,7 +1166,7 @@ export default function Dashboard({
         />
 
         {activeTab === 'alunos' ? (
-          <StudentManager professorId={userId} />
+          <StudentManager professorId={userId} role={role} statusPagamento={statusPagamento} />
         ) : activeTab === 'presenca' ? (
           <AttendanceManager professorId={userId} professorNome={professorNome} />
         ) : activeTab === 'ajuda' ? (

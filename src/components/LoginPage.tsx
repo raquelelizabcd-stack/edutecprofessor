@@ -101,8 +101,11 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
         setError('A senha deve ter pelo menos 6 caracteres.');
       } else if (err.message.includes('User already registered')) {
         setError('Este e-mail já está cadastrado.');
+      } else if (err.message.includes('For security purposes') || err.message.includes('after')) {
+        const seconds = err.message.match(/\d+/);
+        setError(`Por segurança, aguarde ${seconds ? seconds[0] : 'alguns'} segundos antes de tentar novamente.`);
       } else {
-        setError(err.message || 'Ocorreu um erro na autenticação.');
+        setError('Ocorreu um erro na autenticação. Tente novamente mais tarde.');
       }
     } finally {
       setIsLoading(false);

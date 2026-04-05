@@ -32,11 +32,15 @@ const TermsAndRules: React.FC<TermsAndRulesProps> = ({ onAccept, onBack }) => {
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-xs text-neutral-600">
                 <Icons.Check size={14} className="text-emerald-500 mt-0.5 shrink-0" />
-                <span>1 Planejamento Semanal/mês</span>
+                <span>Planejamento Diário / Relatório: 1/dia</span>
               </li>
               <li className="flex items-start gap-2 text-xs text-neutral-600">
                 <Icons.Check size={14} className="text-emerald-500 mt-0.5 shrink-0" />
-                <span>1 Planejamento Mensal/mês</span>
+                <span>Planejamento Semanal: 1/semana</span>
+              </li>
+              <li className="flex items-start gap-2 text-xs text-neutral-600">
+                <Icons.Check size={14} className="text-emerald-500 mt-0.5 shrink-0" />
+                <span>Planejamento Mensal: 1/mês</span>
               </li>
               <li className="flex items-start gap-2 text-xs text-neutral-600">
                 <Icons.Check size={14} className="text-emerald-500 mt-0.5 shrink-0" />
@@ -44,7 +48,7 @@ const TermsAndRules: React.FC<TermsAndRulesProps> = ({ onAccept, onBack }) => {
               </li>
               <li className="flex items-start gap-2 text-orange-500 font-bold text-[10px] uppercase mt-2">
                 <Icons.AlertCircle size={12} className="shrink-0" />
-                <span>Dados apagados após 5 dias</span>
+                <span>Alunos Bloqueados no Free</span>
               </li>
             </ul>
           </div>
