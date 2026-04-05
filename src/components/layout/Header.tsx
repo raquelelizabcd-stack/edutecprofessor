@@ -130,6 +130,13 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             }
         } catch (err: any) {
             console.error('Erro no portal de faturamento:', err);
+            
+            // [NOVO] Se o erro for de falta de histórico, redirecionamos para o checkout em vez de mostrar o alerta
+            if (err?.message?.includes('histórico de pagamentos') && onGoToPayment) {
+                onGoToPayment();
+                return;
+            }
+            
             alert(err?.message || 'Não foi possível acessar o portal de faturamento agora.');
         } finally {
             setIsCreatingSession(false);
