@@ -30,15 +30,20 @@ export default function App() {
   const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
   const [userDataExpiracao, setUserDataExpiracao] = useState<string | null>(null);
   const [userStatusPagamento, setUserStatusPagamento] = useState<string | null>(null);
-  const [userPhone, setUserPhone] = useState<string | null>(null);
-  const [userIntent, setUserIntent] = useState<'free' | 'pro'>('free'); // Default to free
-  const [aceitouPrivacidade, setAceitouPrivacidade] = useState<boolean>(true); // Padrão true para não piscar antes de carregar
+  const [userIntent, setUserIntent] = useState<'free' | 'pro'>(() => {
+    try {
+      return (localStorage.getItem('edutec_user_intent') as 'free' | 'pro') || 'free';
+    } catch (_) {
+      return 'free';
+    }
+  });
+  const [aceitouPrivacidade, setAceitouPrivacidade] = useState<boolean>(false); // Começa false para carregar do banco
   const fetchUserProfile = async (userId: string) => {
     setIsInitializing(true);
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('plano, status_pagamento, created_at, data_expiracao, aceitou_privacidade, telefone')
+        .select('plano, status_pagamento, created_at, data_expiracao, aceitou_privacidade')
         .eq('id', userId)
         .maybeSingle();
 
@@ -54,16 +59,17 @@ export default function App() {
         try {
           await supabase.from('users').upsert({
             id: userId,
-            plano: isProIntent ? 'teste_pro' : 'free',
+            plano: isProIntent ? 'pro' : 'free',
             status_pagamento: isProIntent ? 'pendente' : 'gratis',
             data_expiracao: expIso,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            aceitou_privacidade: false
           });
         } catch (e) {
           console.error('Erro ao criar perfil inicial:', e);
         }
 
-        setCurrentProfile(isProIntent ? 'teste_pro' : 'free');
+        setCurrentProfile(isProIntent ? 'pro' : 'free');
         setUserCreatedAt(new Date().toISOString());
         setUserDataExpiracao(expIso);
         setUserStatusPagamento(isProIntent ? 'pendente' : 'gratis');
@@ -76,26 +82,24 @@ export default function App() {
         setUserCreatedAt(data.created_at);
         setUserDataExpiracao(data.data_expiracao);
         setUserStatusPagamento(data.status_pagamento);
-        setUserPhone(data.telefone);
         setAceitouPrivacidade(data.aceitou_privacidade || false);
 
         const today = new Date().toISOString().split('T')[0];
         const isExpired = data.data_expiracao && data.data_expiracao < today;
 
-        if (matchedPlano === 'pro' || matchedPlano === 'teste_pro') {
+        if (matchedPlano === 'pro') {
           const isPaid = data.status_pagamento === 'aprovado';
-          const isTrial = matchedPlano === 'teste_pro' && data.status_pagamento === 'pendente';
+          const isTrial = data.status_pagamento === 'pendente';
           
-          if (!isPaid && isExpired) {
-            if (isTrial) {
-              alert("Seu período de teste grátis de 7 dias terminou. Para continuar acessando as ferramentas Pro, regularize sua assinatura.");
-              await supabase.from('users').update({ plano: 'free', status_pagamento: 'expirado' }).eq('id', userId);
-              setCurrentProfile('free');
-              setUserStatusPagamento('expirado');
-            } else if (data.status_pagamento !== 'expirado' && data.status_pagamento !== 'cancelado') {
-              alert("Sua assinatura Pro expirou. Por favor, regularize seu pagamento para continuar.");
-            }
+          if (!isPaid && !isTrial && isExpired) {
+            alert("Seu período de teste grátis de 7 dias terminou. Para continuar acessando as ferramentas Pro, regularize sua assinatura.");
+            await supabase.from('users').update({ plano: 'free', status_pagamento: 'expirado' }).eq('id', userId);
+            setCurrentProfile('free');
+            setUserStatusPagamento('expirado');
             setView('payment');
+          } else if (!isPaid && !isTrial && (data.status_pagamento !== 'expirado' && data.status_pagamento !== 'cancelado')) {
+             alert("Sua assinatura Pro expirou. Por favor, regularize seu pagamento para continuar.");
+             setView('payment');
           } else {
             // Se estiver tudo ok (pago ou trial ativo)
             setView(intendedViewRef.current || 'dashboard');
@@ -174,9 +178,13 @@ export default function App() {
       intendedViewRef.current = intent;
     }
     if (planIntent) {
+      console.log('Definindo userIntent como:', planIntent);
       setUserIntent(planIntent);
+      try {
+        localStorage.setItem('edutec_user_intent', planIntent);
+      } catch (_) {}
     }
-    setView('login'); // Volta a ir direto para o login
+    setView('login');
   };
 
   const handleBackToLanding = () => {
@@ -188,6 +196,11 @@ export default function App() {
   };
 
   const handleGoToPayment = () => {
+    // Ao ir para pagamento, assumimos intenção Pro
+    setUserIntent('pro');
+    try {
+      localStorage.setItem('edutec_user_intent', 'pro');
+    } catch (_) {}
     setView('payment');
   };
 
@@ -198,15 +211,35 @@ export default function App() {
 
   const handleAcceptTerms = async () => {
     if (session?.user.id) {
-      await supabase.from('users').update({ aceitou_privacidade: true }).eq('id', session.user.id);
+      const isProIntent = userIntent === 'pro';
+      const trialDate = isProIntent ? new Date() : null;
+      if (isProIntent && trialDate) trialDate.setDate(trialDate.getDate() + 7);
+      const expIso = trialDate ? trialDate.toISOString().split('T')[0] : null;
+
+      const updateData: any = { aceitou_privacidade: true };
+      if (isProIntent && currentProfile === 'free') {
+          updateData.plano = 'pro';
+          updateData.status_pagamento = 'pendente';
+          updateData.data_expiracao = expIso;
+      }
+
+      await supabase.from('users').update(updateData).eq('id', session.user.id);
+      
       setAceitouPrivacidade(true);
+      if (isProIntent && currentProfile === 'free') {
+          setCurrentProfile('pro');
+          setUserStatusPagamento('pendente');
+          setUserDataExpiracao(expIso);
+      }
     }
   };
 
-  if (isInitializing) {
+  // Carregamento inicial ou Perfil ainda em transição (public)
+  if (isInitializing || (session && currentProfile === 'public')) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDFCFB]">
-        <div className="w-12 h-12 border-4 border-[#00A859]/20 border-t-[#00A859] rounded-full animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FDFCFB]">
+        <div className="w-12 h-12 border-4 border-[#00A859]/20 border-t-[#00A859] rounded-full animate-spin mb-4" />
+        <p className="text-black/40 font-medium animate-pulse">Sincronizando perfil...</p>
       </div>
     );
   }
@@ -230,7 +263,7 @@ export default function App() {
     );
   }
 
-  // Se logado mas NÃO aceitou os termos ainda
+  // Se logado mas NÃO aceitou os termos ainda (ou é conta nova)
   if (session && !aceitouPrivacidade) {
     return (
       <TermsAndRules 
@@ -260,7 +293,6 @@ export default function App() {
       onGoToPayment={handleGoToPayment}
       userCreatedAt={userCreatedAt}
       userDataExpiracao={userDataExpiracao}
-      userPhone={userPhone}
       statusPagamento={userStatusPagamento}
     />
   );

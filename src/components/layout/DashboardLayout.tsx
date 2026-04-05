@@ -17,7 +17,7 @@ interface DashboardLayoutProps {
     subtitle?: string;
     userEmail?: string;
     userPassword?: string;
-    userPhone?: string | null;
+    userWhatsapp?: string;
     children: React.ReactNode;
 }
 
@@ -35,7 +35,7 @@ export default function DashboardLayout({
     subtitle,
     userEmail,
     userPassword,
-    userPhone,
+    userWhatsapp,
     children
 }: DashboardLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -45,6 +45,7 @@ export default function DashboardLayout({
         <div className="flex h-screen bg-[#AFEEEE] text-[#1A1A1A] font-sans overflow-hidden relative">
             <Sidebar
                 role={role}
+                statusPagamento={statusPagamento}
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
                 isSidebarOpen={isSidebarOpen}
@@ -67,7 +68,8 @@ export default function DashboardLayout({
                     onSaveRobotName={onSaveRobotName}
                     userEmail={userEmail}
                     userPassword={userPassword}
-                    userPhone={userPhone}
+                    userWhatsapp={userWhatsapp}
+
                 />
                 <div className="flex-1 overflow-y-scroll p-4 md:p-8 custom-scrollbar">
                     {children}

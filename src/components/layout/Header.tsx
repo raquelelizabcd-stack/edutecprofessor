@@ -19,15 +19,19 @@ interface HeaderProps {
     onSaveRobotName?: (name: string) => Promise<void>;
     userEmail?: string;
     userPassword?: string;
-    userPhone?: string | null;
+    userWhatsapp?: string;
 }
 
-export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, onStartTour, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword, userPhone }: HeaderProps) {
+export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, onStartTour, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword, userWhatsapp }: HeaderProps) {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isCreatingSession, setIsCreatingSession] = useState(false);
+
+    // Proteção: Nome do professor a partir do email ou padrão
+    const professorDisplayName = userEmail?.split('@')[0] || 'Professor';
+    const professorInitials = professorDisplayName.slice(0, 2).toUpperCase() || 'P';
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -257,7 +261,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         className="flex items-center gap-2 md:gap-3 p-1.5 hover:bg-black/5 rounded-2xl transition-all"
                     >
                         <div className="text-right hidden sm:block">
-                            <p className="text-sm font-bold">Raquel Duarte</p>
+                            <p className="text-sm font-bold truncate max-w-[150px]">{professorDisplayName}</p>
                             <p className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
                                 {role === 'diretor' || role === 'professor' ? 'Escola EduTec Matriz' : (
                                     <span className="flex items-center gap-1">
@@ -267,10 +271,10 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                         )}>
                                             {role === 'pro' ? (
                                                 <>
-                                                    CONTA PRO
-                                                    {daysLeft !== null && statusPagamento === 'trial' && (
+                                                    {statusPagamento === 'pendente' || statusPagamento === 'trial' ? 'TESTE PRO' : 'CONTA PRO'}
+                                                    {(statusPagamento === 'pendente' || statusPagamento === 'trial') && daysLeft !== null && (
                                                         <span className="opacity-80">
-                                                            — {daysLeft > 0 ? `${daysLeft} dias restantes do teste grátis` : 'Teste encerrado, faça o pagamento'}
+                                                            — {daysLeft > 0 ? `${daysLeft} dias restantes` : 'Teste encerrado, assine agora'}
                                                         </span>
                                                     )}
                                                 </>
@@ -290,7 +294,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                             </p>
                         </div>
                         <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-[#00A859] to-[#008F4C] rounded-lg md:rounded-xl flex items-center justify-center text-white font-bold text-sm md:text-base shadow-sm group-hover:shadow-md transition-all">
-                            RD
+                            {professorInitials}
                         </div>
                     </button>
 
@@ -347,7 +351,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Telefone de Contato</label>
-                        <input type="text" defaultValue={userPhone || ""} placeholder="Ex: (21) 99999-9999" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                        <input type="text" defaultValue={userWhatsapp || ""} placeholder="Ex: (21) 99999-9999" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nova Senha</label>

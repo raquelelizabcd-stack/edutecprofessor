@@ -12,6 +12,7 @@ interface SidebarProps {
     setIsSidebarOpen: (isOpen: boolean) => void;
     onLogout: () => void;
     onGoToPayment?: () => void;
+    statusPagamento?: string | null;
 }
 
 export default function Sidebar({
@@ -21,7 +22,8 @@ export default function Sidebar({
     isSidebarOpen,
     setIsSidebarOpen,
     onLogout,
-    onGoToPayment
+    onGoToPayment,
+    statusPagamento
 }: SidebarProps) {
     const filteredNav = NAV_ITEMS.filter(item => item.roles.includes(role as any));
     const categories = Array.from(new Set(filteredNav.map(item => item.category)));
@@ -76,7 +78,7 @@ export default function Sidebar({
                                 <p className="text-sm font-semibold capitalize truncate text-white">
                                     {role === 'diretor' ? 'Diretor da Escola' :
                                         role === 'professor' ? 'Professor da Escola' :
-                                            role === 'pro' ? 'Conta Pro' : 'Conta Free'}
+                                            role === 'pro' ? (statusPagamento === 'pendente' ? 'Teste Pro' : 'Conta Pro') : 'Conta Free'}
                                 </p>
                             </div>
                             {role === 'free' && (

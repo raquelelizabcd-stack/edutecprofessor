@@ -29,7 +29,6 @@ interface DashboardProps {
   statusPagamento?: string | null;
   onLogout: () => void;
   onGoToPayment: () => void;
-  userPhone?: string | null;
 }
 
 const CAMPOS_EXPLICACAO: Record<string, string> = {
@@ -75,11 +74,11 @@ export default function Dashboard({
   userDataExpiracao, 
   statusPagamento,
   onLogout, 
-  onGoToPayment,
-  userPhone 
+  onGoToPayment
 }: DashboardProps) {
   // Initialize restoring the last active tab from localStorage (validated against the current role)
   const getInitialTab = () => {
+    if (role === 'public') return NAV_ITEMS[0].id;
     const authorizedTabs = NAV_ITEMS.filter(item => item.roles.includes(role as any));
     const defaultTab = authorizedTabs.length > 0 ? authorizedTabs[0].id : NAV_ITEMS[0].id;
     try {
@@ -108,6 +107,7 @@ export default function Dashboard({
   const [showBnccPicker, setShowBnccPicker] = useState(false);
   const [activePickerContext, setActivePickerContext] = useState<'global' | string>('global');
   const [professorNome, setProfessorNome] = useState<string>('');
+  const [professorWhatsapp, setProfessorWhatsapp] = useState<string>('');
   const [robotName, setRobotName] = useState<string>('EduBot');
   const [userPassword, setUserPassword] = useState<string>('');
   const [isTourActive, setIsTourActive] = useState(false);
@@ -167,11 +167,12 @@ export default function Dashboard({
       try {
         const { data } = await supabase
           .from('users')
-          .select('nome, nome_robo')
+          .select('nome, nome_robo, whatsapp')
           .eq('id', userId)
           .single();
         if (data?.nome) setProfessorNome(data.nome);
         if (data?.nome_robo) setRobotName(data.nome_robo);
+        if (data?.whatsapp) setProfessorWhatsapp(data.whatsapp);
       } catch (err) {
         console.error('Erro ao buscar nome do professor:', err);
       }
@@ -1094,6 +1095,17 @@ export default function Dashboard({
     ? (editingRecord ? 'Editar Registro' : 'Novo Registro')
     : undefined;
 
+  if (isBnccLoading) {
+    return (
+      <div className="min-h-screen bg-[#FDFCFB] flex flex-col items-center justify-center p-6">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[#00A859] border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-black/40 font-medium animate-pulse">Carregando base BNCC...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <DashboardLayout
       role={role}
@@ -1103,13 +1115,14 @@ export default function Dashboard({
       onGoToPayment={onGoToPayment}
       userDataExpiracao={userDataExpiracao}
       statusPagamento={statusPagamento}
-      userPhone={userPhone}
+
       robotName={robotName}
       onSaveRobotName={handleSaveRobotName}
       subtitle={headerSubtitle}
       onStartTour={() => setIsAssistantOpen(true)}
       userEmail={userEmail}
       userPassword={userPassword}
+      userWhatsapp={professorWhatsapp}
     >
       <AnimatePresence>
         {isTourActive && (

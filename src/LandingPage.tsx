@@ -64,7 +64,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
         trialEnd.setDate(trialEnd.getDate() + 7);
         await supabase.from('users').upsert({
           id: session.user.id,
-          plano: 'teste_pro',
+          plano: 'pro',
           status_pagamento: 'pendente',
           data_expiracao: trialEnd.toISOString().split('T')[0]
         });

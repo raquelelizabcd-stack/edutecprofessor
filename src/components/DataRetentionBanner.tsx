@@ -68,7 +68,8 @@ export default function DataRetentionBanner({
         }
 
     } else if (role === 'pro') {
-        if (!userDataExpiracao || new Date(userDataExpiracao) >= today) {
+        if (!userDataExpiracao) return null; // Wait for profile sync
+        if (new Date(userDataExpiracao) >= today) {
             const expDateStr = userDataExpiracao ? new Date(userDataExpiracao).toLocaleDateString('pt-BR') : 'Indeterminado';
             showExportButton = true; // Always available for active Pro
             return (
