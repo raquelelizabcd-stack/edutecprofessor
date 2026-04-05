@@ -5,12 +5,12 @@ import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface LoginPageProps {
-  onLogin: (role: UserProfile) => void;
+  onSuccess: () => void;
   onBack: () => void;
   initialIntent?: 'free' | 'pro';
 }
 
-export default function LoginPage({ onLogin, onBack, initialIntent = 'free' }: LoginPageProps) {
+export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }: LoginPageProps) {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -74,10 +74,11 @@ export default function LoginPage({ onLogin, onBack, initialIntent = 'free' }: L
               id: data.user.id,
               nome: name || email.split('@')[0],
               email: email,
-              plano: isProIntent ? 'pro' : 'free',
-              status_pagamento: isProIntent ? 'teste' : 'gratis',
+              plano: isProIntent ? 'teste_pro' : 'free',
+              status_pagamento: isProIntent ? 'pendente' : 'gratis',
               data_expiracao: trialExpiration ? trialExpiration.toISOString().split('T')[0] : null,
-              created_at: new Date().toISOString()
+              created_at: new Date().toISOString(),
+              aceitou_privacidade: true
             }, {
               onConflict: 'id'
             });

@@ -419,12 +419,12 @@ const stripeWebhookHandler = async (req, res) => {
                         .from('users')
                         .update({ 
                             plano: 'pro', 
-                            status_pagamento: 'ativo',
+                            status_pagamento: 'aprovado',
                             data_expiracao: currentPeriodEnd.split('T')[0]
                         })
                         .eq('id', userId);
 
-                    console.log(`[Stripe Webhook] Fluxo Pro ativado para usuário ${userId}`);
+                    console.log(`[Stripe Webhook] Fluxo Pro (APROVADO) ativado para usuário ${userId}`);
                 }
                 break;
             }
@@ -445,9 +445,18 @@ const stripeWebhookHandler = async (req, res) => {
 
                 if (user) {
                     const isStillActive = ['active', 'trialing'].includes(status);
+                    const isCanceled = status === 'canceled' || status === 'unpaid';
                     const currentPeriodEnd = new Date(subscription.current_period_end * 1000).toISOString();
 
-                    // Se estiver marcado para cancelar mas ainda ativo, status é 'cancelado' (conforme regra de negócio)
+                    // Atualiza o perfil principal
+                    await supabase
+                        .from('users')
+                        .update({ 
+                            plano: isStillActive ? 'pro' : 'free', 
+                            status_pagamento: isStillActive ? 'aprovado' : (isCanceled ? 'cancelado' : 'expirado'),
+                            data_expiracao: currentPeriodEnd.split('T')[0]
+                        })
+                        .eq('id', user.id);
                     // Se o status do Stripe for realmente cancelado ou expirado, vira 'expirado' ou 'cancelado'
                     let finalStatus = isStillActive ? (cancelAtPeriodEnd ? 'cancelado' : 'ativo') : 'expirado';
 

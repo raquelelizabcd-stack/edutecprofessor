@@ -59,18 +59,17 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
 
       if (error && error.code !== 'PGRST116') throw error;
 
-      if (!userRecord || (userRecord.status_pagamento !== 'ativo' && userRecord.status_pagamento !== 'aprovado' && userRecord.status_pagamento !== 'teste' && userRecord.status_pagamento !== 'trial')) {
+      if (!userRecord || (userRecord.status_pagamento !== 'aprovado' && userRecord.status_pagamento !== 'pendente')) {
         const trialEnd = new Date();
         trialEnd.setDate(trialEnd.getDate() + 7);
         await supabase.from('users').upsert({
           id: session.user.id,
-          plano: 'pro',
-          status_pagamento: 'teste',
+          plano: 'teste_pro',
+          status_pagamento: 'pendente',
           data_expiracao: trialEnd.toISOString().split('T')[0]
         });
       }
       onGoToDashboard();
-      window.location.reload();
     } catch (err) {
       console.error(err);
       onGoToLogin();

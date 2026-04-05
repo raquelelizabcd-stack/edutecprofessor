@@ -370,12 +370,12 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         <div>
                             <p className="text-xs font-bold text-black/40 uppercase tracking-wider">Plano Atual</p>
                             <p className="font-bold flex items-center gap-2">
-                                {role === 'pro' ? 'EduTec Pro Platinum' : 'EduTec Gratuito'}
+                                {role === 'pro' ? 'EduTec Pro Platinum' : (role === 'teste_pro' ? 'EduTec Pro (Teste)' : 'EduTec Gratuito')}
                                 <span className={cn(
                                     "px-2 py-0.5 text-white text-[10px] rounded animate-pulse",
-                                    (statusPagamento === 'teste' || statusPagamento === 'trial') ? "bg-amber-500" : "bg-[#00A859]"
+                                    (role === 'teste_pro' || statusPagamento === 'pendente') ? "bg-amber-500" : "bg-[#00A859]"
                                 )}>
-                                    {(statusPagamento === 'teste' || statusPagamento === 'trial') ? 'Teste Grátis' : 'Ativo'}
+                                    {(role === 'teste_pro' || statusPagamento === 'pendente') ? 'Teste Grátis' : 'Ativo'}
                                 </span>
                             </p>
                         </div>
@@ -601,7 +601,7 @@ function PaymentSection({ handleManageBilling, handleCancelSubscription, isCreat
         );
     }
 
-    if (statusPagamento === 'ativo' || statusPagamento === 'aprovado' || statusPagamento === 'teste' || statusPagamento === 'trial' || card) {
+    if (role === 'pro' || role === 'teste_pro' || statusPagamento === 'aprovado' || statusPagamento === 'pendente' || card) {
         return (
             <div className="space-y-4">
                 {/* Billing Summary Card */}
@@ -614,15 +614,15 @@ function PaymentSection({ handleManageBilling, handleCancelSubscription, isCreat
                         <div className="flex items-center justify-between">
                              <span className={cn(
                                 "px-3 py-1.5 border rounded-full text-[10px] font-black uppercase tracking-tight flex items-center gap-2",
-                                (statusPagamento === 'teste' || statusPagamento === 'trial' || statusPagamento === 'cancelado')
+                                (role === 'teste_pro' || statusPagamento === 'pendente' || statusPagamento === 'cancelado')
                                     ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
                                     : "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                             )}>
-                                {(statusPagamento === 'teste' || statusPagamento === 'trial') ? 'Período de Teste (7 dias)' : 
+                                {(role === 'teste_pro' || statusPagamento === 'pendente') ? 'Período de Teste (7 dias)' : 
                                  statusPagamento === 'cancelado' ? 'Assinatura Cancelada' : 'Assinatura Pro Ativa'}
                                 
-                                {statusPagamento === 'ativo' && <Icons.ShieldCheck size={14} className="text-emerald-400" />}
-                                {(statusPagamento === 'teste' || statusPagamento === 'trial') && <Icons.Zap size={14} className="text-amber-400" />}
+                                {statusPagamento === 'aprovado' && <Icons.ShieldCheck size={14} className="text-emerald-400" />}
+                                {(role === 'teste_pro' || statusPagamento === 'pendente') && <Icons.Zap size={14} className="text-amber-400" />}
                                 {statusPagamento === 'cancelado' && <Icons.AlertCircle size={14} className="text-amber-400" />}
                             </span>
                         </div>
@@ -659,7 +659,7 @@ function PaymentSection({ handleManageBilling, handleCancelSubscription, isCreat
                                 disabled={isCreatingSession}
                                 className="flex-1 py-3 bg-white text-black text-[12px] font-black rounded-xl transition-all hover:bg-emerald-50 dynamic-shadow active:scale-95 disabled:opacity-50"
                             >
-                                {isCreatingSession ? 'Conectando...' : (statusPagamento === 'teste' || statusPagamento === 'trial' ? 'Assinar Pro Agora' : 'Portal de Faturamento')}
+                                {isCreatingSession ? 'Conectando...' : (statusPagamento === 'pendente' || role === 'teste_pro' ? 'Assinar Pro Agora' : 'Portal de Faturamento')}
                             </button>
                             {statusPagamento !== 'cancelado' && role === 'pro' && (
                                 <button

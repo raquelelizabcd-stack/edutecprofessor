@@ -3,12 +3,13 @@ import LandingPage from './LandingPage';
 import Dashboard from './components/Dashboard';
 import LoginPage from './components/LoginPage';
 import PaymentPage from './components/PaymentPage';
+import TermsAndRules from './components/auth/TermsAndRules';
 import PrivacyModal from './components/layout/PrivacyModal';
 import { UserProfile } from './types';
 import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
 
-type View = 'landing' | 'login' | 'dashboard' | 'payment';
+type View = 'landing' | 'terms' | 'login' | 'dashboard' | 'payment';
 
 export default function App() {
   const getInitialView = (): View => {
@@ -44,16 +45,16 @@ export default function App() {
 
       if (!data) {
         // Novo cadastro via fallback: Respeita a intenção do usuário (Free ou Pro Teste)
-        const isPro = userIntent === 'pro';
-        const trialDate = isPro ? new Date() : null;
-        if (isPro && trialDate) trialDate.setDate(trialDate.getDate() + 7);
+        const isProIntent = userIntent === 'pro';
+        const trialDate = isProIntent ? new Date() : null;
+        if (isProIntent && trialDate) trialDate.setDate(trialDate.getDate() + 7);
         const expIso = trialDate ? trialDate.toISOString().split('T')[0] : null;
 
         try {
           await supabase.from('users').upsert({
             id: userId,
-            plano: isPro ? 'pro' : 'free',
-            status_pagamento: isPro ? 'teste' : 'gratis',
+            plano: isProIntent ? 'teste_pro' : 'free',
+            status_pagamento: isProIntent ? 'pendente' : 'gratis',
             data_expiracao: expIso,
             created_at: new Date().toISOString()
           });
@@ -61,18 +62,13 @@ export default function App() {
           console.error('Erro ao criar perfil inicial:', e);
         }
 
-        setCurrentProfile(isPro ? 'pro' : 'free');
+        setCurrentProfile(isProIntent ? 'teste_pro' : 'free');
         setUserCreatedAt(new Date().toISOString());
         setUserDataExpiracao(expIso);
-        setUserStatusPagamento(isPro ? 'teste' : 'gratis');
-        setAceitouPrivacidade(false); // Mostra o modal de privacidade para novos usuários
+        setUserStatusPagamento(isProIntent ? 'pendente' : 'gratis');
+        setAceitouPrivacidade(false);
 
-        if (intendedViewRef.current) {
-          setView(intendedViewRef.current);
-          intendedViewRef.current = null;
-        } else {
-          setView('dashboard');
-        }
+        setView('dashboard');
       } else {
         const matchedPlano = (data.plano as UserProfile) || 'free';
         setCurrentProfile(matchedPlano);
@@ -84,50 +80,29 @@ export default function App() {
         const today = new Date().toISOString().split('T')[0];
         const isExpired = data.data_expiracao && data.data_expiracao < today;
 
-        if (matchedPlano === 'pro') {
-          const isPaid = data.status_pagamento === 'ativo' || data.status_pagamento === 'aprovado';
-          const isTrial = data.status_pagamento === 'teste' || data.status_pagamento === 'trial';
+        if (matchedPlano === 'pro' || matchedPlano === 'teste_pro') {
+          const isPaid = data.status_pagamento === 'aprovado';
+          const isTrial = matchedPlano === 'teste_pro' && data.status_pagamento === 'pendente';
           
           if (!isPaid && isExpired) {
-            // Teste terminou e não foi pago
             if (isTrial) {
-              alert("Seu período de teste grátis de 7 dias terminou. Para continuar acessando as ferramentas Pro, escolha uma forma de pagamento.");
-              
-              // REVERSÃO AUTOMÁTICA NO BANCO: Se o teste acabou e não pagou, volta para Free e marca como expirado
-              const { error: updateError } = await supabase
-                .from('users')
-                .update({ 
-                  plano: 'free',
-                  status_pagamento: 'expirado'
-                })
-                .eq('id', userId);
-              
-              if (updateError) console.error("Erro ao reverter plano:", updateError);
-            } else if (data.status_pagamento !== 'expirado') {
+              alert("Seu período de teste grátis de 7 dias terminou. Para continuar acessando as ferramentas Pro, regularize sua assinatura.");
+              await supabase.from('users').update({ plano: 'free', status_pagamento: 'expirado' }).eq('id', userId);
+              setCurrentProfile('free');
+              setUserStatusPagamento('expirado');
+            } else if (data.status_pagamento !== 'expirado' && data.status_pagamento !== 'cancelado') {
               alert("Sua assinatura Pro expirou. Por favor, regularize seu pagamento para continuar.");
             }
             setView('payment');
-          } else if (!isPaid && !isTrial && data.status_pagamento !== 'pendente') {
-            // Caso não esteja pago, não seja trial e nem pendente (ex: erro no gateway)
-            setCurrentProfile('free');
-            setView('dashboard');
           } else {
-            // Mantém no Pro se for trial ativo ou pago
-            if (intendedViewRef.current) {
-              setView(intendedViewRef.current);
-              intendedViewRef.current = null;
-            } else {
-              setView('dashboard');
-            }
+            // Se estiver tudo ok (pago ou trial ativo)
+            setView(intendedViewRef.current || 'dashboard');
+            intendedViewRef.current = null;
           }
         } else {
-          // Free plan
-          if (intendedViewRef.current) {
-            setView(intendedViewRef.current);
-            intendedViewRef.current = null;
-          } else {
-            setView('dashboard');
-          }
+          // Usuário Free
+          setView(intendedViewRef.current || 'dashboard');
+          intendedViewRef.current = null;
         }
       }
     } catch (err) {
@@ -236,8 +211,23 @@ export default function App() {
     />;
   }
 
+  if (view === 'terms') {
+    return (
+      <TermsAndRules 
+        onAccept={() => setView('login')}
+        onBack={() => setView('landing')}
+      />
+    );
+  }
+
   if (view === 'login') {
-    return <LoginPage onLogin={handleLogin} onBack={handleBackToLanding} initialIntent={userIntent} />;
+    return (
+      <LoginPage 
+        onSuccess={() => setView('dashboard')}
+        onBack={() => setView('landing')}
+        initialIntent={userIntent}
+      />
+    );
   }
 
   if (view === 'payment') {
