@@ -30,6 +30,7 @@ export default function App() {
   const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
   const [userDataExpiracao, setUserDataExpiracao] = useState<string | null>(null);
   const [userStatusPagamento, setUserStatusPagamento] = useState<string | null>(null);
+  const [userPhone, setUserPhone] = useState<string | null>(null);
   const [userIntent, setUserIntent] = useState<'free' | 'pro'>('free'); // Default to free
   const [aceitouPrivacidade, setAceitouPrivacidade] = useState<boolean>(true); // Padrão true para não piscar antes de carregar
   const fetchUserProfile = async (userId: string) => {
@@ -37,7 +38,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('plano, status_pagamento, created_at, data_expiracao, aceitou_privacidade')
+        .select('plano, status_pagamento, created_at, data_expiracao, aceitou_privacidade, telefone')
         .eq('id', userId)
         .maybeSingle();
 
@@ -75,6 +76,7 @@ export default function App() {
         setUserCreatedAt(data.created_at);
         setUserDataExpiracao(data.data_expiracao);
         setUserStatusPagamento(data.status_pagamento);
+        setUserPhone(data.telefone);
         setAceitouPrivacidade(data.aceitou_privacidade || false);
 
         const today = new Date().toISOString().split('T')[0];
@@ -258,6 +260,7 @@ export default function App() {
       onGoToPayment={handleGoToPayment}
       userCreatedAt={userCreatedAt}
       userDataExpiracao={userDataExpiracao}
+      userPhone={userPhone}
       statusPagamento={userStatusPagamento}
     />
   );

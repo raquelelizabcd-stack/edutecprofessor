@@ -19,9 +19,10 @@ interface HeaderProps {
     onSaveRobotName?: (name: string) => Promise<void>;
     userEmail?: string;
     userPassword?: string;
+    userPhone?: string | null;
 }
 
-export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, onStartTour, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword }: HeaderProps) {
+export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, onStartTour, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword, userPhone }: HeaderProps) {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -346,7 +347,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Telefone de Contato</label>
-                        <input type="text" placeholder="Ex: (21) 99999-9999" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                        <input type="text" defaultValue={userPhone || ""} placeholder="Ex: (21) 99999-9999" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nova Senha</label>
@@ -415,16 +416,30 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                     <div className="space-y-4 pt-2">
                         <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Segurança e Notificações</h4>
                         <div className="space-y-2">
+                            {/* Notificações por E-mail */}
                             <div className="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
                                 <div className="flex items-center gap-3 text-black/60">
                                     <Icons.Bell size={18} />
                                     <span className="text-sm font-medium">Notificações por E-mail</span>
                                 </div>
-                                <button className="w-10 h-5 bg-[#00A859] rounded-full relative transition-all">
+                                <button className="w-10 h-5 bg-[#00A859] rounded-full relative transition-all shadow-sm">
                                     <div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm" />
                                 </button>
                             </div>
 
+                            {/* Notificações por WhatsApp */}
+                            <div className="flex items-center justify-between p-3 bg-black/5 rounded-2xl">
+                                <div className="flex items-center gap-3 text-black/60">
+                                    <Icons.MessageCircle size={18} className="text-[#25D366]" />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium">Notificações por WhatsApp</span>
+                                        <span className="text-[9px] font-black text-black/20 uppercase">Cadastre seu número em "Editar Dados"</span>
+                                    </div>
+                                </div>
+                                <button className="w-10 h-5 bg-[#00A859] rounded-full relative transition-all shadow-sm">
+                                    <div className="absolute right-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-sm" />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

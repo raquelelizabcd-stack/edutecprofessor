@@ -29,6 +29,7 @@ interface DashboardProps {
   statusPagamento?: string | null;
   onLogout: () => void;
   onGoToPayment: () => void;
+  userPhone?: string | null;
 }
 
 const CAMPOS_EXPLICACAO: Record<string, string> = {
@@ -74,7 +75,8 @@ export default function Dashboard({
   userDataExpiracao, 
   statusPagamento,
   onLogout, 
-  onGoToPayment 
+  onGoToPayment,
+  userPhone 
 }: DashboardProps) {
   // Initialize restoring the last active tab from localStorage (validated against the current role)
   const getInitialTab = () => {
@@ -1028,6 +1030,7 @@ export default function Dashboard({
       onGoToPayment={onGoToPayment}
       userDataExpiracao={userDataExpiracao}
       statusPagamento={statusPagamento}
+      userPhone={userPhone}
       robotName={robotName}
       onSaveRobotName={handleSaveRobotName}
       subtitle={headerSubtitle}
