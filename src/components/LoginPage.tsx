@@ -78,7 +78,7 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
               status_pagamento: isProIntent ? 'pendente' : 'gratis',
               data_expiracao: trialExpiration ? trialExpiration.toISOString().split('T')[0] : null,
               created_at: new Date().toISOString(),
-              aceitou_privacidade: true
+              aceitou_privacidade: false
             }, {
               onConflict: 'id'
             });

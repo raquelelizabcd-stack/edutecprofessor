@@ -388,7 +388,10 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                             </div>
                         </div>
                         {role === 'free' && (
-                            <button className="px-4 py-2 bg-[#00A859] text-white text-xs font-bold rounded-lg transition-all hover:bg-[#008F4C] shadow-sm">
+                            <button 
+                                onClick={() => window.open(import.meta.env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/28E14ngsDg454UtcAn6EU01", "_blank")}
+                                className="px-4 py-2 bg-[#00A859] text-white text-xs font-bold rounded-lg transition-all hover:bg-[#008F4C] shadow-sm"
+                            >
                                 Fazer Upgrade
                             </button>
                         )}

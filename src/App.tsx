@@ -174,7 +174,7 @@ export default function App() {
     if (planIntent) {
       setUserIntent(planIntent);
     }
-    setView('terms'); // Garantindo que passe pelos termos agora
+    setView('login'); // Volta a ir direto para o login
   };
 
   const handleBackToLanding = () => {
@@ -194,6 +194,13 @@ export default function App() {
     setView('dashboard');
   };
 
+  const handleAcceptTerms = async () => {
+    if (session?.user.id) {
+      await supabase.from('users').update({ aceitou_privacidade: true }).eq('id', session.user.id);
+      setAceitouPrivacidade(true);
+    }
+  };
+
   if (isInitializing) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FDFCFB]">
@@ -211,21 +218,22 @@ export default function App() {
     />;
   }
 
-  if (view === 'terms') {
-    return (
-      <TermsAndRules 
-        onAccept={() => setView('login')}
-        onBack={() => setView('landing')}
-      />
-    );
-  }
-
   if (view === 'login') {
     return (
       <LoginPage 
         onSuccess={() => setView('dashboard')}
         onBack={() => setView('landing')}
-        initialIntent={userIntent as 'free' | 'pro'} // Passa a intenção guardada
+        initialIntent={userIntent as 'free' | 'pro'} 
+      />
+    );
+  }
+
+  // Se logado mas NÃO aceitou os termos ainda
+  if (session && !aceitouPrivacidade) {
+    return (
+      <TermsAndRules 
+        onAccept={handleAcceptTerms}
+        onBack={handleLogout}
       />
     );
   }
