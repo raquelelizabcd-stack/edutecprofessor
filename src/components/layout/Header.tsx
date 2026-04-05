@@ -369,15 +369,23 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                     <div className="p-4 bg-black/5 rounded-2xl flex items-center justify-between">
                         <div>
                             <p className="text-xs font-bold text-black/40 uppercase tracking-wider">Plano Atual</p>
-                            <p className="font-bold flex items-center gap-2">
-                                {role === 'pro' ? 'EduTec Pro Platinum' : (role === 'teste_pro' ? 'EduTec Pro (Teste)' : 'EduTec Gratuito')}
-                                <span className={cn(
-                                    "px-2 py-0.5 text-white text-[10px] rounded animate-pulse",
-                                    (role === 'teste_pro' || statusPagamento === 'pendente') ? "bg-amber-500" : "bg-[#00A859]"
-                                )}>
-                                    {(role === 'teste_pro' || statusPagamento === 'pendente') ? 'Teste Grátis' : 'Ativo'}
-                                </span>
-                            </p>
+                            <div className="flex flex-col">
+                                <p className="font-bold flex items-center gap-2">
+                                    {role === 'pro' ? 'EduTec Pro Platinum' : (role === 'teste_pro' ? 'EduTec Pro (Teste)' : 'EduTec Gratuito')}
+                                    <span className={cn(
+                                        "px-2 py-0.5 text-white text-[10px] rounded animate-pulse",
+                                        (role === 'teste_pro' || statusPagamento === 'pendente') ? "bg-amber-500" : "bg-[#00A859]"
+                                    )}>
+                                        {(role === 'teste_pro' || statusPagamento === 'pendente') ? 'Teste Grátis' : 'Ativo'}
+                                    </span>
+                                </p>
+                                {role === 'teste_pro' && userDataExpiracao && (
+                                    <p className="text-[10px] text-amber-600 font-black flex items-center gap-1.5 mt-1">
+                                        <Icons.Clock size={12} />
+                                        Faltam {Math.max(0, Math.ceil((new Date(userDataExpiracao).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))} dias para acabar seu teste Pro!
+                                    </p>
+                                )}
+                            </div>
                         </div>
                         {role === 'free' && (
                             <button className="px-4 py-2 bg-[#00A859] text-white text-xs font-bold rounded-lg transition-all hover:bg-[#008F4C] shadow-sm">

@@ -34,7 +34,7 @@ export const checkPlanLimits = async (
   if (role === 'teste_pro') {
     if (action === 'pdf') {
       const { count } = await supabase.from('pedagogical_records').select('*', { count: 'exact', head: true }).eq('professor_id', userId);
-      if ((count || 0) >= 4) return { allowed: false, message: "Você atingiu o limite de 4 PDFs do período de teste." };
+      if ((count || 0) >= 4) return { allowed: false, message: "Você atingiu o limite de 4 PDFs totais do período de teste." };
     }
     if (action === 'student') {
       const { count } = await supabase.from('students').select('*', { count: 'exact', head: true }).eq('professor_id', userId);
@@ -43,6 +43,19 @@ export const checkPlanLimits = async (
     if (action === 'portfolio') {
       const { count } = await supabase.from('pedagogical_records').select('*', { count: 'exact', head: true }).eq('professor_id', userId).eq('moduleId', 'portfolio');
       if ((count || 0) >= 10) return { allowed: false, message: "Limite de 10 registros de portfólio atingido no teste." };
+    }
+    if (action === 'reflection') {
+      const { count } = await supabase.from('pedagogical_records').select('*', { count: 'exact', head: true }).eq('professor_id', userId).eq('moduleId', 'reflexoes');
+      if ((count || 0) >= 5) return { allowed: false, message: "Limite de 5 entradas de reflexões atingido no teste." };
+    }
+    if (action === 'planning') {
+       // Checa se já existe pelo menos um planejamento mensal e semanal
+       const { count: weeklyCount } = await supabase.from('pedagogical_records').select('*', { count: 'exact', head: true }).eq('professor_id', userId).eq('moduleId', 'semanal');
+       const { count: monthlyCount } = await supabase.from('pedagogical_records').select('*', { count: 'exact', head: true }).eq('professor_id', userId).eq('moduleId', 'mensal');
+       
+       if ((weeklyCount || 0) >= 1 || (monthlyCount || 0) >= 1) {
+          return { allowed: false, message: "No período de teste é permitido apenas 1 planejamento de cada tipo." };
+       }
     }
   }
 
