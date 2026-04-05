@@ -379,18 +379,19 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         )}
                     </div>
 
-                    {/* Dados de Pagamento Section */}
-                    <div className="space-y-4">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-black/30 px-1">Dados de Pagamento</h4>
-                        <PaymentSection 
-                            handleManageBilling={handleManageBilling} 
-                            handleCancelSubscription={handleCancelSubscription}
-                            isCreatingSession={isCreatingSession}
-                            statusPagamento={statusPagamento}
-                            userDataExpiracao={userDataExpiracao}
-                            role={role}
-                        />
-                    </div>
+                    {/* Seção de Assinatura Pro — Exibida apenas para quem já é Pro ou está em teste */}
+                    {(role === 'pro' || statusPagamento === 'teste' || statusPagamento === 'trial' || statusPagamento === 'aprovado') && (
+                        <div className="space-y-4">
+                            <PaymentSection 
+                                handleManageBilling={handleManageBilling} 
+                                handleCancelSubscription={handleCancelSubscription}
+                                isCreatingSession={isCreatingSession}
+                                statusPagamento={statusPagamento}
+                                userDataExpiracao={userDataExpiracao}
+                                role={role}
+                            />
+                        </div>
+                    )}
 
                     {/* Segurança e Notificações Section */}
                     <div className="space-y-4 pt-2">
@@ -593,7 +594,7 @@ function PaymentSection({ handleManageBilling, handleCancelSubscription, isCreat
         );
     }
 
-    if (statusPagamento === 'ativo' || statusPagamento === 'teste' || statusPagamento === 'trial' || card) {
+    if (statusPagamento === 'ativo' || statusPagamento === 'aprovado' || statusPagamento === 'teste' || statusPagamento === 'trial' || card) {
         return (
             <div className="space-y-4">
                 {/* Billing Summary Card */}
@@ -684,15 +685,6 @@ function PaymentSection({ handleManageBilling, handleCancelSubscription, isCreat
         );
     }
 
-    return (
-        <button
-            onClick={() => setIsEditing(true)}
-            className="w-full p-8 border-2 border-dashed border-black/10 rounded-[24px] text-black/40 font-bold flex flex-col items-center justify-center gap-3 hover:border-[#00A859] hover:bg-[#00A859]/5 hover:text-[#00A859] transition-all group"
-        >
-            <div className="w-12 h-12 rounded-full bg-black/5 flex items-center justify-center group-hover:bg-[#00A859]/10 transition-colors">
-                <Icons.Plus size={24} />
-            </div>
-            <span>Adicionar Cartão de Crédito</span>
-        </button>
-    );
+    // Se não for Pro ou Trial, não mostramos nada aqui, pois o usuário usa o botão "Fazer Upgrade" acima
+    return null;
 }
