@@ -51,7 +51,6 @@ const TermsAndRules: React.FC<TermsAndRulesProps> = ({ onAccept, onBack }) => {
 
           {/* Plano Teste Pro */}
           <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-200 shadow-sm relative">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-black text-[9px] font-black px-3 py-1 rounded-full uppercase">Melhor Escolha</div>
             <h3 className="font-black text-emerald-700 uppercase text-[10px] mb-4 tracking-widest">Teste Pro (7 Dias)</h3>
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-xs text-emerald-900">
@@ -74,7 +73,8 @@ const TermsAndRules: React.FC<TermsAndRulesProps> = ({ onAccept, onBack }) => {
           </div>
 
           {/* Plano Pro Pago */}
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl text-white">
+          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-xl text-white relative">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-black text-[9px] font-black px-3 py-1 rounded-full uppercase">Melhor Escolha</div>
             <h3 className="font-black text-white/40 uppercase text-[10px] mb-4 tracking-widest">Pro Pago (R$ 29,90)</h3>
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-xs text-slate-300">
@@ -107,9 +107,9 @@ const TermsAndRules: React.FC<TermsAndRulesProps> = ({ onAccept, onBack }) => {
             <p className="mb-3">Ao utilizar o EduTecPro, você concorda com o tratamento de seus dados conforme as regras abaixo:</p>
             <ul className="list-disc pl-5 space-y-2">
               <li><strong>Coleta:</strong> Coletamos nome, e-mail e dados pedagógicos exclusivamente para o funcionamento do sistema.</li>
-              <li><strong>Privacidade:</strong> Nenhum dado é vendido ou compartilhado com terceiros, limitando-se apenas às integrações Stripe, Supabase e Vercel.</li>
-              <li><strong>Direitos:</strong> Você pode solicitar a exclusão total de seus dados a qualquer momento via suporte.</li>
-              <li><strong>Cookies:</strong> Usamos armazenamento local apenas para manter sua sessão e preferências de uso.</li>
+              <li><strong>Privacidade:</strong> Nenhum dado é vendido ou compartilhado com terceiros. Suas informações são transmitidas apenas para nossos parceiros tecnológicos e processadores de dados seguindo rigorosamente os padrões da LGPD.</li>
+              <li><strong>Segurança de Pagamento:</strong> Todas as transações financeiras são processadas por gateways de pagamento globais altamente seguros, com criptografia de ponta a ponta. Nenhum dado do seu cartão é armazenado em nossos servidores locais.</li>
+              <li><strong>Direitos:</strong> Você possui controle total sobre suas informações, podendo solicitar a exclusão total de seus dados pedagógicos a qualquer momento via suporte.</li>
             </ul>
           </div>
 

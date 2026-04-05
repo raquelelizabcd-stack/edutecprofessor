@@ -174,7 +174,7 @@ export default function App() {
     if (planIntent) {
       setUserIntent(planIntent);
     }
-    setView('login');
+    setView('terms'); // Garantindo que passe pelos termos agora
   };
 
   const handleBackToLanding = () => {
@@ -225,7 +225,7 @@ export default function App() {
       <LoginPage 
         onSuccess={() => setView('dashboard')}
         onBack={() => setView('landing')}
-        initialIntent={userIntent}
+        initialIntent={userIntent as 'free' | 'pro'} // Passa a intenção guardada
       />
     );
   }
