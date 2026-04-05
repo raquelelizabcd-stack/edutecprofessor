@@ -69,8 +69,8 @@ export default function PaymentPage({
                 activeEmail = session.user.email || userEmail;
             }
 
-            // Link oficial de produção — se já estava em trial, o Stripe deve processar conforme link padrão, mas a UI foca no pagamento agora
-            const stripeLink = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
+            // Link oficial de produção — novo link de hoje 05/04
+            const stripeLink = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/28E14ngsDg454UtcAn6EU01";
             
             // Adicionamos parâmetros para o Stripe reconhecer o usuário no Webhook
             const separator = stripeLink.includes('?') ? '&' : '?';
@@ -81,7 +81,7 @@ export default function PaymentPage({
         } catch (err: any) {
             console.error('Checkout error:', err);
             // Fallback para o link puro em caso de erro crítico
-            window.location.href = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
+            window.location.href = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/28E14ngsDg454UtcAn6EU01";
         } finally {
             setIsProcessing(false);
         }

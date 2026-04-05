@@ -68,8 +68,8 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             const userId = data?.user?.id;
             const uemail = data?.user?.email;
 
-            // Link oficial de produção
-            const stripeLink = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
+            // Link oficial de produção — novo link de hoje 05/04
+            const stripeLink = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/28E14ngsDg454UtcAn6EU01";
             
             // Adicionamos parâmetros para o Stripe reconhecer o usuário no Webhook
             const separator = stripeLink.includes('?') ? '&' : '?';
@@ -79,7 +79,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
         } catch (err) {
             console.error('Erro no checkout:', err);
             // Fallback para o link puro em caso de erro crítico
-            window.location.href = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/eVq7sLa4f3hj1Ih57V6EU00";
+            window.location.href = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/28E14ngsDg454UtcAn6EU01";
         } finally {
             setIsCreatingSession(false);
         }
