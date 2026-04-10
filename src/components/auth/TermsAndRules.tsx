@@ -7,6 +7,17 @@ interface TermsAndRulesProps {
 }
 
 const TermsAndRules: React.FC<TermsAndRulesProps> = ({ onAccept, onBack }) => {
+  const [hasChecked, setHasChecked] = React.useState(false);
+  const [showError, setShowError] = React.useState(false);
+
+  const handleValidation = () => {
+    if (!hasChecked) {
+      setShowError(true);
+      return;
+    }
+    onAccept();
+  };
+
   return (
     <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-4">
       <div className="max-w-4xl w-full bg-white rounded-[32px] shadow-2xl overflow-hidden border border-neutral-100">
@@ -117,13 +128,32 @@ const TermsAndRules: React.FC<TermsAndRulesProps> = ({ onAccept, onBack }) => {
             </ul>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-[11px] text-neutral-400 text-center sm:text-left">
-              Ao clicar no botão ao lado, você confirma que leu e concorda com todos os termos listados acima.
-            </p>
+          {showError && (
+             <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-xs font-bold animate-shake">
+                <Icons.AlertCircle size={16} />
+                <span>Você precisa aceitar os Termos de Uso e Privacidade para continuar.</span>
+             </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <div className={`w-6 h-6 rounded-lg border-2 transition-all flex items-center justify-center ${hasChecked ? 'bg-emerald-500 border-emerald-500' : 'border-neutral-300 group-hover:border-emerald-500'}`}>
+                {hasChecked && <Icons.Check size={16} className="text-white" />}
+              </div>
+              <input 
+                type="checkbox" 
+                className="hidden" 
+                checked={hasChecked}
+                onChange={(e) => {
+                   setHasChecked(e.target.checked);
+                   if (e.target.checked) setShowError(false);
+                }}
+              />
+              <span className="text-[13px] font-medium text-neutral-600">Li e concordo com os Termos de Uso e Privacidade acima descritos.</span>
+            </label>
             <button
-              onClick={onAccept}
-              className="w-full sm:w-auto px-8 py-4 bg-[#00A859] text-white rounded-2xl font-black text-sm transition-all hover:bg-[#008F4C] hover:scale-105 active:scale-95 shadow-lg shadow-emerald-500/20"
+              onClick={handleValidation}
+              className="w-full sm:w-auto px-10 py-5 bg-[#00A859] text-white rounded-2xl font-black text-sm transition-all hover:bg-[#008F4C] hover:scale-105 active:scale-95 shadow-xl shadow-emerald-500/20"
             >
               Aceito e Quero Entrar
             </button>

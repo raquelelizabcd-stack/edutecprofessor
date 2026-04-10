@@ -1,4 +1,5 @@
-export type UserProfile = 'diretor' | 'professor' | 'free' | 'pro' | 'teste_pro' | 'public';
+export type UserRole = 'admin' | 'professor';
+export type UserProfile = 'diretor' | 'professor' | 'free' | 'pro' | 'teste_pro' | 'public' | 'admin';
 
 export interface NavItem {
   id: string;

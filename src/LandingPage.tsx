@@ -18,7 +18,8 @@ import {
   FileDown,
   LayoutDashboard,
   MessageSquare,
-  ShieldCheck
+  ShieldCheck,
+  Loader2
 } from 'lucide-react';
 import { cn } from './lib/utils';
 import { UserProfile } from './types';
@@ -27,14 +28,47 @@ import { supabase } from './lib/supabase';
 
 interface LandingPageProps {
   onLogin: (role: UserProfile) => void;
-  onGoToLogin: (intent?: 'payment' | 'dashboard', planIntent?: 'free' | 'pro') => void;
+  onGoToLogin: (planIntent?: 'free' | 'pro') => void;
   onGoToPayment: () => void;
   onGoToDashboard: () => void;
+  role?: string;
+  statusPagamento?: string | null;
+  userEmail?: string;
+  userId?: string;
 }
 
-export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoToDashboard }: LandingPageProps) {
+export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoToDashboard, role, statusPagamento, userEmail, userId }: LandingPageProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedPlanView, setSelectedPlanView] = useState<'none' | 'free' | 'pro'>('none');
+  const [isCreatingPortalSession, setIsCreatingPortalSession] = useState(false);
+
+  const handleCancelSubscription = async () => {
+    setIsCreatingPortalSession(true);
+    try {
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const apiUrl = isLocal
+            ? 'http://localhost:3001/api/create-portal-session'
+            : '/api/create-portal-session';
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                email: userEmail,
+                userId: userId
+            })
+        });
+
+        if (!response.ok) throw new Error('Erro ao abrir portal');
+        const { url } = await response.json();
+        if (url) window.location.href = url;
+    } catch (err) {
+        console.error(err);
+        alert('Não foi possível acessar o portal agora.');
+    } finally {
+        setIsCreatingPortalSession(false);
+    }
+  };
 
   const features = [
     { title: 'Planejamentos Prontos', desc: 'Planejamentos semanais, mensais e diários prontos em minutos.', icon: Calendar },
@@ -47,7 +81,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        onGoToLogin('dashboard', 'pro');
+        onGoToLogin('pro');
         return;
       }
 
@@ -166,9 +200,37 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
               ))}
             </div>
 
+            {/* Início dos Avisos Estratégicos Pro */}
+            {!isFree && (
+              <div className="mb-10 text-center space-y-3">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-[#00A859] rounded-full border border-emerald-100 shadow-sm">
+                   <Zap size={16} fill="currentColor" />
+                   <span className="font-black text-sm uppercase tracking-tight">Teste grátis disponível por até 7 dias</span>
+                </div>
+                <div className="flex items-center justify-center gap-2 text-black/40">
+                   <ShieldCheck size={16} />
+                   <p className="text-sm font-medium">Cancele sua assinatura quando quiser, sem burocracia</p>
+                </div>
+
+                {/* Botão de Cancelamento para quem já é assinante */}
+                {role === 'pro' && (statusPagamento === 'aprovado' || statusPagamento === 'cancelado') && (
+                  <motion.button
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    onClick={handleCancelSubscription}
+                    disabled={isCreatingPortalSession}
+                    className="mt-4 px-6 py-2.5 border-2 border-red-500/20 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center justify-center gap-2 mx-auto disabled:opacity-50"
+                  >
+                    {isCreatingPortalSession ? <Loader2 className="animate-spin" size={14} /> : <Zap size={14} />}
+                    Cancelar Plano Pro
+                  </motion.button>
+                )}
+              </div>
+            )}
+
             <div className="text-center">
               <button
-                onClick={() => isFree ? onGoToLogin('dashboard') : handleUpgradeClick()}
+                onClick={() => isFree ? onGoToLogin('free') : handleUpgradeClick()}
                 className="px-12 py-5 bg-[#00A859] text-white rounded-full font-bold text-lg hover:bg-[#008F4C] transition-all shadow-xl shadow-[#00A859]/20"
               >
                 {isFree ? 'Começar agora' : 'Finalizar Assinatura Pro'}
@@ -375,7 +437,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 onClick={async () => {
                   const { data: { session } } = await supabase.auth.getSession();
                   if (!session) {
-                    onGoToLogin('dashboard', 'free');
+                    onGoToLogin('free');
                   } else {
                     onGoToDashboard();
                   }

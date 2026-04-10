@@ -75,6 +75,7 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
               nome: name || email.split('@')[0],
               email: email,
               plano: isProIntent ? 'pro' : 'free',
+              role: 'professor',
               status_pagamento: isProIntent ? 'pendente' : 'gratis',
               data_expiracao: trialExpiration ? trialExpiration.toISOString().split('T')[0] : null,
               created_at: new Date().toISOString(),
