@@ -47,7 +47,11 @@ import {
   Bell,
   Trash2,
   MessageSquare,
-  Reply
+  Reply,
+  Volume2,
+  Music,
+  BellRing,
+  Play
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { UserProfile } from '../../types';
@@ -156,6 +160,35 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [supportViewTab, setSupportViewTab] = useState<'inbox' | 'compose'>('inbox');
   const [supportSearch, setSupportSearch] = useState('');
   const [newEmailData, setNewEmailData] = useState({ to: '', subject: '', message: '' });
+  
+  // Notificações Sonoras
+  const [soundConfig, setSoundConfig] = useState(() => {
+    const saved = localStorage.getItem('edutec_sound_config');
+    return saved ? JSON.parse(saved) : {
+      support: { enabled: true, sound: 'bell', customUrl: '' },
+      payments: { enabled: true, sound: 'soft', customUrl: '' },
+      students: { enabled: true, sound: 'notify', customUrl: '' },
+      planning: { enabled: false, sound: 'soft', customUrl: '' },
+    };
+  });
+
+  const soundUrls = {
+    bell: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
+    soft: 'https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3',
+    notify: 'https://assets.mixkit.co/active_storage/sfx/2218/2218-preview.mp3'
+  };
+
+  const playEventSound = (type: keyof typeof soundConfig) => {
+    const config = soundConfig[type];
+    if (!config.enabled) return;
+
+    const url = config.customUrl || soundUrls[config.sound as keyof typeof soundUrls];
+    if (url) {
+      const audio = new Audio(url);
+      audio.volume = 0.6;
+      audio.play().catch(e => console.warn("Erro ao reproduzir som:", e));
+    }
+  };
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
 
   useEffect(() => {
@@ -171,21 +204,51 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     fetchSupportMessages();
 
+    // Ouvinte Suporte
     const supportChannel = supabase
-      .channel('suporte_admin')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'suporte_mensagens' }, (payload) => {
+      .channel('suporte_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'suporte_mensagens' }, () => {
         fetchSupportMessages();
-        if (payload.eventType === 'INSERT') {
-          // Toast ou notificação visual poderia ser adicionada aqui
-          console.log("Nova mensagem de suporte!");
-        }
+        playEventSound('support');
       })
+      .subscribe();
+
+    // Ouvinte Pagamentos
+    const paymentChannel = supabase
+      .channel('payments_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments' }, () => {
+        playEventSound('payments');
+        fetchDashboardStats();
+      })
+      .subscribe();
+
+    // Ouvinte Alunos e Presença
+    const studentsChannel = supabase
+      .channel('students_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alunos' }, () => {
+        playEventSound('students');
+        fetchDashboardStats();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'presenca_alunos' }, () => {
+        playEventSound('students');
+      })
+      .subscribe();
+
+    // Ouvinte Planejamentos
+    const planningChannel = supabase
+      .channel('planning_realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'planejamento_diario' }, () => playEventSound('planning'))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'planejamento_semanal' }, () => playEventSound('planning'))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'planejamento_mensal' }, () => playEventSound('planning'))
       .subscribe();
 
     return () => {
       supabase.removeChannel(supportChannel);
+      supabase.removeChannel(paymentChannel);
+      supabase.removeChannel(studentsChannel);
+      supabase.removeChannel(planningChannel);
     };
-  }, []);
+  }, [soundConfig]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -2132,6 +2195,97 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       </div>
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Notificações Sonoras Avançadas */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                      <Volume2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-slate-800">Notificações Sonoras Avançadas</h2>
+                      <p className="text-xs text-slate-500">Configure alertas sonoros específicos para cada evento</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {[
+                    { id: 'support', label: 'Suporte (Mensagens)', icon: BellRing },
+                    { id: 'payments', label: 'Pagamentos (Vendas)', icon: CreditCard },
+                    { id: 'students', label: 'Alunos (Novos/Presença)', icon: Users },
+                    { id: 'planning', label: 'Planejamentos', icon: Calendar },
+                  ].map((event) => (
+                    <div key={event.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center text-slate-600">
+                            <event.icon size={20} />
+                          </div>
+                          <span className="font-bold text-slate-700 text-sm">{event.label}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const newConfig = { ...soundConfig, [event.id]: { ...soundConfig[event.id as any], enabled: !soundConfig[event.id as any].enabled } };
+                            setSoundConfig(newConfig);
+                            localStorage.setItem('edutec_sound_config', JSON.stringify(newConfig));
+                          }}
+                          className={`w-12 h-6 rounded-full transition-colors relative ${soundConfig[event.id as any].enabled ? 'bg-blue-600' : 'bg-slate-300'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${soundConfig[event.id as any].enabled ? 'left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
+
+                      {soundConfig[event.id as any].enabled && (
+                        <div className="space-y-3 pt-2 animate-in fade-in duration-300">
+                          <div className="flex gap-2">
+                            {['bell', 'soft', 'notify'].map((s) => (
+                              <button
+                                key={s}
+                                onClick={() => {
+                                  const newConfig = { ...soundConfig, [event.id]: { ...soundConfig[event.id as any], sound: s, customUrl: '' } };
+                                  setSoundConfig(newConfig);
+                                  localStorage.setItem('edutec_sound_config', JSON.stringify(newConfig));
+                                }}
+                                className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase transition-all border-2 ${soundConfig[event.id as any].sound === s && !soundConfig[event.id as any].customUrl ? 'border-blue-600 bg-blue-50 text-blue-700' : 'border-white bg-white text-slate-400'}`}
+                              >
+                                {s === 'bell' ? 'Sino' : s === 'soft' ? 'Suave' : 'Curto'}
+                              </button>
+                            ))}
+                          </div>
+                          
+                          <div className="relative">
+                            <input 
+                              type="text"
+                              placeholder="URL de som personalizado (.mp3)"
+                              value={soundConfig[event.id as any].customUrl}
+                              onChange={(e) => {
+                                const newConfig = { ...soundConfig, [event.id]: { ...soundConfig[event.id as any], customUrl: e.target.value } };
+                                setSoundConfig(newConfig);
+                                localStorage.setItem('edutec_sound_config', JSON.stringify(newConfig));
+                              }}
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <Music className="absolute right-3 top-2.5 text-slate-300" size={14} />
+                          </div>
+
+                          <button 
+                            onClick={() => playEventSound(event.id as any)}
+                            className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10px] font-bold flex items-center justify-center gap-2 transition-colors"
+                          >
+                            <Play size={12} /> Testar Som
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sincronizado com Realtime Admin</span>
                 </div>
               </div>
 
