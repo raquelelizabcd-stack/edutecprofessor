@@ -32,7 +32,8 @@ import {
   ChevronRight,
   ShieldCheck,
   CheckCircle,
-  Plus
+  Plus,
+  CheckSquare
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { UserProfile } from '../../types';
@@ -82,9 +83,31 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeMenuUserId, setActiveMenuUserId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [modalType, setModalType] = useState<'edit' | 'history' | 'logs' | null>(null);
+  const [modalType, setModalType] = useState<'edit' | 'history' | 'logs' | 'userDetails' | null>(null);
   const [userHistory, setUserHistory] = useState<any[]>([]);
   const [userLogs, setUserLogs] = useState<any[]>([]);
+  const [userDetailedData, setUserDetailedData] = useState<{
+    planejamentoDiario: any[];
+    planejamentoSemanal: any[];
+    planejamentoMensal: any[];
+    relatorios: any[];
+    diarioReflexoes: any[];
+    portfolioDigital: any[];
+    alunos: any[];
+    presencaAlunos: any[];
+    loading: boolean;
+  }>({
+    planejamentoDiario: [],
+    planejamentoSemanal: [],
+    planejamentoMensal: [],
+    relatorios: [],
+    diarioReflexoes: [],
+    portfolioDigital: [],
+    alunos: [],
+    presencaAlunos: [],
+    loading: false
+  });
+  const [userDetailedActiveTab, setUserDetailedActiveTab] = useState('resumo');
   
   const [layoutConfig, setLayoutConfig] = useState({
     theme: 'light',
@@ -308,6 +331,52 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setUserLogs(mergedLogs);
     setModalType('logs');
     setActiveMenuUserId(null);
+  };
+
+  const openUserDetails = async (user: AdminUser) => {
+    setSelectedUser(user);
+    setModalType('userDetails');
+    setActiveMenuUserId(null);
+    setUserDetailedActiveTab('resumo');
+    setUserDetailedData(prev => ({ ...prev, loading: true }));
+
+    try {
+      const [
+        { data: diários },
+        { data: semanais },
+        { data: mensais },
+        { data: relatorios },
+        { data: reflexoes },
+        { data: portfolio },
+        { data: alunos },
+        { data: presencas }
+      ] = await Promise.all([
+        supabase.from('planejamento_diario').select('*').eq('professor_id', user.id).order('data', { ascending: false }),
+        supabase.from('planejamento_semanal').select('*').eq('professor_id', user.id).order('data_ref', { ascending: false }),
+        supabase.from('planejamento_mensal').select('*').eq('professor_id', user.id).order('data_ref', { ascending: false }),
+        supabase.from('relatorios').select('*').eq('professor_id', user.id).order('created_at', { ascending: false }),
+        supabase.from('diario_reflexoes').select('*').eq('professor_id', user.id).order('data', { ascending: false }),
+        supabase.from('portfolio_digital').select('*').eq('professor_id', user.id).order('data_ref', { ascending: false }),
+        supabase.from('alunos').select('*').eq('professor_id', user.id).order('nome', { ascending: true }),
+        supabase.from('presenca_alunos').select('*').eq('user_id', user.id).order('data', { ascending: false })
+      ]);
+
+      setUserDetailedData({
+        planejamentoDiario: diários || [],
+        planejamentoSemanal: semanais || [],
+        planejamentoMensal: mensais || [],
+        relatorios: relatorios || [],
+        diarioReflexoes: reflexoes || [],
+        portfolioDigital: portfolio || [],
+        alunos: alunos || [],
+        presencaAlunos: presencas || [],
+        loading: false
+      });
+    } catch (err) {
+      console.error('Erro ao buscar detalhes do professor:', err);
+      setUserDetailedData(prev => ({ ...prev, loading: false }));
+      alert('Erro ao carregar dados detalhados do professor.');
+    }
   };
 
   const saveAppearance = () => {
@@ -642,7 +711,13 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
                         {/* Dropdown Menu */}
                         {activeMenuUserId === user.id && (
-                          <div className="absolute right-6 top-12 w-48 bg-white rounded-xl shadow-xl border border-slate-100 z-50 py-2 animate-in fade-in zoom-in-95 duration-100">
+                          <div className="absolute right-6 top-12 w-52 bg-white rounded-xl shadow-xl border border-slate-100 z-50 py-2 animate-in fade-in zoom-in-95 duration-100">
+                            <button 
+                              onClick={() => openUserDetails(user)}
+                              className="w-full text-left px-4 py-2 text-sm text-indigo-600 font-bold hover:bg-indigo-50 flex items-center gap-2 border-b border-slate-50 mb-1"
+                            >
+                              <Eye size={16} /> Ver tudo do usuário
+                            </button>
                             <button 
                               onClick={() => handleUpdateUserStatus(user.id, 'aprovado')}
                               className="w-full text-left px-4 py-2 text-sm text-green-600 hover:bg-green-50 flex items-center gap-2"
@@ -789,27 +864,311 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               )}
 
-              {modalType === 'logs' && selectedUser && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                  <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                    <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                      <h2 className="text-xl font-bold text-slate-800">Logs de Atividade Administrativa</h2>
-                      <button onClick={() => setModalType(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
-                    </div>
-                    <div className="p-8">
-                      <div className="space-y-4 max-h-[50vh] overflow-auto pr-2">
-                        {userLogs.length > 0 ? userLogs.map((log, i) => (
-                          <div key={i} className="flex gap-4 p-4 bg-slate-50 rounded-xl relative border-l-4 border-blue-500">
-                            <div>
-                              <p className="text-sm text-slate-900 font-bold">{log.type}</p>
-                              <p className="text-xs text-slate-600 mt-1">{log.titulo || log.atividade_principal || 'Ação registrada'}</p>
-                              <p className="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
-                                <Clock size={10} /> {new Date(log.created_at).toLocaleString('pt-BR')}
-                              </p>
-                            </div>
+              {modalType === 'userDetails' && selectedUser && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+                  <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+                    {/* Header do Modal */}
+                    <div className="p-8 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 text-white flex items-center justify-between shrink-0">
+                      <div className="flex items-center gap-6">
+                        <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl font-bold border border-white/20">
+                          {selectedUser.nome?.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold tracking-tight">{selectedUser.nome}</h2>
+                          <div className="flex items-center gap-3 mt-1 text-slate-300">
+                            <span className="flex items-center gap-1 text-xs bg-white/10 px-2 py-0.5 rounded-full border border-white/10">
+                              <ShieldCheck size={12} /> {selectedUser.plano?.toUpperCase()}
+                            </span>
+                            <span className="text-xs opacity-60">•</span>
+                            <span className="text-sm font-medium">{selectedUser.email}</span>
                           </div>
-                        )) : <p className="text-center py-10 text-slate-400">Nenhuma atividade pedagógica recente encontrada.</p>}
+                        </div>
                       </div>
+                      <button 
+                        onClick={() => setModalType(null)} 
+                        className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-all border border-white/10 group"
+                      >
+                        <X size={24} className="group-hover:rotate-90 transition-transform duration-300" />
+                      </button>
+                    </div>
+
+                    {/* Tabs / Navegação Interna */}
+                    <div className="flex bg-slate-50 border-b border-slate-200 px-8 py-2 gap-2 overflow-x-auto scrollbar-hide shrink-0">
+                      {[ 
+                        { id: 'resumo', label: 'Resumo Geral', icon: LayoutDashboard },
+                        { id: 'planejamentos', label: 'Planejamentos', icon: Calendar },
+                        { id: 'relatorios', label: 'Relatórios/Pareceres', icon: FileText },
+                        { id: 'pratica', label: 'Prática Autônoma', icon: BookOpen },
+                        { id: 'gestao', label: 'Gestão/Alunos', icon: GraduationCap }
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setUserDetailedActiveTab(tab.id)}
+                          className={`
+                            flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap
+                            ${userDetailedActiveTab === tab.id 
+                              ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' 
+                              : 'text-slate-500 hover:bg-slate-200/50'}
+                          `}
+                        >
+                          <tab.icon size={18} /> {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Conteúdo do Modal */}
+                    <div className="flex-1 overflow-auto p-8 bg-slate-50/30">
+                      {userDetailedData.loading ? (
+                        <div className="flex flex-col items-center justify-center h-full gap-4">
+                          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-slate-500 font-medium animate-pulse">Compilando dados do professor...</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                          
+                          {/* TAB RESUMO */}
+                          {userDetailedActiveTab === 'resumo' && (
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
+                                  <Users size={24} />
+                                </div>
+                                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Alunos Ativos</h4>
+                                <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.alunos.length}</p>
+                              </div>
+                              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                                <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-4">
+                                  <BookOpen size={24} />
+                                </div>
+                                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Planejamentos</h4>
+                                <p className="text-3xl font-black text-slate-900 mt-2">
+                                  {userDetailedData.planejamentoDiario.length + userDetailedData.planejamentoSemanal.length + userDetailedData.planejamentoMensal.length}
+                                </p>
+                              </div>
+                              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                                <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-4">
+                                  <FileText size={24} />
+                                </div>
+                                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Relatórios Emitidos</h4>
+                                <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.relatorios.length}</p>
+                              </div>
+                              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                                <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-4">
+                                  <CheckSquare size={24} />
+                                </div>
+                                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Presenças Registradas</h4>
+                                <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.presencaAlunos.length}</p>
+                              </div>
+
+                              <div className="md:col-span-4 bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                  <Activity className="text-indigo-600" size={20} /> Atividades Pedagógicas Recentes
+                                </h3>
+                                <div className="space-y-4">
+                                  {[
+                                    ...userDetailedData.planejamentoDiario.slice(0, 3).map(p => ({ ...p, type: 'Planejamento Diário', color: 'indigo' })),
+                                    ...userDetailedData.relatorios.slice(0, 3).map(p => ({ ...p, type: 'Relatório', color: 'green' })),
+                                    ...userDetailedData.diarioReflexoes.slice(0, 3).map(p => ({ ...p, type: 'Reflexão', color: 'orange' }))
+                                  ].sort((a, b) => new Date(b.created_at || b.data_ref || b.data).getTime() - new Date(a.created_at || a.data_ref || a.data).getTime()).slice(0, 10).map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-100 transition-all">
+                                      <div className="flex items-center gap-4">
+                                        <div className={`w-2 h-10 rounded-full bg-${item.color}-500`} />
+                                        <div>
+                                          <p className="text-sm font-bold text-slate-800">{item.titulo_registro || item.titulo || item.conteudo?.substring(0, 50) || 'Registro sem título'}</p>
+                                          <p className="text-xs text-slate-500 mt-1">{item.type} • {new Date(item.created_at || item.data_ref || item.data).toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                      </div>
+                                      <span className="text-xs font-semibold text-slate-400">#{idx + 1}</span>
+                                    </div>
+                                  ))}
+                                  {userDetailedData.planejamentoDiario.length === 0 && userDetailedData.relatorios.length === 0 && (
+                                    <div className="py-12 text-center">
+                                      <p className="text-slate-400">Nenhum registro encontrado para este professor.</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* TAB PLANEJAMENTOS */}
+                          {userDetailedActiveTab === 'planejamentos' && (
+                            <div className="space-y-8">
+                              <section>
+                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                  <Clock className="text-indigo-600" size={20} /> Registros Pedagógicos (Planejamentos)
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                  {/* Diários */}
+                                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm border-t-4 border-t-indigo-500">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">Diários <span className="bg-indigo-50 text-indigo-600 text-[10px] px-2 py-0.5 rounded-full">{userDetailedData.planejamentoDiario.length}</span></h4>
+                                    <div className="space-y-3 max-h-64 overflow-auto pr-2">
+                                      {userDetailedData.planejamentoDiario.map((p, i) => (
+                                        <div key={i} className="p-3 bg-slate-50 rounded-xl text-xs">
+                                          <p className="font-bold text-slate-700">{p.titulo_registro}</p>
+                                          <p className="text-slate-500 mt-1">{new Date(p.data).toLocaleDateString('pt-BR')} • {p.componente}</p>
+                                        </div>
+                                      ))}
+                                      {userDetailedData.planejamentoDiario.length === 0 && <p className="text-center py-4 text-slate-400 text-xs">Sem registros</p>}
+                                    </div>
+                                  </div>
+
+                                  {/* Semanais */}
+                                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm border-t-4 border-t-blue-500">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">Semanais <span className="bg-blue-50 text-blue-600 text-[10px] px-2 py-0.5 rounded-full">{userDetailedData.planejamentoSemanal.length}</span></h4>
+                                    <div className="space-y-3 max-h-64 overflow-auto pr-2">
+                                      {userDetailedData.planejamentoSemanal.map((p, i) => (
+                                        <div key={i} className="p-3 bg-slate-50 rounded-xl text-xs">
+                                          <p className="font-bold text-slate-700">{p.titulo_registro}</p>
+                                          <p className="text-slate-500 mt-1">{new Date(p.data_ref).toLocaleDateString('pt-BR')} • {p.ano_serie}</p>
+                                        </div>
+                                      ))}
+                                      {userDetailedData.planejamentoSemanal.length === 0 && <p className="text-center py-4 text-slate-400 text-xs">Sem registros</p>}
+                                    </div>
+                                  </div>
+
+                                  {/* Mensais */}
+                                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm border-t-4 border-t-teal-500">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">Mensais <span className="bg-teal-50 text-teal-600 text-[10px] px-2 py-0.5 rounded-full">{userDetailedData.planejamentoMensal.length}</span></h4>
+                                    <div className="space-y-3 max-h-64 overflow-auto pr-2">
+                                      {userDetailedData.planejamentoMensal.map((p, i) => (
+                                        <div key={i} className="p-3 bg-slate-50 rounded-xl text-xs">
+                                          <p className="font-bold text-slate-700">{p.titulo_registro || `${p.mes}/${p.ano}`}</p>
+                                          <p className="text-slate-500 mt-1">{p.ano_serie}</p>
+                                        </div>
+                                      ))}
+                                      {userDetailedData.planejamentoMensal.length === 0 && <p className="text-center py-4 text-slate-400 text-xs">Sem registros</p>}
+                                    </div>
+                                  </div>
+                                </div>
+                              </section>
+                            </div>
+                          )}
+
+                          {/* TAB RELATÓRIOS */}
+                          {userDetailedActiveTab === 'relatorios' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                              <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                  <FileText className="text-indigo-600" size={20} /> Relatório Individual e Geral
+                                </h3>
+                                <div className="space-y-4 max-h-[50vh] overflow-auto pr-2">
+                                  {userDetailedData.relatorios.map((r, i) => (
+                                    <div key={i} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <p className="font-bold text-slate-800">{r.titulo_registro || 'Relatório'}</p>
+                                        <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">{r.tipo}</span>
+                                      </div>
+                                      <p className="text-xs text-slate-500 mb-3">{r.aluno_nome} • {new Date(r.created_at).toLocaleDateString('pt-BR')}</p>
+                                      <p className="text-xs text-slate-600 line-clamp-3 bg-white p-3 rounded-lg italic">"{r.conteudo}"</p>
+                                    </div>
+                                  ))}
+                                  {userDetailedData.relatorios.length === 0 && (
+                                    <div className="py-12 text-center text-slate-400">Nenhum relatório emitido.</div>
+                                  )}
+                                </div>
+                              </section>
+
+                              <section className="bg-indigo-50 p-8 rounded-[2rem] border border-indigo-100 shadow-sm flex flex-col justify-center items-center text-center">
+                                <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-indigo-600 shadow-xl mb-6">
+                                  <Download size={40} />
+                                </div>
+                                <h3 className="text-xl font-bold text-indigo-900 mb-2">Exportar Dossier</h3>
+                                <p className="text-indigo-600 text-sm mb-6 max-w-xs">Gere um documento completo com todos os dados pedagógicos deste professor.</p>
+                                <button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">
+                                  Gerar PDF Completo
+                                </button>
+                              </section>
+                            </div>
+                          )}
+
+                          {/* TAB PRÁTICA AUTÔNOMA */}
+                          {userDetailedActiveTab === 'pratica' && (
+                            <div className="space-y-8">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                    <History className="text-indigo-600" size={20} /> Portfólio Digital
+                                  </h3>
+                                  <div className="space-y-4 max-h-[40vh] overflow-auto pr-2">
+                                    {userDetailedData.portfolioDigital.map((p, i) => (
+                                      <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                                        <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400"><BookOpen size={20} /></div>
+                                        <div>
+                                          <p className="text-sm font-bold text-slate-800">{p.titulo_registro}</p>
+                                          <p className="text-[10px] text-slate-500 mt-1">{p.aluno_nome} • {new Date(p.data_ref || p.created_at).toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {userDetailedData.portfolioDigital.length === 0 && <p className="text-center py-10 text-slate-400">Nenhum registro de portfólio.</p>}
+                                  </div>
+                                </section>
+
+                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                    <BookOpen className="text-indigo-600" size={20} /> Diário de Reflexões
+                                  </h3>
+                                  <div className="space-y-4 max-h-[40vh] overflow-auto pr-2">
+                                    {userDetailedData.diarioReflexoes.map((r, i) => (
+                                      <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <p className="text-sm font-bold text-slate-800 mb-1">{r.titulo}</p>
+                                        <p className="text-xs text-slate-500 mb-2">{new Date(r.data).toLocaleDateString('pt-BR')}</p>
+                                        <p className="text-xs text-slate-600 line-clamp-2 bg-white/50 p-2 rounded-lg italic">"{r.reflexao}"</p>
+                                      </div>
+                                    ))}
+                                    {userDetailedData.diarioReflexoes.length === 0 && <p className="text-center py-10 text-slate-400">Nenhuma reflexão registrada.</p>}
+                                  </div>
+                                </section>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* TAB GESTÃO */}
+                          {userDetailedActiveTab === 'gestao' && (
+                            <div className="space-y-8">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                    <Users className="text-indigo-600" size={20} /> Alunos vinculados
+                                  </h3>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[40vh] overflow-auto pr-2">
+                                    {userDetailedData.alunos.map((a, i) => (
+                                      <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
+                                        <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-black text-xs">{a.nome?.substring(0, 2).toUpperCase()}</div>
+                                        <div>
+                                          <p className="text-sm font-bold text-slate-800 leading-tight">{a.nome}</p>
+                                          <p className="text-[10px] text-slate-500 mt-1">{a.serie || 'Sem turma'}</p>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    {userDetailedData.alunos.length === 0 && <p className="col-span-full text-center py-10 text-slate-400">Nenhum aluno cadastrado.</p>}
+                                  </div>
+                                </section>
+
+                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                    <CheckCircle className="text-indigo-600" size={20} /> Presença do Aluno (Frequência)
+                                  </h3>
+                                  <div className="space-y-4 max-h-[40vh] overflow-auto pr-2">
+                                    {userDetailedData.presencaAlunos.map((p, i) => (
+                                      <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                        <div>
+                                          <p className="text-sm font-bold text-slate-800">{p.aluno_nome || 'Aluno'}</p>
+                                          <p className="text-xs text-slate-500">{new Date(p.data).toLocaleDateString('pt-BR')}</p>
+                                        </div>
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${p.status === 'presente' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                          {p.status}
+                                        </span>
+                                      </div>
+                                    ))}
+                                    {userDetailedData.presencaAlunos.length === 0 && <p className="text-center py-10 text-slate-400">Nenhuma chamada realizada.</p>}
+                                  </div>
+                                </section>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
