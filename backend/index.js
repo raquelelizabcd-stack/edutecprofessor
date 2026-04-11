@@ -3,6 +3,9 @@ import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
 import Stripe from 'stripe';
+import nodemailer from 'nodemailer';
+import imaps from 'imap-simple';
+import { simpleParser } from 'mailparser';
 
 const app = express();
 app.use(express.json());
@@ -15,6 +18,29 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
 });
+
+// Configuração E-mail (Nodemailer)
+const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, // SSL
+    auth: {
+        user: process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com',
+        pass: process.env.SUPPORT_PASSWORD // Senha de aplicativo
+    }
+});
+
+// Configuração IMAP
+const imapConfig = {
+    imap: {
+        user: process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com',
+        password: process.env.SUPPORT_PASSWORD,
+        host: 'imap.gmail.com',
+        port: 993,
+        tls: true,
+        authTimeout: 3000
+    }
+};
 
 app.get('/api/status', (req, res) => {
     res.json({ status: 'online', service: 'EduTec-API' });
@@ -118,6 +144,104 @@ app.get('/api/status-assinatura/:userId', async (req, res) => {
         res.json(data);
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+/**
+ * Endpoint para responder mensagem de suporte e enviar e-mail real
+ */
+app.post('/api/support/reply', async (req, res) => {
+    const { messageId, email, subject, replyText } = req.body;
+
+    if (!messageId || !email || !replyText) {
+        return res.status(400).json({ error: 'Dados incompletos.' });
+    }
+
+    try {
+        // 1. Enviar e-mail real
+        await transporter.sendMail({
+            from: `"Suporte EduTecPro" <${process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com'}>`,
+            to: email,
+            subject: `Re: ${subject || 'Suporte EduTecPro'}`,
+            text: replyText,
+        });
+
+        // 2. Atualizar no Supabase
+        const { error } = await supabase
+            .from('suporte_mensagens')
+            .update({
+                resposta: replyText,
+                status: 'respondido',
+                respondido_em: new Date().toISOString()
+            })
+            .eq('id', messageId);
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Resposta enviada e registrada.' });
+    } catch (error) {
+        console.error('Erro ao responder suporte:', error);
+        res.status(500).json({ error: 'Erro ao enviar e-mail.' });
+    }
+});
+
+/**
+ * Endpoint para sincronizar e-mails do Gmail com o banco de dados
+ */
+app.get('/api/support/sync', async (req, res) => {
+    try {
+        const connection = await imaps.connect(imapConfig);
+        await connection.openBox('INBOX');
+
+        const delay = 24 * 3600 * 1000 * 2; 
+        const yesterday = new Date(Date.now() - delay).toISOString();
+        const searchCriteria = ['UNSEEN', ['SINCE', yesterday]];
+        const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], struct: true };
+
+        const messages = await connection.search(searchCriteria, fetchOptions);
+        let syncedCount = 0;
+
+        for (const item of messages) {
+            const all = item.parts.filter(part => part.which === '');
+            const id = item.attributes.uid;
+            const headerPart = item.parts.filter(part => part.which === 'HEADER')[0];
+            const messageId = headerPart?.body['message-id']?.[0] || `imap-${id}`;
+
+            const parsed = await simpleParser(all[0].body);
+            const from = parsed.from?.value[0];
+            
+            const { data: existing } = await supabase
+                .from('suporte_mensagens')
+                .select('id')
+                .contains('metadata', { message_id: messageId })
+                .maybeSingle();
+
+            if (!existing) {
+                const { error: insertError } = await supabase
+                    .from('suporte_mensagens')
+                    .insert([{
+                        remetente_email: from?.address || 'desconhecido@email.com',
+                        remetente_nome: from?.name || from?.address || 'Professor',
+                        assunto: parsed.subject || '(Sem assunto)',
+                        mensagem: parsed.text || parsed.html || '',
+                        status: 'aberto',
+                        lido: false,
+                        metadata: { 
+                            imap_uid: id,
+                            message_id: messageId,
+                            sync_date: new Date().toISOString()
+                        }
+                    }]);
+                
+                if (!insertError) syncedCount++;
+            }
+        }
+
+        connection.end();
+        res.json({ success: true, synced: syncedCount });
+    } catch (error) {
+        console.error('Erro na sincronização IMAP:', error);
+        res.status(500).json({ error: 'Falha na sincronização.' });
     }
 });
 

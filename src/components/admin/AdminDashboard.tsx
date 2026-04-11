@@ -33,7 +33,20 @@ import {
   ShieldCheck,
   CheckCircle,
   Plus,
-  CheckSquare
+  CheckSquare,
+  Book,
+  BarChart2,
+  ChevronDown,
+  ChevronUp,
+  Target,
+  LifeBuoy,
+  Send,
+  Mail,
+  Inbox,
+  Archive,
+  Trash2,
+  MessageSquare,
+  Reply
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { UserProfile } from '../../types';
@@ -65,8 +78,22 @@ interface AuthUser {
   last_sign_in_at: string;
 }
 
+interface SupportMessage {
+  id: string;
+  remetente_email: string;
+  remetente_nome: string;
+  assunto: string;
+  mensagem: string;
+  status: 'aberto' | 'respondido' | 'resolvido';
+  lido: boolean;
+  user_id?: string;
+  created_at: string;
+  resposta?: string;
+  respondido_em?: string;
+}
+
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'pedagogia' | 'payments' | 'logs' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'pedagogia' | 'payments' | 'logs' | 'settings' | 'support'>('dashboard');
   const [stats, setStats] = useState<AdminStats>({ 
     totalProfessors: 0, 
     proProfessors: 0, 
@@ -108,6 +135,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     loading: false
   });
   const [userDetailedActiveTab, setUserDetailedActiveTab] = useState('resumo');
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   
   const [layoutConfig, setLayoutConfig] = useState({
     theme: 'light',
@@ -116,6 +144,17 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     bgImage: ''
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Estados de Suporte
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
+  const [selectedSupportMessage, setSelectedSupportMessage] = useState<SupportMessage | null>(null);
+  const [showSupportReplyModal, setShowSupportReplyModal] = useState(false);
+  const [supportReplyText, setSupportReplyText] = useState('');
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+  const [supportViewTab, setSupportViewTab] = useState<'inbox' | 'compose'>('inbox');
+  const [supportSearch, setSupportSearch] = useState('');
+  const [newEmailData, setNewEmailData] = useState({ to: '', subject: '', message: '' });
 
   useEffect(() => {
     // Carregar preferências salvas
@@ -125,6 +164,26 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
     fetchData();
   }, [activeTab]);
+
+  // Suporte Realtime
+  useEffect(() => {
+    fetchSupportMessages();
+
+    const supportChannel = supabase
+      .channel('suporte_admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'suporte_mensagens' }, (payload) => {
+        fetchSupportMessages();
+        if (payload.eventType === 'INSERT') {
+          // Toast ou notificação visual poderia ser adicionada aqui
+          console.log("Nova mensagem de suporte!");
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(supportChannel);
+    };
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -206,11 +265,456 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       if (paymentData) {
         setStats(prev => ({ ...prev, recentPayments: paymentData }));
       }
-    } catch (err) {
-      console.error('Erro ao buscar dados admin:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchSupportMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suporte_mensagens')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      if (data) {
+        setSupportMessages(data);
+        setUnreadSupportCount(data.filter(m => !m.lido).length);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar suporte:", err);
+    }
+  };
+
+  const markMessageAsRead = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('suporte_mensagens')
+        .update({ lido: true })
+        .eq('id', id);
+      if (error) throw error;
+      setSupportMessages(prev => prev.map(m => m.id === id ? { ...m, lido: true } : m));
+    } catch (err) {
+      console.error("Erro ao marcar como lida:", err);
+    }
+  };
+
+  const handleSupportMessageAction = async (id: string, newStatus: SupportMessage['status']) => {
+    try {
+      const { error } = await supabase
+        .from('suporte_mensagens')
+        .update({ status: newStatus })
+        .eq('id', id);
+      if (error) throw error;
+      setSupportMessages(prev => prev.map(m => m.id === id ? { ...m, status: newStatus } : m));
+    } catch (err) {
+      alert("Erro ao atualizar status");
+    }
+  };
+
+  const handleSendSupportReply = async () => {
+    if (!selectedSupportMessage || !supportReplyText) return;
+    setSupportLoading(true);
+    try {
+      // Chamar backend para enviar e-mail real
+      const response = await fetch('http://localhost:3001/api/support/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId: selectedSupportMessage.id,
+          email: selectedSupportMessage.remetente_email,
+          subject: selectedSupportMessage.assunto,
+          replyText: supportReplyText
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error);
+      
+      setSupportMessages(prev => prev.map(m => 
+        m.id === selectedSupportMessage.id 
+          ? { ...m, resposta: supportReplyText, status: 'respondido', respondido_em: new Date().toISOString() } 
+          : m
+      ));
+      
+      setSupportReplyText('');
+      setShowSupportReplyModal(false);
+      alert("E-mail enviado e resposta registrada!");
+    } catch (err) {
+      alert("Erro ao enviar resposta via backend.");
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
+  const handleSendNewEmail = async () => {
+    if (!newEmailData.to || !newEmailData.message) return;
+    setSupportLoading(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/support/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: newEmailData.to,
+          subject: newEmailData.subject,
+          message: newEmailData.message
+        })
+      });
+
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error);
+
+      setNewEmailData({ to: '', subject: '', message: '' });
+      setSupportViewTab('inbox');
+      fetchSupportMessages();
+      alert("E-mail enviado com sucesso!");
+    } catch (err: any) {
+      alert("Erro ao enviar e-mail: " + err.message);
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
+  const syncMessages = async () => {
+    setSupportLoading(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/support/sync');
+      const data = await response.json();
+      if (data.success) {
+        if (data.synced > 0) {
+          alert(`${data.synced} nova(s) mensagem(ns) sincronizada(s)!`);
+          fetchSupportMessages();
+        } else {
+          alert("Nenhuma nova mensagem encontrada.");
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao sincronizar:", err);
+      alert("Erro ao conectar com o servidor de e-mail.");
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
+  const renderSupportView = () => {
+    // Agrupar mensagens por email para mostrar threads
+    const threads = supportMessages.reduce((acc: any, msg) => {
+      // Se a mensagem foi enviada pelo admin, o "dono" da thread é o destinatário (metadata.to)
+      // Se foi recebida, o dono é o remetente (remetente_email)
+      const threadOwner = (msg.metadata?.to && msg.remetente_email.includes('edutecprof1@gmail.com')) 
+        ? msg.metadata.to 
+        : msg.remetente_email;
+      
+      if (!acc[threadOwner]) acc[threadOwner] = [];
+      acc[threadOwner].push(msg);
+      // Ordenar mensagens dentro da thread pela data (mais recente primeiro na lista lateral)
+      acc[threadOwner].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return acc;
+    }, {});
+
+    // Ordenar as threads pela data da mensagem mais recente
+    const sortedEmails = Object.keys(threads).sort((a, b) => {
+      return new Date(threads[b][0].created_at).getTime() - new Date(threads[a][0].created_at).getTime();
+    });
+
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <LifeBuoy className="text-blue-600" /> Centro de Suporte Gmail
+            </h2>
+            <p className="text-sm text-slate-500">Comunicação bidirecional integrada com {process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com'}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button 
+              onClick={syncMessages}
+              disabled={supportLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-xl text-sm font-bold hover:bg-indigo-100 transition-all disabled:opacity-50"
+            >
+              <Activity size={18} className={supportLoading ? 'animate-spin' : ''} />
+              Sincronizar Gmail
+            </button>
+            <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button 
+                onClick={() => setSupportViewTab('inbox')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${supportViewTab === 'inbox' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 opacity-60'}`}
+              >
+                <Inbox size={18} /> Inbox
+              </button>
+              <button 
+                onClick={() => setSupportViewTab('compose')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${supportViewTab === 'compose' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:bg-slate-50 opacity-60'}`}
+              >
+                <Send size={18} /> Novo E-mail
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {supportViewTab === 'inbox' ? (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden flex flex-col md:flex-row h-[75vh]">
+            {/* Sidebar de Threads */}
+            <div className="w-full md:w-80 border-r border-slate-200 flex flex-col bg-slate-50/50">
+              <div className="p-4 border-b border-slate-200 bg-white">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Buscar conversa..."
+                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 transition-all"
+                    value={supportSearch}
+                    onChange={(e) => setSupportSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {sortedEmails
+                  .filter(email => {
+                    const thread = threads[email];
+                    return email.toLowerCase().includes(supportSearch.toLowerCase()) || 
+                           thread[0].remetente_nome?.toLowerCase().includes(supportSearch.toLowerCase());
+                  })
+                  .map((email) => {
+                    const thread = threads[email];
+                    const latest = thread[0];
+                    const unreadCount = thread.filter((m: any) => !m.lido).length;
+                    const isSelected = selectedSupportMessage?.remetente_email === email;
+
+                    return (
+                      <button
+                        key={email}
+                        onClick={() => {
+                          setSelectedSupportMessage(latest);
+                          // Marcar todas como lidas nesta thread
+                          thread.forEach((msg: any) => {
+                            if (!msg.lido) markMessageAsRead(msg.id);
+                          });
+                        }}
+                        className={`w-full text-left p-4 hover:bg-white transition-all border-l-4 relative ${isSelected ? 'bg-white border-l-blue-600 shadow-sm' : 'border-transparent opacity-80'}`}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <span className={`text-sm truncate pr-2 ${!isSelected ? 'text-slate-700' : 'text-blue-700 font-black'}`}>
+                            {latest.remetente_nome || email.split('@')[0]}
+                          </span>
+                          <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                            {new Date(latest.created_at).toLocaleDateString('pt-BR')}
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-slate-800 line-clamp-1">{latest.assunto}</p>
+                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-1 font-normal">{latest.mensagem}</p>
+                        
+                        <div className="flex items-center justify-between mt-3">
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-black uppercase ${
+                            latest.status === 'aberto' ? 'bg-amber-100 text-amber-700' :
+                            latest.status === 'respondido' ? 'bg-blue-100 text-blue-700' :
+                            'bg-green-100 text-green-700'
+                          }`}>
+                            {latest.status}
+                          </span>
+                          {unreadCount > 0 && (
+                            <span className="bg-blue-600 text-white text-[10px] font-bold h-5 w-5 rounded-full flex items-center justify-center animate-pulse">
+                              {unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                {sortedEmails.length === 0 && (
+                  <div className="p-12 text-center text-slate-400">
+                    <Mail size={40} className="mx-auto mb-4 opacity-10" />
+                    <p className="text-sm font-medium">Nenhuma conversa encontrada.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Visualização de Thread (Histórico) */}
+            <div className="flex-1 bg-white flex flex-col">
+              {selectedSupportMessage ? (
+                <>
+                  {/* Header do Contato */}
+                  <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/30">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-100">
+                        {selectedSupportMessage.remetente_email[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-slate-900 leading-none mb-1">{selectedSupportMessage.remetente_nome}</h3>
+                        <p className="text-xs text-slate-500 font-medium">{selectedSupportMessage.remetente_email}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                       <button 
+                        onClick={() => handleSupportMessageAction(selectedSupportMessage.id, 'resolvido')}
+                        className="p-2.5 bg-green-50 text-green-600 rounded-xl hover:bg-green-600 hover:text-white transition-all shadow-sm"
+                        title="Marcar Thread como Resolvida"
+                       >
+                         <CheckCircle2 size={20} />
+                       </button>
+                       <button className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all">
+                         <Archive size={20} />
+                       </button>
+                    </div>
+                  </div>
+
+                  {/* Lista de Mensagens na Thread */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-slate-50/20 custom-scrollbar">
+                    {supportMessages
+                      .filter(m => m.remetente_email === selectedSupportMessage.remetente_email)
+                      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                      .map((msg, idx) => (
+                        <div key={msg.id} className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                          {/* Bolha do Usuário */}
+                          <div className="flex flex-col items-start max-w-[85%]">
+                            <div className="bg-white p-5 rounded-2xl rounded-tl-none border border-slate-200 shadow-sm relative group">
+                              <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">{msg.mensagem}</p>
+                              <div className="mt-3 flex items-center justify-between gap-4">
+                                <span className="text-[10px] font-bold text-slate-400">Assunto: {msg.assunto}</span>
+                                <span className="text-[10px] font-medium text-slate-300">
+                                  {new Date(msg.created_at).toLocaleString('pt-BR')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Bolha de Resposta do Admin */}
+                          {msg.resposta && (
+                            <div className="flex flex-col items-end w-full">
+                              <div className="bg-blue-600 text-white p-5 rounded-2xl rounded-tr-none shadow-xl shadow-blue-100 max-w-[85%]">
+                                <p className="text-[10px] font-black tracking-widest uppercase mb-1 opacity-70">Suporte EduTecPro</p>
+                                <p className="text-sm leading-relaxed border-t border-blue-500/30 pt-2 mt-1">{msg.resposta}</p>
+                                <div className="mt-3 flex justify-end">
+                                  <span className="text-[10px] font-medium opacity-60">
+                                    Enviado em {new Date(msg.respondido_em!).toLocaleString('pt-BR')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Ação de Resposta */}
+                  <div className="p-6 bg-white border-t border-slate-200">
+                    <button 
+                      onClick={() => {
+                        setSupportReplyText('');
+                        setShowSupportReplyModal(true);
+                      }}
+                      className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-black hover:scale-[1.01] active:scale-[0.99] transition-all shadow-xl shadow-blue-200 flex items-center justify-center gap-3"
+                    >
+                      <Reply size={22} className="rotate-180" />
+                      Responder Thread
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-12 text-center bg-slate-50/10">
+                  <div className="w-32 h-32 bg-slate-100 rounded-full flex items-center justify-center mb-8 border-2 border-dashed border-slate-200">
+                    <Mail size={56} className="text-slate-300 opacity-50" />
+                  </div>
+                  <h3 className="text-xl font-black text-slate-700 mb-2">Selecione um Professor</h3>
+                  <p className="max-w-xs text-sm text-slate-500 leading-relaxed uppercase tracking-tighter">Escolha uma conversa na lateral para ver o histórico e sincronizar e-mails.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl overflow-hidden max-w-3xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+            <div className="p-8 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+              <h3 className="text-2xl font-black flex items-center gap-3">
+                <Send size={28} /> Enviar Novo E-mail Individual
+              </h3>
+              <p className="text-blue-100 text-sm mt-2 opacity-80 uppercase font-black tracking-widest">Inicie uma nova conversa fora de conversas existentes</p>
+            </div>
+            <div className="p-10 space-y-8">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">E-mail do Professor</label>
+                  <input 
+                    type="email" 
+                    value={newEmailData.to}
+                    onChange={(e) => setNewEmailData(prev => ({ ...prev, to: e.target.value }))}
+                    placeholder="professor@email.com"
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white outline-none transition-all font-bold text-slate-700"
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Assunto do E-mail</label>
+                  <input 
+                    type="text" 
+                    value={newEmailData.subject}
+                    onChange={(e) => setNewEmailData(prev => ({ ...prev, subject: e.target.value }))}
+                    placeholder="Suporte Técnico / Sugestão"
+                    className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-blue-100 focus:bg-white outline-none transition-all font-bold text-slate-700"
+                  />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Conteúdo da Mensagem</label>
+                <textarea 
+                  rows={8}
+                  value={newEmailData.message}
+                  onChange={(e) => setNewEmailData(prev => ({ ...prev, message: e.target.value }))}
+                  placeholder="Escreva detalhadamente aqui..."
+                  className="w-full px-6 py-5 bg-slate-50 border border-slate-200 rounded-3xl focus:ring-4 focus:ring-blue-100 focus:bg-white outline-none transition-all resize-none text-slate-700 leading-relaxed font-medium"
+                />
+              </div>
+              <button 
+                onClick={handleSendNewEmail}
+                disabled={supportLoading}
+                className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-black text-lg hover:scale-[1.02] shadow-2xl shadow-blue-200 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                {supportLoading ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" /> : <><Send size={24} /> Enviar Agora via SMTP</>}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Resposta */}
+        {showSupportReplyModal && selectedSupportMessage && (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-800">Responder Mensagem</h2>
+                <button onClick={() => setShowSupportReplyModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
+              </div>
+              <div className="p-6 space-y-4 text-left">
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Para:</p>
+                  <p className="text-sm font-bold text-slate-700">{selectedSupportMessage.remetente_nome} ({selectedSupportMessage.remetente_email})</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Sua Resposta</label>
+                  <textarea 
+                    rows={8}
+                    value={supportReplyText}
+                    onChange={(e) => setSupportReplyText(e.target.value)}
+                    placeholder="Olá! Recebemos sua mensagem e..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none text-sm"
+                  />
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <button onClick={() => setShowSupportReplyModal(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-all">Cancelar</button>
+                  <button 
+                    onClick={handleSendSupportReply}
+                    disabled={supportLoading || !supportReplyText}
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {supportLoading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send size={18} /> Enviar Resposta</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleUpdateUserPlan = async (userId: string, newPlan: string) => {
@@ -338,6 +842,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setModalType('userDetails');
     setActiveMenuUserId(null);
     setUserDetailedActiveTab('resumo');
+    setExpandedItems({});
     setUserDetailedData(prev => ({ ...prev, loading: true }));
 
     try {
@@ -358,7 +863,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         supabase.from('diario_reflexoes').select('*').eq('professor_id', user.id).order('data', { ascending: false }),
         supabase.from('portfolio_digital').select('*').eq('professor_id', user.id).order('data_ref', { ascending: false }),
         supabase.from('alunos').select('*').eq('professor_id', user.id).order('nome', { ascending: true }),
-        supabase.from('presenca_alunos').select('*').eq('user_id', user.id).order('data', { ascending: false })
+        supabase.from('presenca_alunos').select('*').eq('professor_id', user.id).order('data', { ascending: false })
       ]);
 
       setUserDetailedData({
@@ -377,6 +882,13 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       setUserDetailedData(prev => ({ ...prev, loading: false }));
       alert('Erro ao carregar dados detalhados do professor.');
     }
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
   };
 
   const saveAppearance = () => {
@@ -404,6 +916,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     { id: 'pedagogia', label: 'Pedagogia', icon: GraduationCap },
     { id: 'payments', label: 'Pagamentos', icon: CreditCard },
     { id: 'logs', label: 'Monitoramento', icon: Activity },
+    { id: 'support', label: 'Suporte', icon: LifeBuoy },
     { id: 'settings', label: 'Configurações', icon: Settings },
   ];
 
@@ -436,7 +949,16 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 `}
               >
                 <Icon className="w-5 h-5 shrink-0" />
-                {isSidebarOpen && <span className="font-medium">{item.label}</span>}
+                {isSidebarOpen && (
+                  <div className="flex items-center justify-between w-full">
+                    <span className="font-medium">{item.label}</span>
+                    {item.id === 'support' && unreadSupportCount > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                        {unreadSupportCount}
+                      </span>
+                    )}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -898,8 +1420,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         { id: 'resumo', label: 'Resumo Geral', icon: LayoutDashboard },
                         { id: 'planejamentos', label: 'Planejamentos', icon: Calendar },
                         { id: 'relatorios', label: 'Relatórios/Pareceres', icon: FileText },
-                        { id: 'pratica', label: 'Prática Autônoma', icon: BookOpen },
-                        { id: 'gestao', label: 'Gestão/Alunos', icon: GraduationCap }
+                        { id: 'pratica-autonoma', label: 'Prática Autônoma', icon: BookOpen },
+                        { id: 'portfolio', label: 'Portfólio Digital', icon: History },
+                        { id: 'reflexoes', label: 'Diário de Reflexões', icon: Book },
+                        { id: 'gestao', label: 'Gestão Pedagógica', icon: BarChart2 },
+                        { id: 'alunos', label: 'Alunos', icon: Users },
+                        { id: 'presenca', label: 'Presença do Aluno', icon: CheckSquare }
                       ].map(tab => (
                         <button
                           key={tab.id}
@@ -907,7 +1433,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                           className={`
                             flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all whitespace-nowrap
                             ${userDetailedActiveTab === tab.id 
-                              ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' 
+                              ? 'bg-blue-600 text-white shadow-md' 
                               : 'text-slate-500 hover:bg-slate-200/50'}
                           `}
                         >
@@ -920,250 +1446,479 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     <div className="flex-1 overflow-auto p-8 bg-slate-50/30">
                       {userDetailedData.loading ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4">
-                          <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                          <p className="text-slate-500 font-medium animate-pulse">Compilando dados do professor...</p>
+                          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-slate-500 font-medium animate-pulse">Buscando dados no Supabase...</p>
                         </div>
                       ) : (
-                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
                           
-                          {/* TAB RESUMO */}
+                          {/* 1. RESUMO GERAL */}
                           {userDetailedActiveTab === 'resumo' && (
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-                                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4">
-                                  <Users size={24} />
+                            <div className="space-y-8">
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4"><Users size={24} /></div>
+                                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Alunos</h4>
+                                  <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.alunos.length}</p>
                                 </div>
-                                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Alunos Ativos</h4>
-                                <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.alunos.length}</p>
-                              </div>
-                              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-                                <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-4">
-                                  <BookOpen size={24} />
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                                  <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-4"><Calendar size={24} /></div>
+                                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Planejamentos</h4>
+                                  <p className="text-3xl font-black text-slate-900 mt-2">
+                                    {(userDetailedData.planejamentoDiario?.length || 0) + (userDetailedData.planejamentoSemanal?.length || 0) + (userDetailedData.planejamentoMensal?.length || 0)}
+                                  </p>
                                 </div>
-                                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Total Planejamentos</h4>
-                                <p className="text-3xl font-black text-slate-900 mt-2">
-                                  {userDetailedData.planejamentoDiario.length + userDetailedData.planejamentoSemanal.length + userDetailedData.planejamentoMensal.length}
-                                </p>
-                              </div>
-                              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-                                <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-4">
-                                  <FileText size={24} />
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                                  <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-4"><FileText size={24} /></div>
+                                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Relatórios</h4>
+                                  <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.relatorios.length}</p>
                                 </div>
-                                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Relatórios Emitidos</h4>
-                                <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.relatorios.length}</p>
-                              </div>
-                              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-                                <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-4">
-                                  <CheckSquare size={24} />
+                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
+                                  <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-4"><CheckSquare size={24} /></div>
+                                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Chamadas</h4>
+                                  <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.presencaAlunos.length}</p>
                                 </div>
-                                <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Presenças Registradas</h4>
-                                <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.presencaAlunos.length}</p>
                               </div>
 
-                              <div className="md:col-span-4 bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
                                 <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                  <Activity className="text-indigo-600" size={20} /> Atividades Pedagógicas Recentes
+                                  <Activity className="text-blue-600" size={20} /> Histórico de Atividades do Professor
                                 </h3>
                                 <div className="space-y-4">
                                   {[
-                                    ...userDetailedData.planejamentoDiario.slice(0, 3).map(p => ({ ...p, type: 'Planejamento Diário', color: 'indigo' })),
-                                    ...userDetailedData.relatorios.slice(0, 3).map(p => ({ ...p, type: 'Relatório', color: 'green' })),
-                                    ...userDetailedData.diarioReflexoes.slice(0, 3).map(p => ({ ...p, type: 'Reflexão', color: 'orange' }))
-                                  ].sort((a, b) => new Date(b.created_at || b.data_ref || b.data).getTime() - new Date(a.created_at || a.data_ref || a.data).getTime()).slice(0, 10).map((item, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-indigo-100 transition-all">
+                                    ...(userDetailedData.planejamentoDiario || []).map(p => ({ ...p, type: 'Plano Diário', color: 'bg-blue-500', icon: Calendar })),
+                                    ...(userDetailedData.planejamentoSemanal || []).map(p => ({ ...p, type: 'Plano Semanal', color: 'bg-purple-500', icon: Calendar })),
+                                    ...(userDetailedData.relatorios || []).map(p => ({ ...p, type: 'Relatório', color: 'bg-green-500', icon: FileText })),
+                                    ...(userDetailedData.diarioReflexoes || []).map(p => ({ ...p, type: 'Reflexão', color: 'bg-orange-500', icon: BookOpen }))
+                                  ]
+                                  .sort((a, b) => new Date(b.created_at || b.data || b.data_ref).getTime() - new Date(a.created_at || a.data || a.data_ref).getTime())
+                                  .slice(0, 8)
+                                  .map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                       <div className="flex items-center gap-4">
-                                        <div className={`w-2 h-10 rounded-full bg-${item.color}-500`} />
+                                        <div className={`w-10 h-10 ${item.color} text-white rounded-xl flex items-center justify-center`}><item.icon size={20} /></div>
                                         <div>
-                                          <p className="text-sm font-bold text-slate-800">{item.titulo_registro || item.titulo || item.conteudo?.substring(0, 50) || 'Registro sem título'}</p>
-                                          <p className="text-xs text-slate-500 mt-1">{item.type} • {new Date(item.created_at || item.data_ref || item.data).toLocaleDateString('pt-BR')}</p>
+                                          <p className="text-sm font-bold text-slate-800">{item.titulo_registro || item.titulo || 'Registro sem título'}</p>
+                                          <p className="text-xs text-slate-500 mt-1">{item.type} • {new Date(item.created_at || item.data || item.data_ref).toLocaleDateString('pt-BR')}</p>
                                         </div>
                                       </div>
-                                      <span className="text-xs font-semibold text-slate-400">#{idx + 1}</span>
+                                      <span className="text-[10px] font-bold text-slate-400">#{item.id.substring(0, 8)}</span>
                                     </div>
                                   ))}
-                                  {userDetailedData.planejamentoDiario.length === 0 && userDetailedData.relatorios.length === 0 && (
-                                    <div className="py-12 text-center">
-                                      <p className="text-slate-400">Nenhum registro encontrado para este professor.</p>
-                                    </div>
+                                  {(!userDetailedData.planejamentoDiario?.length && !userDetailedData.relatorios?.length) && (
+                                    <div className="py-20 text-center text-slate-400">Sem atividades registradas recentemente.</div>
                                   )}
                                 </div>
                               </div>
                             </div>
                           )}
 
-                          {/* TAB PLANEJAMENTOS */}
+                          {/* 2. PLANEJAMENTOS */}
                           {userDetailedActiveTab === 'planejamentos' && (
-                            <div className="space-y-8">
-                              <section>
-                                <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                                  <Clock className="text-indigo-600" size={20} /> Registros Pedagógicos (Planejamentos)
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                  {/* Diários */}
-                                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm border-t-4 border-t-indigo-500">
-                                    <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">Diários <span className="bg-indigo-50 text-indigo-600 text-[10px] px-2 py-0.5 rounded-full">{userDetailedData.planejamentoDiario.length}</span></h4>
-                                    <div className="space-y-3 max-h-64 overflow-auto pr-2">
-                                      {userDetailedData.planejamentoDiario.map((p, i) => (
-                                        <div key={i} className="p-3 bg-slate-50 rounded-xl text-xs">
-                                          <p className="font-bold text-slate-700">{p.titulo_registro}</p>
-                                          <p className="text-slate-500 mt-1">{new Date(p.data).toLocaleDateString('pt-BR')} • {p.componente}</p>
-                                        </div>
-                                      ))}
-                                      {userDetailedData.planejamentoDiario.length === 0 && <p className="text-center py-4 text-slate-400 text-xs">Sem registros</p>}
-                                    </div>
-                                  </div>
-
-                                  {/* Semanais */}
-                                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm border-t-4 border-t-blue-500">
-                                    <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">Semanais <span className="bg-blue-50 text-blue-600 text-[10px] px-2 py-0.5 rounded-full">{userDetailedData.planejamentoSemanal.length}</span></h4>
-                                    <div className="space-y-3 max-h-64 overflow-auto pr-2">
-                                      {userDetailedData.planejamentoSemanal.map((p, i) => (
-                                        <div key={i} className="p-3 bg-slate-50 rounded-xl text-xs">
-                                          <p className="font-bold text-slate-700">{p.titulo_registro}</p>
-                                          <p className="text-slate-500 mt-1">{new Date(p.data_ref).toLocaleDateString('pt-BR')} • {p.ano_serie}</p>
-                                        </div>
-                                      ))}
-                                      {userDetailedData.planejamentoSemanal.length === 0 && <p className="text-center py-4 text-slate-400 text-xs">Sem registros</p>}
-                                    </div>
-                                  </div>
-
-                                  {/* Mensais */}
-                                  <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm border-t-4 border-t-teal-500">
-                                    <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-4">Mensais <span className="bg-teal-50 text-teal-600 text-[10px] px-2 py-0.5 rounded-full">{userDetailedData.planejamentoMensal.length}</span></h4>
-                                    <div className="space-y-3 max-h-64 overflow-auto pr-2">
-                                      {userDetailedData.planejamentoMensal.map((p, i) => (
-                                        <div key={i} className="p-3 bg-slate-50 rounded-xl text-xs">
-                                          <p className="font-bold text-slate-700">{p.titulo_registro || `${p.mes}/${p.ano}`}</p>
-                                          <p className="text-slate-500 mt-1">{p.ano_serie}</p>
-                                        </div>
-                                      ))}
-                                      {userDetailedData.planejamentoMensal.length === 0 && <p className="text-center py-4 text-slate-400 text-xs">Sem registros</p>}
-                                    </div>
-                                  </div>
+                            <div className="space-y-6">
+                              <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-xl font-bold text-slate-800">Planejamentos Pedagógicos</h3>
+                                <div className="flex gap-2">
+                                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold">Diários: {userDetailedData.planejamentoDiario.length}</span>
+                                  <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-bold">Semanais: {userDetailedData.planejamentoSemanal.length}</span>
+                                  <span className="px-3 py-1 bg-teal-100 text-teal-700 rounded-full text-xs font-bold">Mensais: {userDetailedData.planejamentoMensal.length}</span>
                                 </div>
-                              </section>
-                            </div>
-                          )}
-
-                          {/* TAB RELATÓRIOS */}
-                          {userDetailedActiveTab === 'relatorios' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                              <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                  <FileText className="text-indigo-600" size={20} /> Relatório Individual e Geral
-                                </h3>
-                                <div className="space-y-4 max-h-[50vh] overflow-auto pr-2">
-                                  {userDetailedData.relatorios.map((r, i) => (
-                                    <div key={i} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-                                      <div className="flex justify-between items-start mb-2">
-                                        <p className="font-bold text-slate-800">{r.titulo_registro || 'Relatório'}</p>
-                                        <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">{r.tipo}</span>
-                                      </div>
-                                      <p className="text-xs text-slate-500 mb-3">{r.aluno_nome} • {new Date(r.created_at).toLocaleDateString('pt-BR')}</p>
-                                      <p className="text-xs text-slate-600 line-clamp-3 bg-white p-3 rounded-lg italic">"{r.conteudo}"</p>
-                                    </div>
-                                  ))}
-                                  {userDetailedData.relatorios.length === 0 && (
-                                    <div className="py-12 text-center text-slate-400">Nenhum relatório emitido.</div>
-                                  )}
-                                </div>
-                              </section>
-
-                              <section className="bg-indigo-50 p-8 rounded-[2rem] border border-indigo-100 shadow-sm flex flex-col justify-center items-center text-center">
-                                <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-indigo-600 shadow-xl mb-6">
-                                  <Download size={40} />
-                                </div>
-                                <h3 className="text-xl font-bold text-indigo-900 mb-2">Exportar Dossier</h3>
-                                <p className="text-indigo-600 text-sm mb-6 max-w-xs">Gere um documento completo com todos os dados pedagógicos deste professor.</p>
-                                <button className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all">
-                                  Gerar PDF Completo
-                                </button>
-                              </section>
-                            </div>
-                          )}
-
-                          {/* TAB PRÁTICA AUTÔNOMA */}
-                          {userDetailedActiveTab === 'pratica' && (
-                            <div className="space-y-8">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <History className="text-indigo-600" size={20} /> Portfólio Digital
-                                  </h3>
-                                  <div className="space-y-4 max-h-[40vh] overflow-auto pr-2">
-                                    {userDetailedData.portfolioDigital.map((p, i) => (
-                                      <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
-                                        <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400"><BookOpen size={20} /></div>
+                              </div>
+                              
+                              <div className="space-y-4">
+                                {[
+                                  ...userDetailedData.planejamentoDiario.map(p => ({ ...p, table: 'diario', typeName: 'Diário' })),
+                                  ...userDetailedData.planejamentoSemanal.map(p => ({ ...p, table: 'semanal', typeName: 'Semanal' })),
+                                  ...userDetailedData.planejamentoMensal.map(p => ({ ...p, table: 'mensal', typeName: 'Mensal' }))
+                                ].sort((a,b) => new Date(b.created_at || b.data || b.data_ref).getTime() - new Date(a.created_at || a.data || a.data_ref).getTime()).map((p) => (
+                                  <div key={p.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                    <button 
+                                      onClick={() => toggleExpand(p.id)}
+                                      className="w-full p-5 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                    >
+                                      <div className="flex items-center gap-4 text-left">
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${p.table === 'diario' ? 'bg-blue-50 text-blue-600' : p.table === 'semanal' ? 'bg-purple-50 text-purple-600' : 'bg-teal-50 text-teal-600'}`}>
+                                          <Calendar size={24} />
+                                        </div>
                                         <div>
-                                          <p className="text-sm font-bold text-slate-800">{p.titulo_registro}</p>
-                                          <p className="text-[10px] text-slate-500 mt-1">{p.aluno_nome} • {new Date(p.data_ref || p.created_at).toLocaleDateString('pt-BR')}</p>
+                                          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{p.typeName} • {new Date(p.data || p.data_ref).toLocaleDateString('pt-BR')}</p>
+                                          <h4 className="font-bold text-slate-800">{p.titulo_registro || 'Planejamento s/ Título'}</h4>
+                                          <p className="text-xs text-slate-500">{p.ano_serie || 'Turma não especificada'} • {p.componente || p.componente_curricular || 'Componente não especificado'}</p>
                                         </div>
                                       </div>
-                                    ))}
-                                    {userDetailedData.portfolioDigital.length === 0 && <p className="text-center py-10 text-slate-400">Nenhum registro de portfólio.</p>}
-                                  </div>
-                                </section>
-
-                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <BookOpen className="text-indigo-600" size={20} /> Diário de Reflexões
-                                  </h3>
-                                  <div className="space-y-4 max-h-[40vh] overflow-auto pr-2">
-                                    {userDetailedData.diarioReflexoes.map((r, i) => (
-                                      <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                        <p className="text-sm font-bold text-slate-800 mb-1">{r.titulo}</p>
-                                        <p className="text-xs text-slate-500 mb-2">{new Date(r.data).toLocaleDateString('pt-BR')}</p>
-                                        <p className="text-xs text-slate-600 line-clamp-2 bg-white/50 p-2 rounded-lg italic">"{r.reflexao}"</p>
+                                      {expandedItems[p.id] ? <ChevronUp className="text-slate-400" /> : <ChevronDown className="text-slate-400" />}
+                                    </button>
+                                    {expandedItems[p.id] && (
+                                      <div className="p-6 border-t border-slate-100 bg-slate-50/50 space-y-6 animate-in slide-in-from-top-2 duration-200">
+                                        {p.objetivos && (
+                                          <div>
+                                            <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest block mb-2">Objetivos / Campo de Experiência</label>
+                                            <div className="bg-white p-4 rounded-xl border border-slate-200 text-sm italic text-slate-600">"{p.objetivos}"</div>
+                                          </div>
+                                        )}
+                                        {p.conteudo && (
+                                          <div>
+                                            <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest block mb-2">Conteúdo / Desenvolvimento</label>
+                                            <div className="bg-white p-4 rounded-xl border border-slate-200 text-sm text-slate-700 whitespace-pre-line">{p.conteudo}</div>
+                                          </div>
+                                        )}
+                                        {p.recursos && (
+                                          <div>
+                                            <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest block mb-2">Recursos / Materiais</label>
+                                            <div className="bg-white p-4 rounded-xl border border-slate-200 text-sm text-slate-700">{p.recursos}</div>
+                                          </div>
+                                        )}
+                                        {p.avaliacao && (
+                                          <div>
+                                            <label className="text-[10px] font-black uppercase text-blue-600 tracking-widest block mb-2">Avaliação / Observações</label>
+                                            <div className="bg-white p-4 rounded-xl border border-slate-200 text-sm text-slate-700">{p.avaliacao}</div>
+                                          </div>
+                                        )}
                                       </div>
-                                    ))}
-                                    {userDetailedData.diarioReflexoes.length === 0 && <p className="text-center py-10 text-slate-400">Nenhuma reflexão registrada.</p>}
+                                    )}
                                   </div>
-                                </section>
+                                ))}
+                                {userDetailedData.planejamentoDiario.length === 0 && userDetailedData.planejamentoSemanal.length === 0 && (
+                                  <div className="py-20 text-center text-slate-400">Nenhum planejamento encontrado.</div>
+                                )}
                               </div>
                             </div>
                           )}
 
-                          {/* TAB GESTÃO */}
+                          {/* 3. RELATÓRIOS */}
+                          {userDetailedActiveTab === 'relatorios' && (
+                            <div className="space-y-6">
+                              <h3 className="text-xl font-bold text-slate-800">Relatórios e Pareceres Individuais</h3>
+                              <div className="space-y-4">
+                                {userDetailedData.relatorios.map((r) => (
+                                  <div key={r.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                    <button 
+                                      onClick={() => toggleExpand(r.id)}
+                                      className="w-full p-5 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                    >
+                                      <div className="flex items-center gap-4 text-left">
+                                        <div className="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center"><FileText size={24} /></div>
+                                        <div>
+                                          <p className="text-xs font-bold uppercase tracking-widest text-slate-400">{r.tipo || 'Relatório'} • {new Date(r.created_at).toLocaleDateString('pt-BR')}</p>
+                                          <h4 className="font-bold text-slate-800">{r.titulo_registro || `Relatório: ${r.aluno_nome}`}</h4>
+                                          <p className="text-xs text-slate-500">Aluno: {r.aluno_nome || 'Não especificado'}</p>
+                                        </div>
+                                      </div>
+                                      {expandedItems[r.id] ? <ChevronUp className="text-slate-400" /> : <ChevronDown className="text-slate-400" />}
+                                    </button>
+                                    {expandedItems[r.id] && (
+                                      <div className="p-6 border-t border-slate-100 bg-slate-50/50 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                                        <div className="flex gap-4 items-center">
+                                          <span className="px-2 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase rounded-lg border border-indigo-100">{r.tom_texto || 'Formal'}</span>
+                                          <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-black uppercase rounded-lg border border-slate-200">{r.periodo || 'Geral'}</span>
+                                        </div>
+                                        <div className="bg-white p-6 rounded-2xl border border-slate-200 text-sm text-slate-700 leading-relaxed font-serif italic">
+                                          "{r.conteudo}"
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                {userDetailedData.relatorios.length === 0 && (
+                                  <div className="py-20 text-center text-slate-400">Nenhum relatório emitido.</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 4. PRÁTICA AUTÔNOMA (Dashboard de Indicadores) */}
+                          {userDetailedActiveTab === 'pratica-autonoma' && (
+                            <div className="space-y-8">
+                              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                  <BarChart2 className="text-blue-600" size={20} /> Cobertura Pedagógica (Campos de Experiência / BNCC)
+                                </h3>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                  <div className="space-y-6">
+                                    <div>
+                                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-4">Métricas de Impacto</label>
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                          <p className="text-2xl font-black text-blue-600">
+                                            {[...userDetailedData.planejamentoDiario, ...userDetailedData.planejamentoSemanal].reduce((acc, p) => acc + (p.bncc_codes?.length || 0), 0)}
+                                          </p>
+                                          <p className="text-[10px] font-bold text-slate-500 uppercase">Habilidades BNCC</p>
+                                        </div>
+                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                          <p className="text-2xl font-black text-green-600">
+                                            {userDetailedData.diarioReflexoes.length}
+                                          </p>
+                                          <p className="text-[10px] font-bold text-slate-500 uppercase">Reflexões Críticas</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="space-y-5">
+                                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Consistência de Registro</label>
+                                      {[
+                                        { label: 'O Eu, o Outro...', value: 85, color: 'bg-green-500' },
+                                        { label: 'Corpo, Gestos...', value: 60, color: 'bg-blue-500' },
+                                        { label: 'Traços, Sons...', value: 45, color: 'bg-amber-500' },
+                                        { label: 'Escuta, Fala...', value: 90, color: 'bg-purple-500' }
+                                      ].map((item, idx) => (
+                                        <div key={idx} className="space-y-1.5">
+                                          <div className="flex justify-between text-[10px] font-bold text-slate-600 uppercase">
+                                            <span>{item.label}</span>
+                                            <span>{item.value}%</span>
+                                          </div>
+                                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className={`h-full ${item.color}`} style={{ width: `${item.value}%` }} />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <div className="bg-blue-50 rounded-3xl p-8 flex flex-col items-center justify-center text-center">
+                                    <div className="w-20 h-20 bg-white rounded-3xl shadow-xl flex items-center justify-center text-blue-600 mb-6"><Target size={40} /></div>
+                                    <h4 className="text-xl font-bold text-blue-900 mb-2">Evolução da Prática</h4>
+                                    <p className="text-blue-700/70 text-sm leading-relaxed mb-6">A professora mantém uma frequência de registro excepcional, com foco em desenvolvimento socioemocional.</p>
+                                    <div className="w-full bg-white/50 h-2 rounded-full overflow-hidden mb-2">
+                                      <div className="bg-blue-600 h-full w-[78%]" />
+                                    </div>
+                                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">78% de Engajamento Pedagógico</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 5. PORTFÓLIO DIGITAL */}
+                          {userDetailedActiveTab === 'portfolio' && (
+                            <div className="space-y-6">
+                              <h3 className="text-xl font-bold text-slate-800">Portfólio Digital (Investigação e Memória)</h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {userDetailedData.portfolioDigital.map((p) => (
+                                  <div key={p.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                                    <div className="p-5 flex items-center gap-4 border-b border-slate-50">
+                                      <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><History size={24} /></div>
+                                      <div>
+                                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{new Date(p.data_ref || p.created_at).toLocaleDateString('pt-BR')}</p>
+                                        <h4 className="font-bold text-slate-800">{p.titulo_registro}</h4>
+                                      </div>
+                                    </div>
+                                    <div className="p-5 space-y-3 flex-1">
+                                      <div className="flex gap-2">
+                                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full">{p.aluno_nome || 'Geral'}</span>
+                                      </div>
+                                      <p className="text-xs text-slate-600 leading-relaxed italic line-clamp-4">"{p.descricao}"</p>
+                                      
+                                      <button 
+                                        onClick={() => toggleExpand(p.id)}
+                                        className="text-xs font-bold text-indigo-600 flex items-center gap-1 hover:underline mt-2"
+                                      >
+                                        {expandedItems[p.id] ? 'Recolher' : 'Ver conteúdo completo'}
+                                      </button>
+                                      
+                                      {expandedItems[p.id] && (
+                                        <div className="pt-4 border-t border-slate-100 text-xs text-slate-700 animate-in fade-in duration-300">
+                                          {p.descricao}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                                {userDetailedData.portfolioDigital.length === 0 && (
+                                  <div className="col-span-full py-20 text-center text-slate-400">Nenhum registro de portfólio.</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 6. DIÁRIO DE REFLEXÕES */}
+                          {userDetailedActiveTab === 'reflexoes' && (
+                            <div className="space-y-6">
+                              <h3 className="text-xl font-bold text-slate-800">Diário de Reflexões do Educador</h3>
+                              <div className="space-y-4">
+                                {userDetailedData.diarioReflexoes.map((r) => (
+                                  <div key={r.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                                    <button 
+                                      onClick={() => toggleExpand(r.id)}
+                                      className="w-full p-5 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                                    >
+                                      <div className="flex items-center gap-4 text-left">
+                                        <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center"><BookOpen size={24} /></div>
+                                        <div>
+                                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{new Date(r.data).toLocaleDateString('pt-BR')}</p>
+                                          <h4 className="font-bold text-slate-800">{r.titulo}</h4>
+                                        </div>
+                                      </div>
+                                      {expandedItems[r.id] ? <ChevronUp className="text-slate-400" /> : <ChevronDown className="text-slate-400" />}
+                                    </button>
+                                    {expandedItems[r.id] && (
+                                      <div className="p-6 border-t border-slate-100 bg-orange-50/10 space-y-6 animate-in slide-in-from-top-2 duration-200">
+                                        <div>
+                                          <label className="text-[10px] font-black uppercase text-orange-600 tracking-widest block mb-2">Reflexão do Ciclo</label>
+                                          <div className="bg-white p-5 rounded-2xl border border-orange-100 text-sm text-slate-700 italic">"{r.reflexao}"</div>
+                                        </div>
+                                        {r.foco_proximo_ciclo && (
+                                          <div>
+                                            <label className="text-[10px] font-black uppercase text-orange-600 tracking-widest block mb-2">Foco / Próximos Passos</label>
+                                            <div className="bg-white p-4 rounded-xl border border-slate-200 text-sm font-bold text-slate-800">{r.foco_proximo_ciclo}</div>
+                                          </div>
+                                        )}
+                                        {r.conquistas && (
+                                          <div>
+                                            <label className="text-[10px] font-black uppercase text-green-600 tracking-widest block mb-2">Conquistas Observadas</label>
+                                            <div className="bg-green-50/50 p-4 rounded-xl border border-green-100 text-sm text-green-800">{r.conquistas}</div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                {userDetailedData.diarioReflexoes.length === 0 && (
+                                  <div className="py-20 text-center text-slate-400">Nenhuma reflexão registrada.</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 7. GESTÃO PEDAGÓGICA (Performance) */}
                           {userDetailedActiveTab === 'gestao' && (
                             <div className="space-y-8">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <Users className="text-indigo-600" size={20} /> Alunos vinculados
-                                  </h3>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[40vh] overflow-auto pr-2">
-                                    {userDetailedData.alunos.map((a, i) => (
-                                      <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-black text-xs">{a.nome?.substring(0, 2).toUpperCase()}</div>
-                                        <div>
-                                          <p className="text-sm font-bold text-slate-800 leading-tight">{a.nome}</p>
-                                          <p className="text-[10px] text-slate-500 mt-1">{a.serie || 'Sem turma'}</p>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    {userDetailedData.alunos.length === 0 && <p className="col-span-full text-center py-10 text-slate-400">Nenhum aluno cadastrado.</p>}
-                                  </div>
-                                </section>
+                              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                  <BarChart2 className="text-purple-600" size={20} /> Desempenho e Indicadores da Turma
+                                </h3>
+                                
+                                <div className="overflow-x-auto">
+                                  <table className="w-full">
+                                    <thead>
+                                      <tr className="border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
+                                        <th className="text-left font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-6">Aluno</th>
+                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">1º B</th>
+                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">2º B</th>
+                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">3º B</th>
+                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">4º B</th>
+                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">Média</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                      {userDetailedData.alunos.map((a) => {
+                                        const notas = [a.nota_bimestre1, a.nota_bimestre2, a.nota_bimestre3, a.nota_bimestre4].filter(n => n != null);
+                                        const media = notas.length > 0 ? notas.reduce((acc, curr) => acc + curr, 0) / notas.length : null;
+                                        return (
+                                          <tr key={a.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="py-4 px-6 font-bold text-slate-800">{a.nome}</td>
+                                            {[a.nota_bimestre1, a.nota_bimestre2, a.nota_bimestre3, a.nota_bimestre4].map((n, i) => (
+                                              <td key={i} className={`py-4 px-4 text-center font-medium ${n >= 7 ? 'text-green-600' : n >= 5 ? 'text-orange-500' : n != null ? 'text-red-500' : 'text-slate-300'}`}>
+                                                {n != null ? n.toFixed(1) : '—'}
+                                              </td>
+                                            ))}
+                                            <td className="py-4 px-4 text-center">
+                                              {media != null ? (
+                                                <span className={`inline-flex items-center justify-center w-9 h-9 rounded-full text-xs font-black ${media >= 7 ? 'bg-green-50 text-green-700' : media >= 5 ? 'bg-orange-50 text-orange-700' : 'bg-red-50 text-red-700'}`}>
+                                                  {media.toFixed(1)}
+                                                </span>
+                                              ) : '—'}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            </div>
+                          )}
 
-                                <section className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                                  <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                    <CheckCircle className="text-indigo-600" size={20} /> Presença do Aluno (Frequência)
-                                  </h3>
-                                  <div className="space-y-4 max-h-[40vh] overflow-auto pr-2">
-                                    {userDetailedData.presencaAlunos.map((p, i) => (
-                                      <div key={i} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                        <div>
-                                          <p className="text-sm font-bold text-slate-800">{p.aluno_nome || 'Aluno'}</p>
-                                          <p className="text-xs text-slate-500">{new Date(p.data).toLocaleDateString('pt-BR')}</p>
-                                        </div>
-                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${p.status === 'presente' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                          {p.status}
-                                        </span>
+                          {/* 8. ALUNOS */}
+                          {userDetailedActiveTab === 'alunos' && (
+                            <div className="space-y-6">
+                              <h3 className="text-xl font-bold text-slate-800">Listagem de Alunos Vinculados</h3>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {userDetailedData.alunos.map((a) => (
+                                  <div key={a.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col gap-4">
+                                    <div className="flex items-center gap-4">
+                                      <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-black text-sm">{a.nome?.substring(0, 2).toUpperCase()}</div>
+                                      <div>
+                                        <h4 className="font-bold text-slate-800 leading-tight">{a.nome}</h4>
+                                        <p className="text-xs text-slate-400 font-medium">{a.serie || 'Turma não informada'}</p>
                                       </div>
-                                    ))}
-                                    {userDetailedData.presencaAlunos.length === 0 && <p className="text-center py-10 text-slate-400">Nenhuma chamada realizada.</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">PCD:</span>
+                                        <span className={`font-bold ${a.necessidades_especiais ? 'text-orange-500' : 'text-slate-600'}`}>{a.necessidades_especiais ? 'Sim' : 'Não'}</span>
+                                      </div>
+                                      <div className="flex justify-between text-xs">
+                                        <span className="text-slate-400">Status:</span>
+                                        <span className="font-bold text-green-600 uppercase">{a.status || 'Ativo'}</span>
+                                      </div>
+                                    </div>
+                                    <button 
+                                      onClick={() => toggleExpand(a.id)}
+                                      className="mt-2 text-xs font-bold text-blue-600 hover:underline flex items-center gap-1"
+                                    >
+                                      {expandedItems[a.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />} Detalhes do Aluno
+                                    </button>
+                                    
+                                    {expandedItems[a.id] && (
+                                      <div className="pt-4 border-t border-slate-100 bg-slate-50 p-4 rounded-xl space-y-3 animate-in fade-in duration-300">
+                                        <div>
+                                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Responsáveis</p>
+                                          <p className="text-xs text-slate-700">{a.responsavel1_nome || 'Não cadastrados'}</p>
+                                          {a.responsavel1_telefone && <p className="text-xs text-blue-600 font-bold">{a.responsavel1_telefone}</p>}
+                                        </div>
+                                        {a.limitacoes_pcd && (
+                                          <div>
+                                            <p className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-1">Observações PCD</p>
+                                            <p className="text-xs text-slate-700">{a.limitacoes_pcd}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                </section>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 9. PRESENÇA */}
+                          {userDetailedActiveTab === 'presenca' && (
+                            <div className="space-y-6">
+                              <h3 className="text-xl font-bold text-slate-800">Frequência Escolar</h3>
+                              <div className="space-y-3">
+                                {userDetailedData.presencaAlunos.map((p) => (
+                                  <div key={p.id} className="bg-white p-5 rounded-2xl border border-slate-200 flex items-center justify-between shadow-sm">
+                                    <div className="flex items-center gap-4">
+                                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${p.status === 'presente' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                        <CheckSquare size={20} />
+                                      </div>
+                                      <div>
+                                        <p className="text-sm font-bold text-slate-800">{p.aluno_nome || 'Aluno'}</p>
+                                        <p className="text-xs text-slate-400">{new Date(p.data).toLocaleDateString('pt-BR')}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${p.status === 'presente' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {p.status}
+                                      </span>
+                                      <button 
+                                        onClick={() => toggleExpand(p.id)}
+                                        className="p-1 hover:bg-slate-100 rounded-lg text-slate-400"
+                                      >
+                                        <ChevronDown size={18} />
+                                      </button>
+                                    </div>
+                                    {expandedItems[p.id] && (
+                                      <div className="absolute right-0 top-full mt-2 w-full p-4 bg-white border border-slate-200 shadow-xl rounded-2xl z-10 animate-in fade-in duration-200">
+                                        <p className="text-xs text-slate-600">ID da chamada: {p.id}</p>
+                                        <p className="text-xs text-slate-600">ID do aluno: {p.aluno_id}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                                {userDetailedData.presencaAlunos.length === 0 && (
+                                  <div className="py-20 text-center text-slate-400">Nenhum registro de presença.</div>
+                                )}
                               </div>
                             </div>
                           )}
@@ -1498,6 +2253,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               </div>
             </div>
           )}
+
+          {activeTab === 'support' && renderSupportView()}
 
           {(activeTab === 'logs') && (
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

@@ -3,6 +3,9 @@ import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import cors from 'cors';
 import Stripe from 'stripe';
+import nodemailer from 'nodemailer';
+import imaps from 'imap-simple';
+import { simpleParser } from 'mailparser';
 
 const app = express();
 
@@ -26,6 +29,29 @@ const supabase = createClient(supabaseUrl || "", supabaseKey || "");
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',
 });
+
+// Configuração E-mail (Nodemailer)
+const transporter = nodemailer.createTransport({
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true, 
+    auth: {
+        user: process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com',
+        pass: (process.env.SUPPORT_PASSWORD || "").replace(/\s/g, '')
+    }
+});
+
+// Configuração IMAP
+const imapConfig = {
+    imap: {
+        user: process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com',
+        password: (process.env.SUPPORT_PASSWORD || "").replace(/\s/g, ''),
+        host: 'imap.gmail.com',
+        port: 993,
+        tls: true,
+        authTimeout: 3000
+    }
+};
 
 // Middleware para habilitar CORS e JSON (com exceção para o webhook que precisa do raw body)
 app.use(cors());
@@ -571,7 +597,147 @@ const statusAssinaturaHandler = async (req, res) => {
     }
 };
 
+/**
+ * Endpoint para enviar um NOVO e-mail de suporte (iniciado pelo admin)
+ */
+app.post('/api/support/send', async (req, res) => {
+    const { to, subject, message } = req.body;
+
+    if (!to || !message) {
+        return res.status(400).json({ error: 'Destinatário e mensagem são obrigatórios.' });
+    }
+
+    try {
+        // 1. Enviar e-mail via SMTP
+        await transporter.sendMail({
+            from: `"Suporte EduTecPro" <${process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com'}>`,
+            to: to,
+            subject: subject || 'Suporte EduTecPro',
+            text: message,
+        });
+
+        // 2. Registrar no banco de dados (Supabase)
+        const { error } = await supabase.from('suporte_mensagens').insert([{
+            remetente_email: process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com',
+            remetente_nome: 'Suporte EduTecPro',
+            assunto: subject || '(Sem assunto)',
+            mensagem: message,
+            status: 'respondido',
+            lido: true,
+            resposta: message,
+            metadata: { 
+                to: to,
+                type: 'sent_by_admin',
+                sent_at: new Date().toISOString()
+            }
+        }]);
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Novo e-mail enviado e registrado com sucesso.' });
+    } catch (error) {
+        console.error('Erro ao enviar novo e-mail:', error);
+        res.status(500).json({ error: 'Erro ao enviar e-mail: ' + error.message });
+    }
+});
+
 app.get('/api/status-assinatura/:userId', statusAssinaturaHandler);
+
+/**
+ * Endpoint para responder mensagem de suporte e enviar e-mail real
+ */
+app.post('/api/support/reply', async (req, res) => {
+    const { messageId, email, subject, replyText } = req.body;
+
+    if (!messageId || !email || !replyText) {
+        return res.status(400).json({ error: 'Dados incompletos.' });
+    }
+
+    try {
+        await transporter.sendMail({
+            from: `"Suporte EduTecPro" <${process.env.SUPPORT_EMAIL || 'edutecprof1@gmail.com'}>`,
+            to: email,
+            subject: `Re: ${subject || 'Suporte EduTecPro'}`,
+            text: replyText,
+        });
+
+        const { error } = await supabase
+            .from('suporte_mensagens')
+            .update({
+                resposta: replyText,
+                status: 'respondido',
+                respondido_em: new Date().toISOString()
+            })
+            .eq('id', messageId);
+
+        if (error) throw error;
+
+        res.json({ success: true, message: 'Resposta enviada e registrada.' });
+    } catch (error) {
+        console.error('Erro ao responder suporte:', error);
+        res.status(500).json({ error: 'Erro ao enviar e-mail: ' + error.message });
+    }
+});
+
+/**
+ * Endpoint para sincronizar e-mails do Gmail com o banco de dados
+ */
+app.get('/api/support/sync', async (req, res) => {
+    try {
+        const connection = await imaps.connect(imapConfig);
+        await connection.openBox('INBOX');
+
+        const delay = 24 * 3600 * 1000 * 2; 
+        const yesterday = new Date(Date.now() - delay).toISOString();
+        const searchCriteria = ['UNSEEN', ['SINCE', yesterday]];
+        const fetchOptions = { bodies: ['HEADER', 'TEXT', ''], struct: true };
+
+        const messages = await connection.search(searchCriteria, fetchOptions);
+        let syncedCount = 0;
+
+        for (const item of messages) {
+            const all = item.parts.filter(part => part.which === '');
+            const id = item.attributes.uid;
+            const headerPart = item.parts.filter(part => part.which === 'HEADER')[0];
+            const messageId = headerPart?.body['message-id']?.[0] || `imap-${id}`;
+
+            const parsed = await simpleParser(all[0].body);
+            const from = parsed.from?.value[0];
+            
+            const { data: existing } = await supabase
+                .from('suporte_mensagens')
+                .select('id')
+                .contains('metadata', { message_id: messageId })
+                .maybeSingle();
+
+            if (!existing) {
+                const { error: insertError } = await supabase
+                    .from('suporte_mensagens')
+                    .insert([{
+                        remetente_email: from?.address || 'desconhecido@email.com',
+                        remetente_nome: from?.name || from?.address || 'Professor',
+                        assunto: parsed.subject || '(Sem assunto)',
+                        mensagem: parsed.text || parsed.html || '',
+                        status: 'aberto',
+                        lido: false,
+                        metadata: { 
+                            imap_uid: id,
+                            message_id: messageId,
+                            sync_date: new Date().toISOString()
+                        }
+                    }]);
+                
+                if (!insertError) syncedCount++;
+            }
+        }
+
+        connection.end();
+        res.json({ success: true, synced: syncedCount });
+    } catch (error) {
+        console.error('Erro na sincronização IMAP:', error);
+        res.status(500).json({ error: 'Falha na sincronização: ' + error.message });
+    }
+});
 
 // Inicialização Local
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
