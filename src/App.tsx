@@ -87,6 +87,7 @@ export default function App() {
         // Redirection logic logic
         if (data.role === 'admin') {
           setUserRole('admin');
+          setCurrentProfile('admin'); // Admin não deve ver mensagens de "Plano Free"
           if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/dashboard') {
             navigate('/admin', { replace: true });
           }
