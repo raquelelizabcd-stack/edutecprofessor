@@ -9,6 +9,7 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
 *   **Professores de Educação Infantil (EI):** Foco em campos de experiência e objetivos de aprendizagem.
 *   **Professores de Ensino Fundamental (EF):** Foco em componentes curriculares, habilidades e objetos de conhecimento.
 *   **Coordenadores Pedagógicos:** Para supervisão e padronização de documentos.
+*   **Educadores e Gestores:** Painel dedicado a profissionais da educação, facilitando a gestão, o suporte e o acompanhamento pedagógico contínuo.
 
 ---
 
@@ -16,7 +17,7 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
 1.  **Redução da Sobrecarga:** Automatizar a criação de relatórios e planejamentos que consomem horas do docente.
 2.  **Conformidade Normativa:** Facilitar a aplicação correta dos códigos BNCC em todos os registros.
 3.  **Profissionalização:** Oferecer exportações em PDF de alta qualidade para entrega a pais e instituições.
-4.  **Monetização Sustentável:** Modelo Freemium com conversão para Plano Pro via Stripe.
+4.  **Monetização Sustentável:** Modelo Freemium com conversão para Plano Pro via Stripe e PagBank.
 
 ---
 
@@ -37,40 +38,46 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
 *   **Parecer PCD:** Suporte especializado para alunos com deficiência, com templates estruturados.
 *   **EduBot (Assistente BNCC):** Chatbot integrado para tirar dúvidas pedagógicas, sugerir atividades e localizar códigos da BNCC instantaneamente.
 
-### 4.4. Finanças e Assinaturas
+### 4.4. Finanças e Assinaturas (Resiliência Pro)
 *   **Plano Free:** Acesso limitado a funcionalidades básicas e 1 turma.
 *   **Plano Pro:** 
     *   Turmas e alunos ilimitados.
     *   Exportação de PDFs premium.
     *   Acesso total ao EduBot.
-*   **Sistema de Trial:** 7 dias grátis para experimentar o Pro antes da cobrança.
-*   **Checkout Stripe:** Transações seguras via Cartão de Crédito e Pix (com webhook para ativação automática).
+*   **Sistema de Trial:** 7 dias grátis com sincronização resiliente entre Auth, LocalStorage e Banco de Dados.
+*   **Checkout Multi-Provider:** Integração com Stripe e PagBank (Webhooks automáticos para ativação e cancelamento).
+*   **Gerenciamento de Assinatura:** Portal do Cliente para cancelamento autônomo e histórico de faturamento.
+
+### 4.5. Painel Administrativo (Admin Console)
+*   **Gestão de Usuários:** Visualização completa de métricas, status de pagamento e bloqueio de acesso.
+*   **Suporte Integrado:** Módulo de chamados via Gmail/SMTP para atendimento direto ao professor.
+*   **Auditoria de Dados:** Acesso aos registros pedagógicos para supervisão de qualidade.
 
 ---
 
 ## 5. Arquitetura e Stack Tecnológica
 *   **Frontend:** React 18 + TypeScript + Vite.
-*   **Estilização:** Vanilla CSS (Design System Premium: Mode Dark/Light, Glassmorphism, HSL Colors).
+*   **Estilização:** Vanilla CSS (Design System Premium com Glassmorphism e Micro-animações).
 *   **Backend & DB:** Supabase (Auth, PostgreSQL, Storage).
-*   **Infraestrutura:** Vercel (Hospedagem e Edge Functions).
-*   **Pagamentos:** Stripe (Customer Portal e Payment Links).
-*   **Exportação:** Sistema de geração de PDF dinâmico via Cloud Functions.
+*   **Webhooks & APIs:** Node.js enviando eventos do Stripe/PagBank em tempo real.
+*   **Segurança:** Fluxo de aceite de termos de uso e privacidade obrigatório antes do acesso ao Dashboard.
+*   **Infraestrutura:** Vercel e Supabase Edge Functions.
 
 ---
 
 ## 6. Design e Experiência do Usuário (UX/UI)
-*   **Estética "Wow":** Uso de gradientes suaves, micro-animações em botões e feedbacks visuais claros.
-*   **Responsividade:** Interface adaptada para Desktop, Tablets e Mobile.
-*   **Acessibilidade:** Cores com contraste adequado e semântica HTML5 correta.
+*   **Estética "Wow":** Uso de gradientes HSL adaptativos, dark mode nativo e componentes de feedback premium.
+*   **Responsividade:** Mobile-first com sidebar adaptável e tabelas com scroll horizontal inteligente.
+*   **Acessibilidade:** Semântica HTML5 rigorosa e conformidade com contrastes de UI modernos.
 
 ---
 
 ## 7. Roadmap Futuro (Próximas Fases)
 *   [ ] Integração com Google Classroom.
 *   [ ] Aplicativo Mobile Nativo (PWA Avançado).
-*   [ ] Sistema de Gamificação para engajamento do professor.
-*   [ ] Análise de dados preditiva sobre o desenvolvimento da turma.
+*   [ ] Sistema de Gamificação (Pontuação por completude de planejamento).
+*   [ ] Relatórios Estatísticos Avançados sobre o desenvolvimento da turma.
 
 ---
-**Documento atualizado em:** 08/04/2026
-**Responsável:** Antigravity AI
+**Documento atualizado em:** 12/04/2026
+**Responsável:** Antigravity AI (Google DeepMind)
