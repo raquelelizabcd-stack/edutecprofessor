@@ -97,6 +97,13 @@ export default function PaymentPage({
             return;
         }
 
+        const cleanCpf = cpf.replace(/\D/g, '');
+        if (cleanCpf.length !== 11) {
+            alert('Por favor, informe um CPF válido com 11 dígitos.');
+            setIsProcessing(false);
+            return;
+        }
+
         setIsProcessing(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
@@ -124,10 +131,15 @@ export default function PaymentPage({
                     userId: activeUserId,
                     email: activeEmail,
                     nome: activeEmail.split('@')[0],
-                    cpf: cpf,
+                    cpf: cleanCpf,
                     amount: 29.90
                 })
             });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || `Erro no servidor: ${response.status}`);
+            }
 
             const data = await response.json();
             if (data.error) throw new Error(data.error);
@@ -135,7 +147,10 @@ export default function PaymentPage({
             setPixData(data);
         } catch (err: any) {
             console.error('PIX error:', err);
-            alert('Falha ao gerar PIX: ' + err.message);
+            const msg = err.message === 'Unexpected end of JSON input' 
+                ? 'O servidor da API não está respondendo. Certifique-se de que o comando "npm run api" está rodando.'
+                : err.message;
+            alert('Falha ao gerar PIX: ' + msg);
         } finally {
             setIsProcessing(false);
         }
