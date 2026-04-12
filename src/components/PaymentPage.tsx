@@ -206,7 +206,7 @@ export default function PaymentPage({
                                 </div>
                                 <div>
                                     <h4 className={`font-bold ${paymentMethod === 'stripe' ? 'text-[#0080FF]' : 'text-black/60'}`}>Cartão de Crédito</h4>
-                                    <p className="text-xs text-black/40 mt-1">Stripe Gateway • 7 dias grátis • Recorrente</p>
+                                    <p className="text-xs text-black/40 mt-1">Stripe Gateway • Acesso Imediato • Recorrente</p>
                                 </div>
                             </button>
 
@@ -328,12 +328,7 @@ export default function PaymentPage({
                                         </div>
                                     ) : (
                                         <>
-                                            {paymentMethod === 'stripe' && !isAlreadyInTrial && (
-                                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#0080FF] text-white text-[10px] font-black uppercase tracking-widest rounded-full mb-4">
-                                                    <Clock size={10} fill="currentColor" />
-                                                    7 Dias de Teste Grátis Incluso
-                                                </div>
-                                            )}
+
                                             
                                             <h4 className="text-xl font-bold text-black mb-4">
                                                 {paymentMethod === 'stripe' ? 'Ambiente 100% Seguro' : 'Pagamento Instantâneo'}
@@ -341,9 +336,7 @@ export default function PaymentPage({
                                             
                                             <p className="text-sm text-black/50 leading-relaxed max-w-md mx-auto mb-8">
                                                 {paymentMethod === 'stripe' 
-                                                    ? (isAlreadyInTrial 
-                                                        ? "Você será redirecionado para o checkout oficial do Stripe para ativar sua assinatura mensal ilimitada."
-                                                        : "Você será redirecionado para o checkout oficial do Stripe. Não cobraremos nada durante os primeiros 7 dias. Você pode cancelar a qualquer momento.")
+                                                    ? "Você será redirecionado para o checkout oficial do Stripe para processar sua assinatura do Plano Pro com total segurança."
                                                     : "O PIX é ideal para quem não usa cartão. O acesso Pro é liberado imediatamente após a confirmação do pagamento pelo PagBank."}
                                             </p>
                                             
@@ -391,25 +384,14 @@ export default function PaymentPage({
                                     <div className="flex items-center justify-between">
                                         <div className="space-y-0.5">
                                             <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Total Hoje</span>
-                                            <p className={isAlreadyInTrial || paymentMethod === 'pix' ? "text-white text-xs font-semibold" : "text-[#00A859] text-xs font-semibold"}>
-                                                {paymentMethod === 'pix' ? "Pagamento Único PIX" : (isAlreadyInTrial ? "Ativação Instantânea Pro" : "Início do Teste Grátis")}
+                                            <p className="text-[#00A859] text-xs font-semibold">
+                                                {paymentMethod === 'pix' ? "Pagamento Único PIX" : "Assinatura Plano Pro"}
                                             </p>
                                         </div>
-                                        <span className="text-3xl font-bold">R$ {(isAlreadyInTrial || paymentMethod === 'pix') ? monthlyPrice.toFixed(2).replace('.', ',') : '0,00'}</span>
+                                        <span className="text-3xl font-bold">R$ {monthlyPrice.toFixed(2).replace('.', ',')}</span>
                                     </div>
 
-                                    {!isAlreadyInTrial && paymentMethod === 'stripe' && (
-                                        <div className="pt-4 border-t border-white/5 flex items-center justify-between">
-                                            <div className="space-y-0.5">
-                                                <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Após {trialDays} dias</span>
-                                                <p className="text-white/60 text-xs">Mensalidade Recorrente</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="text-xl font-bold">R$ {monthlyPrice.toFixed(2).replace('.', ',')}</span>
-                                                <span className="text-white/40 text-[10px] block">/mês</span>
-                                            </div>
-                                        </div>
-                                    )}
+
 
                                     {paymentMethod === 'pix' && (
                                         <div className="pt-4 border-t border-white/5">
@@ -439,13 +421,30 @@ export default function PaymentPage({
                                 ))}
                             </div>
 
-                            <button
-                                onClick={handleDowngradeToFree}
-                                disabled={isDowngrading}
-                                className="w-full py-4 bg-white/5 border border-white/10 rounded-xl text-white/60 text-sm font-semibold hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
-                            >
-                                {isDowngrading ? 'Processando...' : 'Manter Plano Free'}
-                            </button>
+                            <div className="space-y-4">
+                                <button
+                                    onClick={paymentMethod === 'stripe' ? handleCreateStripeSession : handleCreatePixCharge}
+                                    disabled={isProcessing || isDowngrading || (paymentMethod === 'pix' && !!pixData)}
+                                    className={`w-full py-5 text-white rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-3 ${paymentMethod === 'stripe' ? 'bg-[#0080FF] hover:bg-[#006ACC] shadow-[#0080FF]/20' : 'bg-[#00A859] hover:bg-[#008F4C] shadow-[#00A859]/20'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                                >
+                                    {isProcessing ? (
+                                        <Loader2 className="animate-spin" size={24} />
+                                    ) : (
+                                        <>
+                                            {paymentMethod === 'stripe' ? <CreditCard size={20} /> : <QrCode size={20} />}
+                                            <span>{paymentMethod === 'stripe' ? 'Assinar Agora' : (pixData ? 'QR Code Gerado' : 'Gerar PIX Agora')}</span>
+                                        </>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={handleDowngradeToFree}
+                                    disabled={isDowngrading || isProcessing}
+                                    className="w-full py-4 bg-white/5 border border-white/10 rounded-xl text-white/40 text-xs font-semibold hover:bg-white/10 hover:text-white transition-all disabled:opacity-50"
+                                >
+                                    {isDowngrading ? 'Processando...' : 'Não, prefiro continuar no Plano Free'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
