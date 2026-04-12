@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, ArrowLeft, CheckCircle2, ShieldCheck, Loader2, Star, Zap, Clock } from 'lucide-react';
+import { CreditCard, ArrowLeft, CheckCircle2, ShieldCheck, Loader2, Star, Zap, Clock, QrCode, Copy, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 
@@ -27,6 +27,10 @@ export default function PaymentPage({
 }: PaymentPageProps) {
     const [isProcessing, setIsProcessing] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'pix'>('stripe');
+    const [cpf, setCpf] = useState('');
+    const [pixData, setPixData] = useState<{ qrCode: string, qrCodeText: string, chargeId: string } | null>(null);
+    const [copied, setCopied] = useState(false);
     
     // Verificamos se o usuário já é um "experimental" ou já está no trial para esconder as frases de teste
     const isAlreadyInTrial = statusPagamento === 'teste' || statusPagamento === 'trial';
@@ -87,6 +91,64 @@ export default function PaymentPage({
         }
     };
 
+    const handleCreatePixCharge = async () => {
+        if (!cpf || cpf.length < 11) {
+            alert('Por favor, informe um CPF válido para gerar o PIX.');
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            let activeUserId = session?.user?.id;
+            let activeEmail = session?.user?.email || email;
+
+            if (!activeUserId) {
+                // Tenta Login ou Cadastro se não estiver logado
+                let { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+                if (authError && (authError.message.includes('User already registered') || authError.status === 400)) {
+                    const loginResp = await supabase.auth.signInWithPassword({ email, password });
+                    if (loginResp.error) throw loginResp.error;
+                    authData = loginResp.data;
+                } else if (authError) {
+                    throw authError;
+                }
+                activeUserId = authData.user?.id;
+                activeEmail = email;
+            }
+
+            const response = await fetch('/api/pix/charge', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: activeUserId,
+                    email: activeEmail,
+                    nome: activeEmail.split('@')[0],
+                    cpf: cpf,
+                    amount: 29.90
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            setPixData(data);
+        } catch (err: any) {
+            console.error('PIX error:', err);
+            alert('Falha ao gerar PIX: ' + err.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const copyToClipboard = () => {
+        if (pixData) {
+            navigator.clipboard.writeText(pixData.qrCodeText);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
     const handleDowngradeToFree = async () => {
         setIsDowngrading(true);
         try {
@@ -130,7 +192,36 @@ export default function PaymentPage({
                     <div className="bg-white rounded-3xl p-8 md:p-10 shadow-sm border border-black/[0.03] relative overflow-hidden">
                         <div className="mb-10">
                             <h2 className="text-2xl font-bold tracking-tight mb-2">Configure sua Assinatura</h2>
-                            <p className="text-black/40 text-sm">Acesse o ambiente seguro do Stripe para finalizar sua conta Pro.</p>
+                            <p className="text-black/40 text-sm">Escolha o melhor método para você e ative sua conta Pro.</p>
+                        </div>
+
+                        {/* Seleção de Método de Pagamento */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+                            <button
+                                onClick={() => setPaymentMethod('stripe')}
+                                className={`p-6 rounded-2xl border-2 transition-all text-left flex flex-col gap-4 ${paymentMethod === 'stripe' ? 'border-[#0080FF] bg-[#0080FF]/[0.02]' : 'border-black/[0.05] hover:border-black/10'}`}
+                            >
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'stripe' ? 'bg-[#0080FF] text-white' : 'bg-black/5 text-black/40'}`}>
+                                    <CreditCard size={20} />
+                                </div>
+                                <div>
+                                    <h4 className={`font-bold ${paymentMethod === 'stripe' ? 'text-[#0080FF]' : 'text-black/60'}`}>Cartão de Crédito</h4>
+                                    <p className="text-xs text-black/40 mt-1">Stripe Gateway • 7 dias grátis • Recorrente</p>
+                                </div>
+                            </button>
+
+                            <button
+                                onClick={() => setPaymentMethod('pix')}
+                                className={`p-6 rounded-2xl border-2 transition-all text-left flex flex-col gap-4 ${paymentMethod === 'pix' ? 'border-[#00A859] bg-[#00A859]/[0.02]' : 'border-black/[0.05] hover:border-black/10'}`}
+                            >
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'pix' ? 'bg-[#00A859] text-white' : 'bg-black/5 text-black/40'}`}>
+                                    <QrCode size={20} />
+                                </div>
+                                <div>
+                                    <h4 className={`font-bold ${paymentMethod === 'pix' ? 'text-[#00A859]' : 'text-black/60'}`}>PIX (PagBank)</h4>
+                                    <p className="text-xs text-black/40 mt-1">Aprovação instantânea • Pagamento único</p>
+                                </div>
+                            </button>
                         </div>
 
                         <div className="space-y-10">
@@ -159,7 +250,7 @@ export default function PaymentPage({
                                                 value={email}
                                                 onChange={(e) => setEmail(e.target.value)}
                                                 placeholder="seu@email.com"
-                                                className="w-full px-5 py-4 bg-[#F9FAFB] rounded-xl border border-black/[0.05] focus:bg-white focus:border-[#00A859] outline-none transition-all text-sm"
+                                                className="w-full px-5 py-4 bg-[#F9FAFB] rounded-xl border border-black/[0.05] focus:bg-white focus:border-black outline-none transition-all text-sm"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -171,9 +262,23 @@ export default function PaymentPage({
                                                 onChange={(e) => setPassword(e.target.value)}
                                                 placeholder="Mínimo 6 caracteres"
                                                 minLength={6}
-                                                className="w-full px-5 py-4 bg-[#F9FAFB] rounded-xl border border-black/[0.05] focus:bg-white focus:border-[#00A859] outline-none transition-all text-sm"
+                                                className="w-full px-5 py-4 bg-[#F9FAFB] rounded-xl border border-black/[0.05] focus:bg-white focus:border-black outline-none transition-all text-sm"
                                             />
                                         </div>
+                                    </div>
+                                )}
+
+                                {paymentMethod === 'pix' && (
+                                    <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                                        <label className="text-[11px] font-bold uppercase tracking-wider text-black/40 ml-1">CPF (Necessário para o PIX)</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            value={cpf}
+                                            onChange={(e) => setCpf(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                                            placeholder="000.000.000-00"
+                                            className="w-full px-5 py-4 bg-[#F9FAFB] rounded-xl border border-black/[0.05] focus:bg-white focus:border-[#00A859] outline-none transition-all text-sm"
+                                        />
                                     </div>
                                 )}
                             </section>
@@ -181,43 +286,86 @@ export default function PaymentPage({
                             {/* 2. Ação de Checkout */}
                             <section className="space-y-6">
                                 <div className="flex items-center gap-3 border-b border-black/[0.03] pb-4">
-                                    <div className="w-8 h-8 bg-[#00A859]/10 rounded-lg flex items-center justify-center text-[#00A859]">
-                                        <Zap size={18} />
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${paymentMethod === 'stripe' ? 'bg-[#0080FF]/10 text-[#0080FF]' : 'bg-[#00A859]/10 text-[#00A859]'}`}>
+                                        {paymentMethod === 'stripe' ? <ShieldCheck size={18} /> : <Zap size={18} />}
                                     </div>
-                                    <h3 className="font-bold text-lg text-black/80">2. Finalizar no Stripe</h3>
+                                    <h3 className="font-bold text-lg text-black/80">
+                                        {paymentMethod === 'stripe' ? '2. Finalizar no Stripe' : '2. Gerar QR Code PIX'}
+                                    </h3>
                                 </div>
 
-                                <div className="bg-[#00A859]/[0.02] border border-[#00A859]/10 rounded-3xl p-6 md:p-8 text-center">
-                                    {!isAlreadyInTrial && (
-                                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#00A859] text-white text-[10px] font-black uppercase tracking-widest rounded-full mb-4">
-                                            <Clock size={10} fill="currentColor" />
-                                            7 Dias de Teste Grátis Incluso
+                                <div className={`border rounded-3xl p-6 md:p-8 text-center ${paymentMethod === 'stripe' ? 'bg-[#0080FF]/[0.02] border-[#0080FF]/10' : 'bg-[#00A859]/[0.02] border-[#00A859]/10'}`}>
+                                    {pixData ? (
+                                        <div className="space-y-6 animate-in zoom-in duration-500">
+                                            <div className="bg-white p-6 rounded-3xl shadow-lg border border-black/[0.05] inline-block mx-auto mb-4">
+                                                <img src={pixData.qrCode} alt="QR Code PIX" className="w-48 h-48 mx-auto" />
+                                            </div>
+                                            
+                                            <div className="space-y-4">
+                                                <div className="p-4 bg-white/50 rounded-2xl border border-black/[0.05] text-left">
+                                                    <p className="text-[10px] uppercase font-bold text-black/40 mb-2">Código Copia e Cola</p>
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex-1 truncate text-xs font-mono text-black/60 bg-[#F9FAFB] p-3 rounded-lg border border-black/[0.03]">
+                                                            {pixData.qrCodeText}
+                                                        </div>
+                                                        <button
+                                                            onClick={copyToClipboard}
+                                                            className="p-3 bg-black text-white rounded-xl hover:bg-black/80 transition-all shrink-0"
+                                                        >
+                                                            {copied ? <Check size={18} /> : <Copy size={18} />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex items-start gap-3 text-left p-4 bg-[#00A859]/5 rounded-2xl border border-[#00A859]/10">
+                                                    <Clock size={16} className="text-[#00A859] mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <p className="text-xs font-bold text-black/70">Aguardando Pagamento</p>
+                                                        <p className="text-[10px] text-black/40 mt-0.5">O sistema detectará o pagamento automaticamente em poucos segundos após a confirmação do seu banco.</p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
+                                    ) : (
+                                        <>
+                                            {paymentMethod === 'stripe' && !isAlreadyInTrial && (
+                                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#0080FF] text-white text-[10px] font-black uppercase tracking-widest rounded-full mb-4">
+                                                    <Clock size={10} fill="currentColor" />
+                                                    7 Dias de Teste Grátis Incluso
+                                                </div>
+                                            )}
+                                            
+                                            <h4 className="text-xl font-bold text-black mb-4">
+                                                {paymentMethod === 'stripe' ? 'Ambiente 100% Seguro' : 'Pagamento Instantâneo'}
+                                            </h4>
+                                            
+                                            <p className="text-sm text-black/50 leading-relaxed max-w-md mx-auto mb-8">
+                                                {paymentMethod === 'stripe' 
+                                                    ? (isAlreadyInTrial 
+                                                        ? "Você será redirecionado para o checkout oficial do Stripe para ativar sua assinatura mensal ilimitada."
+                                                        : "Você será redirecionado para o checkout oficial do Stripe. Não cobraremos nada durante os primeiros 7 dias. Você pode cancelar a qualquer momento.")
+                                                    : "O PIX é ideal para quem não usa cartão. O acesso Pro é liberado imediatamente após a confirmação do pagamento pelo PagBank."}
+                                            </p>
+                                            
+                                            <button
+                                                onClick={paymentMethod === 'stripe' ? handleCreateStripeSession : handleCreatePixCharge}
+                                                disabled={isProcessing}
+                                                className={`w-full py-5 text-white rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-3 ${paymentMethod === 'stripe' ? 'bg-[#0080FF] hover:bg-[#006ACC] shadow-[#0080FF]/20' : 'bg-[#00A859] hover:bg-[#008F4C] shadow-[#00A859]/20'}`}
+                                            >
+                                                {isProcessing ? (
+                                                    <>
+                                                        <Loader2 className="animate-spin" size={24} />
+                                                        <span>Processando...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {paymentMethod === 'stripe' ? <CreditCard size={24} /> : <QrCode size={24} />}
+                                                        <span>{paymentMethod === 'stripe' ? 'Ir para Pagamento Seguro' : 'Gerar QR Code PIX'}</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        </>
                                     )}
-                                    <h4 className="text-xl font-bold text-black mb-4">Ambiente 100% Seguro</h4>
-                                    <p className="text-sm text-black/50 leading-relaxed max-w-md mx-auto mb-8">
-                                        {isAlreadyInTrial 
-                                            ? "Você será redirecionado para o checkout oficial do Stripe para ativar sua assinatura mensal ilimitada."
-                                            : "Você será redirecionado para o checkout oficial do Stripe. Não cobraremos nada durante os primeiros 7 dias. Você pode cancelar a qualquer momento."}
-                                    </p>
-                                    
-                                    <button
-                                        onClick={handleCreateStripeSession}
-                                        disabled={isProcessing}
-                                        className="w-full py-5 bg-[#00A859] text-white rounded-2xl font-black text-lg hover:bg-[#008F4C] transition-all shadow-xl shadow-[#00A859]/20 flex items-center justify-center gap-3"
-                                    >
-                                        {isProcessing ? (
-                                            <>
-                                                <Loader2 className="animate-spin" size={24} />
-                                                <span>Aguarde um momento...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <CreditCard size={24} />
-                                                <span>Ir para Pagamento Seguro</span>
-                                            </>
-                                        )}
-                                    </button>
                                 </div>
                             </section>
                         </div>
@@ -243,14 +391,14 @@ export default function PaymentPage({
                                     <div className="flex items-center justify-between">
                                         <div className="space-y-0.5">
                                             <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Total Hoje</span>
-                                            <p className={isAlreadyInTrial ? "text-white text-xs font-semibold" : "text-[#00A859] text-xs font-semibold"}>
-                                                {isAlreadyInTrial ? "Ativação Instantânea Pro" : "Início do Teste Grátis"}
+                                            <p className={isAlreadyInTrial || paymentMethod === 'pix' ? "text-white text-xs font-semibold" : "text-[#00A859] text-xs font-semibold"}>
+                                                {paymentMethod === 'pix' ? "Pagamento Único PIX" : (isAlreadyInTrial ? "Ativação Instantânea Pro" : "Início do Teste Grátis")}
                                             </p>
                                         </div>
-                                        <span className="text-3xl font-bold">R$ {isAlreadyInTrial ? monthlyPrice.toFixed(2).replace('.', ',') : '0,00'}</span>
+                                        <span className="text-3xl font-bold">R$ {(isAlreadyInTrial || paymentMethod === 'pix') ? monthlyPrice.toFixed(2).replace('.', ',') : '0,00'}</span>
                                     </div>
 
-                                    {!isAlreadyInTrial && (
+                                    {!isAlreadyInTrial && paymentMethod === 'stripe' && (
                                         <div className="pt-4 border-t border-white/5 flex items-center justify-between">
                                             <div className="space-y-0.5">
                                                 <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Após {trialDays} dias</span>
@@ -259,6 +407,15 @@ export default function PaymentPage({
                                             <div className="text-right">
                                                 <span className="text-xl font-bold">R$ {monthlyPrice.toFixed(2).replace('.', ',')}</span>
                                                 <span className="text-white/40 text-[10px] block">/mês</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {paymentMethod === 'pix' && (
+                                        <div className="pt-4 border-t border-white/5">
+                                            <div className="flex items-center gap-2 text-[#00A859]">
+                                                <CheckCircle2 size={14} />
+                                                <span className="text-[10px] font-bold uppercase tracking-wider">Acesso imediato por 30 dias</span>
                                             </div>
                                         </div>
                                     )}

@@ -112,12 +112,25 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [recentStudents, setRecentStudents] = useState<any[]>([]);
   const [recentPlans, setRecentPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   const [activeMenuUserId, setActiveMenuUserId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [modalType, setModalType] = useState<'edit' | 'history' | 'logs' | 'userDetails' | null>(null);
   const [userHistory, setUserHistory] = useState<any[]>([]);
   const [userLogs, setUserLogs] = useState<any[]>([]);
+  
+  // Efeito para ajustar sidebar no resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setIsSidebarOpen(false);
+      } else {
+        setIsSidebarOpen(true);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [userDetailedData, setUserDetailedData] = useState<{
     planejamentoDiario: any[];
     planejamentoSemanal: any[];
@@ -141,6 +154,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   });
   const [userDetailedActiveTab, setUserDetailedActiveTab] = useState('resumo');
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  
+  // Estados de Pagamentos
+  const [stripePayments, setStripePayments] = useState<any[]>([]);
+  const [pixPayments, setPixPayments] = useState<any[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'stripe' | 'pix'>('all');
   
   const [layoutConfig, setLayoutConfig] = useState({
     theme: 'light',
@@ -216,9 +235,13 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     // Ouvinte Pagamentos
     const paymentChannel = supabase
       .channel('payments_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'payments' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pagamentos_stripe' }, () => {
         playEventSound('payments');
-        fetchDashboardStats();
+        fetchData();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pagamentos_pix' }, () => {
+        playEventSound('payments');
+        fetchData();
       })
       .subscribe();
 
@@ -227,7 +250,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       .channel('students_realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alunos' }, () => {
         playEventSound('students');
-        fetchDashboardStats();
+        fetchData();
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'presenca_alunos' }, () => {
         playEventSound('students');
@@ -281,6 +304,24 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         }
       }
 
+      if (activeTab === 'payments') {
+        setPaymentsLoading(true);
+        const [stripeRes, pixRes] = await Promise.all([
+          supabase
+            .from('pagamentos_stripe')
+            .select('*, users(nome, email)')
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('pagamentos_pix')
+            .select('*, users(nome, email)')
+            .order('created_at', { ascending: false })
+        ]);
+        
+        if (stripeRes.data) setStripePayments(stripeRes.data);
+        if (pixRes.data) setPixPayments(pixRes.data);
+        setPaymentsLoading(false);
+      }
+
       
       // Estatísticas Pedagógicas Globais
       const [
@@ -320,16 +361,27 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         .limit(10);
       if (planData) setRecentPlans(planData);
 
-      const { data: paymentData, error: payError } = await supabase
-        .from('payments')
-        .select('*, users(nome, email)')
-        .order('data_pagamento', { ascending: false })
-        .limit(10);
+      // Buscar Pagamentos Recentes (Global - Combinado)
+      const [stripeRecent, pixRecent] = await Promise.all([
+        supabase
+          .from('pagamentos_stripe')
+          .select('*, users(nome, email)')
+          .order('created_at', { ascending: false })
+          .limit(5),
+        supabase
+          .from('pagamentos_pix')
+          .select('*, users(nome, email)')
+          .order('created_at', { ascending: false })
+          .limit(5)
+      ]);
 
-      if (payError) throw payError;
-      if (paymentData) {
-        setStats(prev => ({ ...prev, recentPayments: paymentData }));
-      }
+      const combinedRecent = [
+        ...(stripeRecent.data || []).map(p => ({ ...p, metodo: 'Stripe', data_pagamento: p.created_at })),
+        ...(pixRecent.data || []).map(p => ({ ...p, metodo: 'PIX', data_pagamento: p.created_at }))
+      ].sort((a, b) => new Date(b.data_pagamento).getTime() - new Date(a.data_pagamento).getTime())
+      .slice(0, 10);
+
+      setStats(prev => ({ ...prev, recentPayments: combinedRecent }));
     } finally {
       setLoading(false);
     }
@@ -518,21 +570,21 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
 
         {supportViewTab === 'inbox' ? (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden flex flex-col md:flex-row h-[75vh]">
-            {/* Sidebar de Threads */}
-            <div className="w-full md:w-80 border-r border-slate-200 flex flex-col bg-slate-50/50">
-              <div className="p-4 border-b border-slate-200 bg-white">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input 
-                    type="text" 
-                    placeholder="Buscar conversa..."
-                    className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 transition-all"
-                    value={supportSearch}
-                    onChange={(e) => setSupportSearch(e.target.value)}
-                  />
+            <div className={`bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden flex flex-col md:flex-row h-[75vh]`}>
+              {/* Sidebar de Threads */}
+              <div className={`${selectedSupportMessage ? 'hidden md:flex' : 'flex'} w-full md:w-80 border-r border-slate-200 flex-col bg-slate-50/50`}>
+                <div className="p-4 border-b border-slate-200 bg-white">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="Buscar conversa..."
+                      className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 transition-all"
+                      value={supportSearch}
+                      onChange={(e) => setSupportSearch(e.target.value)}
+                    />
+                  </div>
                 </div>
-              </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar">
                 {sortedEmails
@@ -597,18 +649,24 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             </div>
 
             {/* Visualização de Thread (Histórico) */}
-            <div className="flex-1 bg-white flex flex-col">
+            <div className={`${!selectedSupportMessage ? 'hidden md:flex' : 'flex'} flex-1 bg-white flex-col`}>
               {selectedSupportMessage ? (
                 <>
                   {/* Header do Contato */}
-                  <div className="p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/30">
-                    <div className="flex items-center gap-4">
-                      <div className="h-12 w-12 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-100">
+                  <div className="p-4 md:p-6 border-b border-slate-200 flex items-center justify-between bg-slate-50/30">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <button 
+                        onClick={() => setSelectedSupportMessage(null)}
+                        className="md:hidden p-2 -ml-2 text-slate-500 hover:text-blue-600"
+                      >
+                        <ChevronLeft size={24} />
+                      </button>
+                      <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-lg md:text-xl shadow-lg shadow-blue-100 shrink-0">
                         {selectedSupportMessage.remetente_email[0].toUpperCase()}
                       </div>
-                      <div>
-                        <h3 className="text-lg font-black text-slate-900 leading-none mb-1">{selectedSupportMessage.remetente_nome}</h3>
-                        <p className="text-xs text-slate-500 font-medium">{selectedSupportMessage.remetente_email}</p>
+                      <div className="min-w-0">
+                        <h3 className="text-base md:text-lg font-black text-slate-900 leading-none mb-1 truncate">{selectedSupportMessage.remetente_nome}</h3>
+                        <p className="text-[10px] md:text-xs text-slate-500 font-medium truncate">{selectedSupportMessage.remetente_email}</p>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -874,12 +932,17 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   const openHistory = async (user: AdminUser) => {
     setSelectedUser(user);
-    const { data: payments } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('data_pagamento', { ascending: false });
-    setUserHistory(payments || []);
+    const [stripeRes, pixRes] = await Promise.all([
+      supabase.from('pagamentos_stripe').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('pagamentos_pix').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+    ]);
+
+    const combined = [
+      ...(stripeRes.data || []).map(p => ({ ...p, metodo: 'Stripe', data_pagamento: p.created_at })),
+      ...(pixRes.data || []).map(p => ({ ...p, metodo: 'PIX', data_pagamento: p.created_at }))
+    ].sort((a, b) => new Date(b.data_pagamento).getTime() - new Date(a.data_pagamento).getTime());
+
+    setUserHistory(combined);
     setModalType('history');
     setActiveMenuUserId(null);
   };
@@ -985,17 +1048,34 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   ];
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC]">
+    <div className="flex h-screen bg-[#F8FAFC] overflow-hidden">
+      {/* Sidebar Overlay para Mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside className={`
-        ${isSidebarOpen ? 'w-64' : 'w-20'} 
-        bg-[#0F172A] text-white transition-all duration-300 flex flex-col
+        fixed inset-y-0 left-0 z-50 bg-[#0F172A] text-white transition-all duration-300 ease-in-out flex flex-col shadow-2xl lg:shadow-none
+        lg:relative lg:translate-x-0
+        ${isSidebarOpen ? 'w-64 translate-x-0' : 'w-20 -translate-x-full lg:translate-x-0'}
       `}>
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0">
-            <ShieldCheck className="w-5 h-5" />
+        <div className="p-6 flex items-center justify-between">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/20">
+              <ShieldCheck className="w-5 h-5 text-white" />
+            </div>
+            {isSidebarOpen && <span className="font-bold text-lg tracking-tight whitespace-nowrap">EduTec Admin</span>}
           </div>
-          {isSidebarOpen && <span className="font-bold text-lg tracking-tight">EduTec Admin</span>}
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="p-1 hover:bg-slate-800 rounded-lg lg:hidden text-slate-400"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         <nav className="flex-1 px-4 py-4 space-y-1">
@@ -1004,12 +1084,15 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id as any)}
+                onClick={() => {
+                  setActiveTab(item.id as any);
+                  if (window.innerWidth < 1024) setIsSidebarOpen(false);
+                }}
                 className={`
-                  w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors
+                  w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200 group
                   ${activeTab === item.id 
-                    ? 'bg-blue-600 text-white' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'}
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20 font-bold' 
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}
                 `}
               >
                 <Icon className="w-5 h-5 shrink-0" />
@@ -1041,7 +1124,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       {/* Main Content */}
       <main 
-        className={`flex-1 overflow-auto transition-colors duration-300 ${layoutConfig.theme === 'dark' ? 'bg-[#0F172A] text-white' : ''}`}
+        className={`flex-1 h-screen overflow-y-auto transition-all duration-300 flex flex-col bg-slate-50 relative ${layoutConfig.theme === 'dark' ? 'bg-[#0F172A] text-white' : ''}`}
         style={{ 
           backgroundColor: layoutConfig.theme === 'dark' ? '#0F172A' : layoutConfig.bgColor,
           backgroundImage: layoutConfig.bgImage ? `url(${layoutConfig.bgImage})` : 'none',
@@ -1049,16 +1132,16 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           backgroundAttachment: 'fixed'
         }}
       >
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-8 sticky top-0 z-10">
+        <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 shrink-0">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-2 hover:bg-slate-100 rounded-lg lg:hidden"
+              className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-600"
             >
-              <Menu className="w-5 h-5 text-slate-600" />
+              <Menu className="w-6 h-6" />
             </button>
-            <h1 className="text-xl font-semibold text-slate-800">
-              {menuItems.find(i => i.id === activeTab)?.label || 'Painel Administrativo'}
+            <h1 className="text-lg md:text-xl font-bold text-slate-800 truncate max-w-[150px] md:max-w-none">
+              {menuItems.find(i => i.id === activeTab)?.label || 'Painel'}
             </h1>
           </div>
           
@@ -1156,7 +1239,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           </div>
         </header>
 
-        <div className="p-8">
+        <div className="p-4 md:p-8 flex-1">
           {activeTab === 'dashboard' && (
             <div className="space-y-8">
               {/* Stats Cards */}
@@ -1321,17 +1404,18 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 </div>
               </div>
               
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50 border-b border-slate-100">
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Professor</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Plano</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Status Pagamento</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Cadastro</th>
-                    <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="min-w-[900px] w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Professor</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Plano</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Status Pagamento</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Cadastro</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
                   {users.map((user) => (
                     <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
@@ -1444,8 +1528,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
 
               {/* Modais de Gestão */}
               {modalType === 'edit' && selectedUser && (
@@ -2148,26 +2233,111 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
              <div className="space-y-6">
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-800">Integração de Pagamentos</h2>
-                    <p className="text-sm text-slate-500">Gerencie Stripe e futuras integrações.</p>
+                    <h2 className="text-lg font-bold text-slate-800">Histórico de Pagamentos</h2>
+                    <p className="text-sm text-slate-500">Acompanhe todas as transações via Stripe e PIX.</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="flex items-center gap-2 px-3 py-1 bg-green-50 text-green-700 rounded-full text-xs font-bold ring-1 ring-green-600/20">
-                      <div className="w-1.5 h-1.5 bg-green-600 rounded-full animate-pulse" />
-                      Stripe: Ativo
-                    </span>
-                    <span className="flex items-center gap-2 px-3 py-1 bg-slate-50 text-slate-500 rounded-full text-xs font-bold ring-1 ring-slate-600/20">
-                      PagBank: Em breve
-                    </span>
+                    <button 
+                      onClick={() => setPaymentFilter('all')}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${paymentFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      Todos
+                    </button>
+                    <button 
+                      onClick={() => setPaymentFilter('stripe')}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${paymentFilter === 'stripe' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      Stripe
+                    </button>
+                    <button 
+                      onClick={() => setPaymentFilter('pix')}
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${paymentFilter === 'pix' ? 'bg-teal-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                    >
+                      PIX
+                    </button>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden text-center py-20">
-                  <CreditCard className="w-12 h-12 text-slate-200 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-slate-800">Histórico Completo</h3>
-                  <p className="text-slate-500 max-w-sm mx-auto mt-2">
-                    A listagem detalhada de transações está sendo sincronizada com a API do Stripe.
-                  </p>
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+                  {paymentsLoading ? (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                      <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-slate-500 font-medium">Carregando transações...</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100">
+                          <tr>
+                            <th className="px-6 py-4">Usuário / E-mail</th>
+                            <th className="px-6 py-4">Método</th>
+                            <th className="px-6 py-4">Valor</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Data</th>
+                            <th className="px-6 py-4">ID Transação</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {[
+                            ...stripePayments.map(p => ({ ...p, gateway: 'Stripe' })),
+                            ...pixPayments.map(p => ({ ...p, gateway: 'PIX' }))
+                          ]
+                          .filter(p => paymentFilter === 'all' || p.gateway.toLowerCase() === paymentFilter)
+                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                          .map((payment) => (
+                            <tr key={payment.id} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-6 py-4">
+                                <div>
+                                  <p className="text-sm font-bold text-slate-800">{payment.users?.nome || 'Usuário Desconhecido'}</p>
+                                  <p className="text-[10px] text-slate-400 font-mono">{payment.users?.email}</p>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ring-1 ${payment.gateway === 'Stripe' ? 'bg-indigo-50 text-indigo-700 ring-indigo-200' : 'bg-teal-50 text-teal-700 ring-teal-200'}`}>
+                                  {payment.gateway}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 font-bold text-slate-700">
+                                R$ {payment.valor}
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                  payment.status === 'PAID' || payment.status === 'active' || payment.status === 'succeeded' || payment.status === 'aprovado'
+                                    ? 'bg-green-50 text-green-700 border border-green-100'
+                                    : payment.status === 'WAITING' || payment.status === 'pending'
+                                    ? 'bg-amber-50 text-amber-700 border border-amber-100'
+                                    : 'bg-red-50 text-red-700 border border-red-100'
+                                }`}>
+                                  {payment.status === 'WAITING' ? 'Aguardando' : 
+                                   payment.status === 'PAID' ? 'Pago' : 
+                                   payment.status === 'active' ? 'Ativo' : 
+                                   payment.status === 'succeeded' ? 'Sucedido' : 
+                                   payment.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 text-xs text-slate-500 whitespace-nowrap">
+                                {new Date(payment.created_at).toLocaleString('pt-BR')}
+                              </td>
+                              <td className="px-6 py-4 text-[10px] font-mono text-slate-400">
+                                {payment.charge_id || payment.subscription_id || payment.id.substring(0, 8)}
+                              </td>
+                            </tr>
+                          ))}
+                          {stripePayments.length === 0 && pixPayments.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="py-20 text-center">
+                                <CreditCard className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                                <h3 className="text-lg font-semibold text-slate-800">Nenhum pagamento registrado</h3>
+                                <p className="text-slate-500 max-w-sm mx-auto mt-2">
+                                  As transações aparecerão aqui assim que forem processadas pelos gateways de pagamento.
+                                </p>
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
              </div>
           )}

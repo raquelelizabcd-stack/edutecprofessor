@@ -59,11 +59,15 @@ app.use(cors());
 // Parser especial para capturar o raw body necessário para a assinatura do Webhook do Stripe
 app.use(express.json({
     verify: (req, res, buf) => {
-        if (req.originalUrl.includes('/webhook/stripe')) {
+        if (req.originalUrl.includes('/webhook/stripe') || req.originalUrl.includes('/webhook/pagbank')) {
             req.rawBody = buf;
         }
     }
 }));
+
+// Configuração PagBank
+const PAGBANK_TOKEN = process.env.PAGBANK_TOKEN || '4e15c1dd-7423-4ded-a97f-ddbd33e5ff06632119b84fbeb98448dac1e5d2ea8eb7c576-0f16-42c8-b748-d95d212a4089';
+const PAGBANK_URL = 'https://api.pagseguro.com'; // Use sandbox.api.pagseguro.com para testes
 
 // ENDPOINT: CRIAR SESSÃO DO CUSTOMER PORTAL (Stripe Management)
 app.post('/api/create-portal-session', async (req, res) => {
@@ -426,19 +430,16 @@ const stripeWebhookHandler = async (req, res) => {
                     
                     if (subError) console.error('[Supabase Error] Falha ao atualizar assinaturas:', subError.message);
 
-                    // 4. Insere registro na tabela 'payments' - Histórico de pagamentos
-                    const { error: payError } = await supabase
-                        .from('payments')
+                    // 4. Insere registro na tabela 'pagamentos_stripe' (Nova)
+                    await supabase
+                        .from('pagamentos_stripe')
                         .insert({
                             user_id: userId,
-                            valor: 29.90,
-                            forma_pagamento: 'cartao_credito',
-                            status: 'pago',
-                            data_pagamento: new Date().toISOString(),
-                            plano: 'pro_pago' // Usando 'pro_pago' pois 'Pro' falharia no check constraint atual
+                            amount: 29.90,
+                            stripe_subscription_id: subscriptionId || null,
+                            stripe_customer_id: customerId,
+                            status: 'pago'
                         });
-                    
-                    if (payError) console.error('[Supabase Error] Falha ao inserir em payments:', payError.message);
 
                     // 5. Atualiza o status principal do usuário (Gatilho para o App)
                     await supabase
@@ -579,6 +580,127 @@ const stripeWebhookHandler = async (req, res) => {
 
 app.post('/api/webhook/stripe', stripeWebhookHandler);
 app.post('/webhook/stripe', stripeWebhookHandler);
+
+/**
+ * Endpoint para criar cobrança PIX via PagBank
+ */
+app.post('/api/pix/charge', async (req, res) => {
+    const { userId, email, nome, cpf, amount } = req.body;
+
+    if (!userId || !email || !cpf) {
+        return res.status(400).json({ error: 'Dados incompletos (userId, email, cpf são obrigatórios).' });
+    }
+
+    try {
+        const orderData = {
+            reference_id: `edutec-pix-${userId}-${Date.now()}`,
+            customer: {
+                name: nome || 'Professor EduTec',
+                email: email,
+                tax_id: cpf.replace(/\D/g, ''),
+                phones: [{ country: "55", area: "11", number: "999999999", type: "MOBILE" }]
+            },
+            items: [{
+                name: "Assinatura EduTec Pro (Avulso)",
+                quantity: 1,
+                unit_amount: (amount || 29.9) * 100 // PagBank trabalha em centavos
+            }],
+            qr_codes: [{
+                amount: { value: (amount || 29.9) * 100 },
+                expiration_date: new Date(Date.now() + 24 * 3600 * 1000).toISOString()
+            }],
+            notification_urls: [process.env.PAGBANK_WEBHOOK_URL || 'https://edutechprofe.vercel.app/api/webhook/pagbank']
+        };
+
+        const response = await fetch(`${PAGBANK_URL}/orders`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${PAGBANK_TOKEN}`,
+                'Content-Type': 'application/json',
+                'accept': '*/*'
+            },
+            body: JSON.stringify(orderData)
+        });
+
+        const data = await response.json();
+
+        if (data.error_messages) {
+            console.error('[PagBank Error]', data.error_messages);
+            return res.status(400).json({ error: 'Erro no PagBank: ' + data.error_messages[0].description });
+        }
+
+        const qrCode = data.qr_codes[0];
+        const chargeId = data.id;
+
+        // Salva na tabela pagamentos_pix
+        await supabase.from('pagamentos_pix').insert({
+            user_id: userId,
+            pagbank_charge_id: chargeId,
+            qr_code: qrCode.links.find(l => l.rel === 'QRCODE.PNG')?.href,
+            qr_code_text: qrCode.text,
+            amount: amount || 29.9,
+            status: 'Aguardando',
+            expires_at: qrCode.expiration_date
+        });
+
+        res.json({
+            qrCode: qrCode.links.find(l => l.rel === 'QRCODE.PNG')?.href,
+            qrCodeText: qrCode.text,
+            chargeId: chargeId
+        });
+
+    } catch (error) {
+        console.error('Erro ao gerar PIX:', error);
+        res.status(500).json({ error: 'Falha ao gerar cobrança PIX.' });
+    }
+});
+
+/**
+ * Webhook do PagBank para atualizar status do PIX
+ */
+app.post('/api/webhook/pagbank', async (req, res) => {
+    try {
+        const payload = req.body;
+        const chargeId = payload.id;
+        const status = payload.status; // PAID, WAITING, CANCELED, etc.
+
+        let dbStatus = 'Aguardando';
+        if (status === 'PAID') dbStatus = 'Pago';
+        if (status === 'CANCELED') dbStatus = 'Expirado';
+
+        console.log(`[PagBank Webhook] Charge ${chargeId} -> ${status}`);
+
+        // 1. Atualiza a tabela pagamentos_pix
+        const { data: pixData } = await supabase
+            .from('pagamentos_pix')
+            .update({ status: dbStatus })
+            .eq('pagbank_charge_id', chargeId)
+            .select('user_id')
+            .maybeSingle();
+
+        // 2. Se pago, ativa o plano Pro do usuário
+        if (dbStatus === 'Pago' && pixData?.user_id) {
+            const dataExpiracao = new Date();
+            dataExpiracao.setMonth(dataExpiracao.getMonth() + 1); // +30 dias
+
+            await supabase
+                .from('users')
+                .update({ 
+                    plano: 'pro', 
+                    status_pagamento: 'aprovado',
+                    data_expiracao: dataExpiracao.toISOString().split('T')[0]
+                })
+                .eq('id', pixData.user_id);
+            
+            console.log(`[PagBank Webhook] Usuário ${pixData.user_id} ativado via PIX.`);
+        }
+
+        res.status(200).send('OK');
+    } catch (error) {
+        console.error('[PagBank Webhook Error]', error);
+        res.status(500).send('Webhook Error');
+    }
+});
 
 // Endpoint legado para compatibilidade check de status
 const statusAssinaturaHandler = async (req, res) => {
