@@ -25,7 +25,9 @@ export default function App() {
   const [userStatusPagamento, setUserStatusPagamento] = useState<string | null>(null);
   const [userIntent, setUserIntent] = useState<'free' | 'pro'>(() => {
     try {
-      return (localStorage.getItem('edutec_user_intent') as 'free' | 'pro') || 'free';
+      const saved = localStorage.getItem('edutec_user_intent');
+      console.log('[App] Intent inicial carregada:', saved);
+      return (saved as 'free' | 'pro') || 'free';
     } catch (_) {
       return 'free';
     }
@@ -66,6 +68,8 @@ export default function App() {
         setAceitouPrivacidade(false);
       } else {
         const matchedPlano = (data.plano as UserProfile) || 'free';
+        console.log('[App] Perfil carregado do DB:', { plano: matchedPlano, status: data.status_pagamento });
+        
         setCurrentProfile(matchedPlano);
         setUserRole(data.role as 'admin' | 'professor');
         setUserCreatedAt(data.created_at);
@@ -78,16 +82,21 @@ export default function App() {
         const isBlocked = data.is_blocked === true;
         
         if (isBlocked) {
+          console.warn('[App] Usuário bloqueado');
           await supabase.auth.signOut();
           alert('Este acesso foi bloqueado pelo administrador.');
           navigate('/login');
           return;
         }
 
-        // Redirection logic logic
+        // Se o banco diz que é FREE mas o usuário tinha intenção PRO (localStorage),
+        // talvez devêssemos considerar se ele ainda quer o trial.
+        // Mas por segurança, respeitamos o banco se ele já existe.
+
+        // Lógica de redirecionamento
         if (data.role === 'admin') {
           setUserRole('admin');
-          setCurrentProfile('admin'); // Admin não deve ver mensagens de "Plano Free"
+          setCurrentProfile('admin');
           if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/dashboard') {
             navigate('/admin', { replace: true });
           }
@@ -149,6 +158,8 @@ export default function App() {
   const handleAcceptTerms = async () => {
     if (session?.user.id) {
       const isProIntent = userIntent === 'pro';
+      console.log('[App] Aceitando termos. Intenção Pro:', isProIntent, 'Perfil atual:', currentProfile);
+
       const trialDate = isProIntent ? new Date() : null;
       if (isProIntent && trialDate) trialDate.setDate(trialDate.getDate() + 7);
       const expIso = trialDate ? trialDate.toISOString().split('T')[0] : null;
@@ -159,20 +170,25 @@ export default function App() {
           data_aceite: nowIso 
       };
       
-      if (isProIntent && currentProfile === 'free') {
+      // Se a intenção é PRO e o usuário ainda está como FREE (ou se acinou de vir do registro trial)
+      if (isProIntent && (currentProfile === 'free' || currentProfile === 'public')) {
           updateData.plano = 'pro';
           updateData.status_pagamento = 'pendente';
           updateData.data_expiracao = expIso;
-      }
-
-      await supabase.from('users').update(updateData).eq('id', session.user.id);
-      
-      setAceitouPrivacidade(true);
-      if (isProIntent && currentProfile === 'free') {
+          
           setCurrentProfile('pro');
           setUserStatusPagamento('pendente');
           setUserDataExpiracao(expIso);
       }
+
+      await supabase.from('users').update(updateData).eq('id', session.user.id);
+      setAceitouPrivacidade(true);
+      
+      // Se ativamos o PRO, limpamos a intenção para não confundir futuros logins/registros
+      if (isProIntent) {
+        localStorage.removeItem('edutec_user_intent');
+      }
+
       navigate(userRole === 'admin' ? '/admin' : '/dashboard');
     }
   };

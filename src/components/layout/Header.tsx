@@ -265,14 +265,14 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                             <p className="text-[10px] text-black/40 font-bold uppercase tracking-wider">
                                 {role === 'diretor' || role === 'professor' ? 'Escola EduTec Matriz' : (
                                     <span className="flex items-center gap-1">
-                                        <span className={cn(
+                                            <span className={cn(
                                             "px-2 py-0.5 rounded text-[10px] font-black mt-1 flex items-center gap-1",
                                             role === 'pro' ? (daysLeft !== null && daysLeft <= 0 ? "bg-red-500 text-white" : "bg-[#00A859] text-white") : "bg-black/10 text-black/60"
                                         )}>
                                             {role === 'pro' ? (
                                                 <>
-                                                    {statusPagamento === 'pendente' || statusPagamento === 'trial' ? 'TESTE PRO' : 'CONTA PRO'}
-                                                    {(statusPagamento === 'pendente' || statusPagamento === 'trial') && daysLeft !== null && (
+                                                    {['pendente', 'trial', 'trialing'].includes(statusPagamento || '') ? 'TESTE PRO' : 'CONTA PRO'}
+                                                    {['pendente', 'trial', 'trialing'].includes(statusPagamento || '') && daysLeft !== null && (
                                                         <span className="opacity-80">
                                                             — {daysLeft > 0 ? `${daysLeft} dias restantes` : 'Teste encerrado, assine agora'}
                                                         </span>

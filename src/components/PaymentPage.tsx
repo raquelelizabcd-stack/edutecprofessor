@@ -158,9 +158,10 @@ export default function PaymentPage({
                 return;
             }
 
+            console.log('[PaymentPage] Realizando downgrade para FREE para o usuário:', session.user.id);
             const { error } = await supabase
                 .from('users')
-                .update({ plano: 'free', status_pagamento: 'pendente' })
+                .update({ plano: 'free', status_pagamento: 'gratis' })
                 .eq('id', session.user.id);
 
             if (error) throw error;

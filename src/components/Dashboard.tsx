@@ -502,8 +502,9 @@ export default function Dashboard({
       
       const moduleRecords = records.filter(r => r.moduleId === activeTab);
       const isFree = role === 'free';
-      const isTrial = statusPagamento === 'trial';
-      const isPro = role === 'pro' && statusPagamento === 'paid';
+      const isTrial = statusPagamento === 'trial' || statusPagamento === 'pendente' || statusPagamento === 'trialing';
+      const isPaidPro = role === 'pro' && (statusPagamento === 'paid' || statusPagamento === 'aprovado' || statusPagamento === 'ativo' || statusPagamento === 'active');
+      const isPro = isTrial || isPaidPro;
 
       // 1. Lógica para Plano Free
       if (isFree) {
