@@ -4,7 +4,7 @@ import { CreditCard, ArrowLeft, CheckCircle2, ShieldCheck, Loader2, Star, Zap, C
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 
-const API_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = (import.meta as any).env.VITE_API_URL || '';
 
 interface PaymentPageProps {
     onBack: () => void;
