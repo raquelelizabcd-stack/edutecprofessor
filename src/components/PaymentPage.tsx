@@ -4,6 +4,8 @@ import { CreditCard, ArrowLeft, CheckCircle2, ShieldCheck, Loader2, Star, Zap, C
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 
+const API_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:3001';
+
 interface PaymentPageProps {
     onBack: () => void;
     onSuccess: (role: UserProfile) => void;
@@ -91,70 +93,6 @@ export default function PaymentPage({
         }
     };
 
-    const handleCreatePixCharge = async () => {
-        if (!cpf || cpf.length < 11) {
-            alert('Por favor, informe um CPF válido para gerar o PIX.');
-            return;
-        }
-
-        const cleanCpf = cpf.replace(/\D/g, '');
-        if (cleanCpf.length !== 11) {
-            alert('Por favor, informe um CPF válido com 11 dígitos.');
-            setIsProcessing(false);
-            return;
-        }
-
-        setIsProcessing(true);
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            let activeUserId = session?.user?.id;
-            let activeEmail = session?.user?.email || email;
-
-            if (!activeUserId) {
-                // Tenta Login ou Cadastro se não estiver logado
-                let { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
-                if (authError && (authError.message.includes('User already registered') || authError.status === 400)) {
-                    const loginResp = await supabase.auth.signInWithPassword({ email, password });
-                    if (loginResp.error) throw loginResp.error;
-                    authData = loginResp.data;
-                } else if (authError) {
-                    throw authError;
-                }
-                activeUserId = authData.user?.id;
-                activeEmail = email;
-            }
-
-            const response = await fetch('/api/pix/charge', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: activeUserId,
-                    email: activeEmail,
-                    nome: activeEmail.split('@')[0],
-                    cpf: cleanCpf,
-                    amount: 29.90
-                })
-            });
-
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(text || `Erro no servidor: ${response.status}`);
-            }
-
-            const data = await response.json();
-            if (data.error) throw new Error(data.error);
-
-            setPixData(data);
-        } catch (err: any) {
-            console.error('PIX error:', err);
-            const msg = err.message === 'Unexpected end of JSON input' 
-                ? 'O servidor da API não está respondendo. Certifique-se de que o comando "npm run api" está rodando.'
-                : err.message;
-            alert('Falha ao gerar PIX: ' + msg);
-        } finally {
-            setIsProcessing(false);
-        }
-    };
 
     const handleCreateMercadoPagoPix = async () => {
         setIsProcessing(true);
@@ -182,7 +120,7 @@ export default function PaymentPage({
                 activeEmail = email;
             }
 
-            const response = await fetch('/api/pagamentos/pix', {
+            const response = await fetch(`${API_URL}/api/pagamentos/pix`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -193,12 +131,18 @@ export default function PaymentPage({
                 })
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Erro no servidor: ${response.status}`);
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                console.error('Erro ao processar JSON da resposta:', e);
+                throw new Error('O servidor não respondeu corretamente. Verifique se o backend está rodando.');
             }
 
-            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.details || data.error || data.message || 'Falha ao gerar PIX');
+            }
+            
             setPixData(data);
         } catch (err: any) {
             console.error('Mercado Pago PIX error:', err);

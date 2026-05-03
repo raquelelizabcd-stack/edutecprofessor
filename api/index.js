@@ -722,6 +722,8 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
     }
 
     try {
+        console.log(`[MercadoPago] Iniciando geração de PIX para usuário ${userId} no valor de ${amount}`);
+        
         const paymentData = {
             transaction_amount: Number(amount),
             description: description || 'Assinatura EduTec Pro',
@@ -732,7 +734,7 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
             notification_url: process.env.MERCADOPAGO_WEBHOOK_URL || 'https://edutechprofe.vercel.app/api/webhook/mercadopago'
         };
 
-        const response = await fetch(`${MERCADOPAGO_URL}/payments`, {
+        const mpResponse = await fetch(`${MERCADOPAGO_URL}/payments`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
@@ -742,22 +744,32 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
             body: JSON.stringify(paymentData)
         });
 
-        const data = await response.json();
+        const data = await mpResponse.json();
 
-        if (data.status === 400 || data.error) {
-            console.error('[MercadoPago Error]', data);
-            return res.status(400).json({ error: 'Erro no Mercado Pago: ' + (data.message || 'Falha ao gerar pagamento.') });
+        if (!mpResponse.ok) {
+            console.error('[MercadoPago Error Details]', data);
+            return res.status(mpResponse.status).json({ 
+                error: 'Erro no Mercado Pago', 
+                details: data.message || data.error || 'Falha ao gerar pagamento.' 
+            });
         }
 
         const pointOfInteraction = data.point_of_interaction?.transaction_data;
-        const chargeId = data.id.toString();
+        const chargeId = data.id?.toString();
 
-        // Salva na tabela pagamentos_pix (reaproveitando a tabela conforme pedido)
+        if (!pointOfInteraction || !chargeId) {
+            console.error('[MercadoPago] Resposta incompleta:', data);
+            return res.status(500).json({ error: 'Resposta incompleta do Mercado Pago.' });
+        }
+
+        console.log(`[MercadoPago] PIX Gerado com sucesso. ID: ${chargeId}`);
+
+        // Salva na tabela pagamentos_pix
         const { error: dbError } = await supabase.from('pagamentos_pix').insert({
             user_id: userId,
-            pagbank_charge_id: chargeId, // Salvamos o ID do MP aqui (ou poderíamos renomear a coluna, mas o usuário pediu para usar a existente)
-            qr_code: pointOfInteraction?.qr_code_base64,
-            qr_code_text: pointOfInteraction?.qr_code,
+            pagbank_charge_id: chargeId,
+            qr_code: pointOfInteraction.qr_code_base64,
+            qr_code_text: pointOfInteraction.qr_code,
             amount: amount,
             status: 'Aguardando',
             expires_at: data.date_of_expiration
@@ -768,15 +780,15 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
         }
 
         res.json({
-            qrCode: `data:image/png;base64,${pointOfInteraction?.qr_code_base64}`,
-            qrCodeText: pointOfInteraction?.qr_code,
+            qrCode: `data:image/png;base64,${pointOfInteraction.qr_code_base64}`,
+            qrCodeText: pointOfInteraction.qr_code,
             chargeId: chargeId,
             status: data.status
         });
 
     } catch (error) {
-        console.error('Erro ao gerar PIX Mercado Pago:', error);
-        res.status(500).json({ error: 'Falha ao gerar cobrança PIX com Mercado Pago.' });
+        console.error('❌ Erro crítico ao gerar PIX Mercado Pago:', error);
+        res.status(500).json({ error: 'Erro interno ao processar cobrança PIX.' });
     }
 });
 
