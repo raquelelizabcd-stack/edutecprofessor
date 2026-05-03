@@ -533,7 +533,6 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         <div className="flex justify-center gap-2 mt-2">
                             {/* Ícones de pagamento puramente visuais */}
                             <div className="px-3 py-1 border border-[#00A859] bg-emerald-50 text-[#00A859] rounded-lg text-[10px] font-black uppercase">Cartão</div>
-                            <div className="px-3 py-1 border border-[#009EE3] bg-blue-50 text-[#009EE3] rounded-lg text-[10px] font-black uppercase">PIX</div>
                             <div className="px-3 py-1 border border-black/20 rounded-lg text-[10px] font-bold opacity-30 uppercase">Boleto</div>
                         </div>
 
@@ -542,7 +541,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                             className="w-full mt-4 py-4 bg-[#00A859] text-white rounded-2xl font-black text-[15px] hover:bg-[#008F4C] transition-all shadow-xl shadow-[#00A859]/20 flex items-center justify-center gap-3 transform hover:-translate-y-0.5"
                         >
                             <Icons.QrCode size={20} />
-                            <span>Pagar com PIX (Mercado Pago)</span>
+                            <span>Pagar com PIX</span>
                         </button>
 
                         <p className="text-[10px] text-center text-black/50 font-bold mt-4 leading-relaxed uppercase tracking-widest bg-neutral-50 p-2 rounded-xl">

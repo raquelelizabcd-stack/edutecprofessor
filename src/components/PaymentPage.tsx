@@ -264,30 +264,18 @@ export default function PaymentPage({
                         </div>
 
                         {/* Seleção de Método de Pagamento */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
+                        {/* Seleção de Método de Pagamento */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
                             <button
                                 onClick={() => setPaymentMethod('stripe')}
-                                className={`p-6 rounded-2xl border-2 transition-all text-left flex flex-col gap-4 ${paymentMethod === 'stripe' ? 'border-[#0080FF] bg-[#0080FF]/[0.02]' : 'border-black/[0.05] hover:border-black/10'}`}
+                                className={`p-6 rounded-2xl border-2 transition-all text-left flex flex-col gap-4 ${paymentMethod === 'stripe' ? 'border-black bg-black text-white' : 'border-black/[0.05] hover:border-black/10'}`}
                             >
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'stripe' ? 'bg-[#0080FF] text-white' : 'bg-black/5 text-black/40'}`}>
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'stripe' ? 'bg-white text-black' : 'bg-black/5 text-black/40'}`}>
                                     <CreditCard size={20} />
                                 </div>
                                 <div>
-                                    <h4 className={`font-bold ${paymentMethod === 'stripe' ? 'text-[#0080FF]' : 'text-black/60'}`}>Cartão de Crédito</h4>
-                                    <p className="text-xs text-black/40 mt-1">Stripe Gateway • Acesso Imediato • Recorrente</p>
-                                </div>
-                            </button>
-
-                            <button
-                                onClick={() => setPaymentMethod('pix')}
-                                className={`p-6 rounded-2xl border-2 transition-all text-left flex flex-col gap-4 ${paymentMethod === 'pix' ? 'border-[#00A859] bg-[#00A859]/[0.02]' : 'border-black/[0.05] hover:border-black/10'}`}
-                            >
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${paymentMethod === 'pix' ? 'bg-[#00A859] text-white' : 'bg-black/5 text-black/40'}`}>
-                                    <QrCode size={20} />
-                                </div>
-                                <div>
-                                    <h4 className={`font-bold ${paymentMethod === 'pix' ? 'text-[#00A859]' : 'text-black/60'}`}>PIX (PagBank)</h4>
-                                    <p className="text-xs text-black/40 mt-1">Aprovação instantânea • Pagamento único</p>
+                                    <h4 className={`font-bold ${paymentMethod === 'stripe' ? 'text-white' : 'text-black/60'}`}>Pagamento via Cartão e Boleto (Stripe)</h4>
+                                    <p className={`text-xs mt-1 ${paymentMethod === 'stripe' ? 'text-white/60' : 'text-black/40'}`}>Gateway Seguro • Acesso Imediato</p>
                                 </div>
                             </button>
 
@@ -299,11 +287,8 @@ export default function PaymentPage({
                                     <QrCode size={20} />
                                 </div>
                                 <div>
-                                    <div className="flex items-center gap-2">
-                                        <h4 className={`font-bold ${paymentMethod === 'mercadopago' ? 'text-[#009EE3]' : 'text-black/60'}`}>PIX (Mercado Pago)</h4>
-                                        <span className="bg-[#009EE3] text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase">Novo</span>
-                                    </div>
-                                    <p className="text-xs text-black/40 mt-1">QR Code Dinâmico • Sem necessidade de CPF</p>
+                                    <h4 className={`font-bold ${paymentMethod === 'mercadopago' ? 'text-[#009EE3]' : 'text-black/60'}`}>Pagar com PIX</h4>
+                                    <p className="text-xs text-black/40 mt-1">Mercado Pago • Sem necessidade de CPF</p>
                                 </div>
                             </button>
                         </div>
@@ -420,27 +405,22 @@ export default function PaymentPage({
 
                                             
                                             <h4 className="text-xl font-bold text-black mb-4">
-                                                {paymentMethod === 'stripe' ? 'Ambiente 100% Seguro' : 
-                                                 paymentMethod === 'pix' ? 'Pagamento Instantâneo' : 'Rápido e Seguro'}
+                                                {paymentMethod === 'stripe' ? 'Ambiente 100% Seguro' : 'Pagamento Instantâneo'}
                                             </h4>
                                             
                                             <p className="text-sm text-black/50 leading-relaxed max-w-md mx-auto mb-8">
                                                 {paymentMethod === 'stripe' 
                                                     ? "Você será redirecionado para o checkout oficial do Stripe para processar sua assinatura do Plano Pro com total segurança."
-                                                    : paymentMethod === 'pix' 
-                                                        ? "O PIX é ideal para quem não usa cartão. O acesso Pro é liberado imediatamente após a confirmação do pagamento pelo PagBank."
-                                                        : "Pague com PIX via Mercado Pago. O QR Code será gerado instantaneamente e seu acesso liberado assim que o pagamento for aprovado."}
+                                                    : "O PIX é a forma mais rápida de ativar sua conta. O QR Code será gerado instantaneamente e seu acesso liberado assim que aprovado."}
                                             </p>
                                             
                                             <button
                                                 onClick={
-                                                    paymentMethod === 'stripe' ? handleCreateStripeSession : 
-                                                    paymentMethod === 'pix' ? handleCreatePixCharge : handleCreateMercadoPagoPix
+                                                    paymentMethod === 'stripe' ? handleCreateStripeSession : handleCreateMercadoPagoPix
                                                 }
                                                 disabled={isProcessing}
                                                 className={`w-full py-5 text-white rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-3 ${
-                                                    paymentMethod === 'stripe' ? 'bg-[#0080FF] hover:bg-[#006ACC] shadow-[#0080FF]/20' : 
-                                                    paymentMethod === 'pix' ? 'bg-[#00A859] hover:bg-[#008F4C] shadow-[#00A859]/20' : 
+                                                    paymentMethod === 'stripe' ? 'bg-black hover:bg-zinc-800 shadow-black/20' : 
                                                     'bg-[#009EE3] hover:bg-[#0086C3] shadow-[#009EE3]/20'
                                                 }`}
                                             >
@@ -453,8 +433,7 @@ export default function PaymentPage({
                                                     <>
                                                         {paymentMethod === 'stripe' ? <CreditCard size={24} /> : <QrCode size={24} />}
                                                         <span>
-                                                            {paymentMethod === 'stripe' ? 'Ir para Pagamento Seguro' : 
-                                                             paymentMethod === 'pix' ? 'Gerar QR Code PIX' : 'Gerar PIX Mercado Pago'}
+                                                            {paymentMethod === 'stripe' ? 'Ir para Pagamento Seguro' : 'Gerar PIX Agora'}
                                                         </span>
                                                     </>
                                                 )}
@@ -487,7 +466,7 @@ export default function PaymentPage({
                                         <div className="space-y-0.5">
                                             <span className="text-white/40 text-[10px] font-bold uppercase tracking-wider">Total Hoje</span>
                                             <p className="text-[#00A859] text-xs font-semibold">
-                                                {paymentMethod === 'pix' ? "Pagamento Único PIX" : "Assinatura Plano Pro"}
+                                                {paymentMethod === 'mercadopago' ? "Pagamento Único PIX" : "Assinatura Plano Pro"}
                                             </p>
                                         </div>
                                         <span className="text-3xl font-bold">R$ {monthlyPrice.toFixed(2).replace('.', ',')}</span>
@@ -495,7 +474,7 @@ export default function PaymentPage({
 
 
 
-                                    {paymentMethod === 'pix' && (
+                                    {paymentMethod === 'mercadopago' && (
                                         <div className="pt-4 border-t border-white/5">
                                             <div className="flex items-center gap-2 text-[#00A859]">
                                                 <CheckCircle2 size={14} />
@@ -526,13 +505,11 @@ export default function PaymentPage({
                             <div className="space-y-4">
                                 <button
                                     onClick={
-                                        paymentMethod === 'stripe' ? handleCreateStripeSession : 
-                                        paymentMethod === 'pix' ? handleCreatePixCharge : handleCreateMercadoPagoPix
+                                        paymentMethod === 'stripe' ? handleCreateStripeSession : handleCreateMercadoPagoPix
                                     }
-                                    disabled={isProcessing || isDowngrading || ((paymentMethod === 'pix' || paymentMethod === 'mercadopago') && !!pixData)}
+                                    disabled={isProcessing || isDowngrading || (paymentMethod === 'mercadopago' && !!pixData)}
                                     className={`w-full py-5 text-white rounded-2xl font-black text-lg transition-all shadow-xl flex items-center justify-center gap-3 ${
-                                        paymentMethod === 'stripe' ? 'bg-[#0080FF] hover:bg-[#006ACC] shadow-[#0080FF]/20' : 
-                                        paymentMethod === 'pix' ? 'bg-[#00A859] hover:bg-[#008F4C] shadow-[#00A859]/20' : 
+                                        paymentMethod === 'stripe' ? 'bg-black hover:bg-zinc-800 shadow-black/20' : 
                                         'bg-[#009EE3] hover:bg-[#0086C3] shadow-[#009EE3]/20'
                                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
@@ -543,8 +520,7 @@ export default function PaymentPage({
                                             {paymentMethod === 'stripe' ? <CreditCard size={20} /> : <QrCode size={20} />}
                                             <span>
                                                 {paymentMethod === 'stripe' ? 'Assinar Agora' : 
-                                                 pixData ? 'QR Code Gerado' : 
-                                                 paymentMethod === 'pix' ? 'Gerar PIX Agora' : 'Gerar PIX Mercado Pago'}
+                                                 pixData ? 'QR Code Gerado' : 'Gerar PIX Agora'}
                                             </span>
                                         </>
                                     )}
