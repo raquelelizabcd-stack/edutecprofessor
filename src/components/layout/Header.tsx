@@ -394,7 +394,7 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         </div>
                         {role === 'free' && (
                             <button 
-                                onClick={() => window.open((import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/28E14ngsDg454UtcAn6EU01", "_blank")}
+                                onClick={onGoToPayment}
                                 className="px-4 py-2 bg-[#00A859] text-white text-xs font-bold rounded-lg transition-all hover:bg-[#008F4C] shadow-sm"
                             >
                                 Fazer Upgrade
@@ -530,14 +530,24 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                                 Checkout Seguro via Stripe
                             </p>
                         </div>
-                        <div className="flex justify-center gap-2 mt-2 opacity-60">
+                        <div className="flex justify-center gap-2 mt-2">
                             {/* Ícones de pagamento puramente visuais */}
-                            <div className="px-3 py-1 border border-[#00A859] bg-emerald-50 text-[#00A859] rounded-lg text-[11px] font-black">CARTÃO DE CRÉDITO</div>
-                            <div className="px-3 py-1 border border-black/20 rounded-lg text-[11px] font-bold">BOLETO BANCÁRIO</div>
+                            <div className="px-3 py-1 border border-[#00A859] bg-emerald-50 text-[#00A859] rounded-lg text-[10px] font-black uppercase">Cartão</div>
+                            <div className="px-3 py-1 border border-[#009EE3] bg-blue-50 text-[#009EE3] rounded-lg text-[10px] font-black uppercase">PIX</div>
+                            <div className="px-3 py-1 border border-black/20 rounded-lg text-[10px] font-bold opacity-30 uppercase">Boleto</div>
                         </div>
-                        <p className="text-[10px] text-center text-black/50 font-bold mt-3 leading-relaxed uppercase tracking-widest bg-neutral-50 p-2 rounded-xl">
-                            ✅ <span className="text-[#00A859]">Cartão:</span> Liberação do sistema imediata após pagar<br />
-                            ⏳ <span className="text-amber-600">Boleto:</span> Liberação após 1 a 3 dias úteis (compensação)
+
+                        <button
+                            onClick={onGoToPayment}
+                            className="w-full mt-4 py-4 bg-[#00A859] text-white rounded-2xl font-black text-[15px] hover:bg-[#008F4C] transition-all shadow-xl shadow-[#00A859]/20 flex items-center justify-center gap-3 transform hover:-translate-y-0.5"
+                        >
+                            <Icons.QrCode size={20} />
+                            <span>Pagar com PIX (Mercado Pago)</span>
+                        </button>
+
+                        <p className="text-[10px] text-center text-black/50 font-bold mt-4 leading-relaxed uppercase tracking-widest bg-neutral-50 p-2 rounded-xl">
+                            ⚡ <span className="text-[#00A859]">PIX:</span> Liberação imediata e sem necessidade de CPF<br />
+                            💳 <span className="text-[#00A859]">Cartão:</span> Ativação instantânea via Stripe
                         </p>
                     </div>
                 </div>

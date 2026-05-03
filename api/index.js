@@ -69,6 +69,10 @@ app.use(express.json({
 const PAGBANK_TOKEN = process.env.PAGBANK_TOKEN || '4e15c1dd-7423-4ded-a97f-ddbd33e5ff06632119b84fbeb98448dac1e5d2ea8eb7c576-0f16-42c8-b748-d95d212a4089';
 const PAGBANK_URL = 'https://api.pagseguro.com'; // Use sandbox.api.pagseguro.com para testes
 
+// Configuração Mercado Pago
+const MERCADOPAGO_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || '';
+const MERCADOPAGO_URL = 'https://api.mercadopago.com/v1';
+
 // ENDPOINT: CRIAR SESSÃO DO CUSTOMER PORTAL (Stripe Management)
 app.post('/api/create-portal-session', async (req, res) => {
     try {
@@ -698,6 +702,143 @@ app.post('/api/webhook/pagbank', async (req, res) => {
         res.status(200).send('OK');
     } catch (error) {
         console.error('[PagBank Webhook Error]', error);
+        res.status(500).send('Webhook Error');
+    }
+});
+
+/**
+ * Endpoint para criar cobrança PIX via Mercado Pago
+ */
+app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
+    const { userId, amount, description, email } = req.body;
+
+    if (!userId || !amount) {
+        return res.status(400).json({ error: 'Dados incompletos (userId e amount são obrigatórios).' });
+    }
+
+    if (!MERCADOPAGO_ACCESS_TOKEN) {
+        console.error('❌ MERCADOPAGO_ACCESS_TOKEN não configurado.');
+        return res.status(500).json({ error: 'Configuração do Mercado Pago faltando no servidor.' });
+    }
+
+    try {
+        const paymentData = {
+            transaction_amount: Number(amount),
+            description: description || 'Assinatura EduTec Pro',
+            payment_method_id: 'pix',
+            payer: {
+                email: email || 'usuario@edutecpro.com',
+            },
+            notification_url: process.env.MERCADOPAGO_WEBHOOK_URL || 'https://edutechprofe.vercel.app/api/webhook/mercadopago'
+        };
+
+        const response = await fetch(`${MERCADOPAGO_URL}/payments`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}`,
+                'Content-Type': 'application/json',
+                'X-Idempotency-Key': `pix-${userId}-${Date.now()}`
+            },
+            body: JSON.stringify(paymentData)
+        });
+
+        const data = await response.json();
+
+        if (data.status === 400 || data.error) {
+            console.error('[MercadoPago Error]', data);
+            return res.status(400).json({ error: 'Erro no Mercado Pago: ' + (data.message || 'Falha ao gerar pagamento.') });
+        }
+
+        const pointOfInteraction = data.point_of_interaction?.transaction_data;
+        const chargeId = data.id.toString();
+
+        // Salva na tabela pagamentos_pix (reaproveitando a tabela conforme pedido)
+        const { error: dbError } = await supabase.from('pagamentos_pix').insert({
+            user_id: userId,
+            pagbank_charge_id: chargeId, // Salvamos o ID do MP aqui (ou poderíamos renomear a coluna, mas o usuário pediu para usar a existente)
+            qr_code: pointOfInteraction?.qr_code_base64,
+            qr_code_text: pointOfInteraction?.qr_code,
+            amount: amount,
+            status: 'Aguardando',
+            expires_at: data.date_of_expiration
+        });
+
+        if (dbError) {
+            console.error('[Supabase DB Error]', dbError);
+        }
+
+        res.json({
+            qrCode: `data:image/png;base64,${pointOfInteraction?.qr_code_base64}`,
+            qrCodeText: pointOfInteraction?.qr_code,
+            chargeId: chargeId,
+            status: data.status
+        });
+
+    } catch (error) {
+        console.error('Erro ao gerar PIX Mercado Pago:', error);
+        res.status(500).json({ error: 'Falha ao gerar cobrança PIX com Mercado Pago.' });
+    }
+});
+
+/**
+ * Webhook do Mercado Pago
+ */
+app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) => {
+    try {
+        const { action, data, type } = req.body;
+        
+        // O Mercado Pago envia notificações de diferentes tipos. Focamos em 'payment'
+        if (type === 'payment' || (action && action.includes('payment'))) {
+            const paymentId = data?.id || req.body.id;
+
+            if (!paymentId) return res.status(200).send('OK');
+
+            // Busca detalhes do pagamento no Mercado Pago
+            const response = await fetch(`${MERCADOPAGO_URL}/payments/${paymentId}`, {
+                headers: { 'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}` }
+            });
+            const payment = await response.json();
+
+            console.log(`[MercadoPago Webhook] Payment ${paymentId} -> ${payment.status}`);
+
+            let dbStatus = 'Aguardando';
+            if (payment.status === 'approved') dbStatus = 'Pago';
+            if (payment.status === 'pending') dbStatus = 'Aguardando';
+            if (payment.status === 'rejected' || payment.status === 'cancelled') dbStatus = 'Cancelado';
+
+            // 1. Atualiza a tabela pagamentos_pix
+            const { data: pixData, error: updateError } = await supabase
+                .from('pagamentos_pix')
+                .update({ status: dbStatus })
+                .eq('pagbank_charge_id', paymentId.toString())
+                .select('user_id')
+                .maybeSingle();
+
+            if (updateError) {
+                console.error('[Webhook DB Update Error]', updateError);
+            }
+
+            // 2. Se aprovado, ativa o plano Pro
+            if (dbStatus === 'Pago' && pixData?.user_id) {
+                const dataExpiracao = new Date();
+                dataExpiracao.setMonth(dataExpiracao.getMonth() + 1);
+
+                await supabase
+                    .from('users')
+                    .update({ 
+                        plano: 'pro', 
+                        status_pagamento: 'aprovado',
+                        data_expiracao: dataExpiracao.toISOString().split('T')[0]
+                    })
+                    .eq('id', pixData.user_id);
+                
+                console.log(`[MercadoPago Webhook] Usuário ${pixData.user_id} ativado via PIX MP.`);
+            }
+        }
+
+        res.status(200).send('OK');
+    } catch (error) {
+        console.error('[MercadoPago Webhook Error]', error);
         res.status(500).send('Webhook Error');
     }
 });
