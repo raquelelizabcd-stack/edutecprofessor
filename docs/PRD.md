@@ -46,7 +46,7 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
     *   Exportação de PDFs premium.
     *   Acesso total ao EduBot.
 *   **Sistema de Trial:** 7 dias grátis com sincronização resiliente entre Auth, LocalStorage e Banco de Dados.
-*   **Checkout Multi-Provider:** Integração com Stripe e PagBank (Webhooks automáticos para ativação e cancelamento).
+*   **Checkout Multi-Provider:** Integração com Stripe e Mercado Pago (PIX com QR Code dinâmico e Webhooks automáticos).
 *   **Gerenciamento de Assinatura:** Portal do Cliente para cancelamento autônomo e histórico de faturamento.
 
 ### 4.5. Painel Administrativo (Admin Console)
@@ -54,13 +54,18 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
 *   **Suporte Integrado:** Módulo de chamados via Gmail/SMTP para atendimento direto ao professor.
 *   **Auditoria de Dados:** Acesso aos registros pedagógicos para supervisão de qualidade.
 
+### 4.6. Módulos Especializados
+*   **SOS Adaptação:** Ferramenta de suporte pedagógico que oferece estratégias de inclusão e códigos BNCC baseados no tipo de deficiência do aluno.
+*   **Saúde e Nutrição:** Registro e persistência de dados de saúde, alergias e alimentação dos alunos.
+*   **Hub de Mediação:** Gestão de registros de mediação escolar e acompanhamento de alunos com suporte especializado.
+
 ---
 
 ## 5. Arquitetura e Stack Tecnológica
 *   **Frontend:** React 18 + TypeScript + Vite.
 *   **Estilização:** Vanilla CSS (Design System Premium com Glassmorphism e Micro-animações).
-*   **Backend & DB:** Supabase (Auth, PostgreSQL, Storage).
-*   **Webhooks & APIs:** Node.js enviando eventos do Stripe/PagBank em tempo real.
+*   **Backend & DB:** Supabase (Auth, PostgreSQL, Storage, RLS avançado).
+*   **Webhooks & APIs:** Node.js enviando eventos do Stripe e Mercado Pago em tempo real.
 *   **Segurança:** Fluxo de aceite de termos de uso e privacidade obrigatório antes do acesso ao Dashboard.
 *   **Infraestrutura:** Vercel e Supabase Edge Functions.
 
@@ -80,5 +85,5 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
 *   [ ] Relatórios Estatísticos Avançados sobre o desenvolvimento da turma.
 
 ---
-**Documento atualizado em:** 12/04/2026
+**Documento atualizado em:** 04/05/2026
 **Responsável:** Antigravity AI (Google DeepMind)
