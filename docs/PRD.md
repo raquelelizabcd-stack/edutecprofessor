@@ -3,7 +3,8 @@
 ## 1. Visão Geral do Produto
 O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrática dos professores em uma experiência fluida, organizada e tecnologicamente avançada. A plataforma centraliza o planejamento pedagógico, o acompanhamento de alunos e a geração de documentos oficiais, garantindo total alinhamento com a **BNCC (Base Nacional Comum Curricular)**.
 
----
+-----
+
 
 ## 2. Público-Alvo
 *   **Professores de Educação Infantil (EI):** Foco em campos de experiência e objetivos de aprendizagem.
