@@ -283,7 +283,7 @@ export default function PaymentPage({
 
                                 {paymentMethod === 'pix' && (
                                     <div className="space-y-2 animate-in fade-in slide-in-from-top-4 duration-300">
-                                        <label className="text-[11px] font-bold uppercase tracking-wider text-black/40 ml-1">CPF (Necessário para o PIX)</label>
+                                        <label className="text-[11px] font-bold uppercase tracking-wider text-black/40 ml-1">CPF (Necessário para o PIX PagBank)</label>
                                         <input
                                             type="text"
                                             required
@@ -310,7 +310,6 @@ export default function PaymentPage({
 
                                 <div className={`border rounded-3xl p-6 md:p-8 text-center ${
                                     paymentMethod === 'stripe' ? 'bg-[#0080FF]/[0.02] border-[#0080FF]/10' : 
-                                    paymentMethod === 'pix' ? 'bg-[#00A859]/[0.02] border-[#00A859]/10' : 
                                     'bg-[#009EE3]/[0.02] border-[#009EE3]/10'
                                 }`}>
                                     {pixData ? (

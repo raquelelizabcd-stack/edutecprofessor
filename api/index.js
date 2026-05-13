@@ -70,8 +70,10 @@ const PAGBANK_TOKEN = process.env.PAGBANK_TOKEN || '4e15c1dd-7423-4ded-a97f-ddbd
 const PAGBANK_URL = 'https://api.pagseguro.com'; // Use sandbox.api.pagseguro.com para testes
 
 // Configuração Mercado Pago
-const MERCADOPAGO_ACCESS_TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN || '';
+const MERCADOPAGO_ACCESS_TOKEN = (process.env.MERCADOPAGO_ACCESS_TOKEN || '').trim();
 const MERCADOPAGO_URL = 'https://api.mercadopago.com/v1';
+
+console.log(`[Config] Mercado Pago Token carregado: ${MERCADOPAGO_ACCESS_TOKEN ? MERCADOPAGO_ACCESS_TOKEN.substring(0, 7) + '...' : 'Vazio'}`);
 
 // ENDPOINT: CRIAR SESSÃO DO CUSTOMER PORTAL (Stripe Management)
 app.post('/api/create-portal-session', async (req, res) => {
@@ -745,12 +747,13 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
         });
 
         const data = await mpResponse.json();
+        const requestId = `pix-${userId}-${Date.now()}`;
 
         if (!mpResponse.ok) {
-            console.error('[MercadoPago Error Details]', data);
+            console.error(`❌ [MercadoPago Error] HTTP ${mpResponse.status}:`, JSON.stringify(data, null, 2));
             return res.status(mpResponse.status).json({ 
                 error: 'Erro no Mercado Pago', 
-                details: data.message || data.error || 'Falha ao gerar pagamento.' 
+                details: data.message || data.error || 'Falha ao gerar pagamento no Mercado Pago. Verifique suas credenciais.' 
             });
         }
 
@@ -762,7 +765,7 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
             return res.status(500).json({ error: 'Resposta incompleta do Mercado Pago.' });
         }
 
-        console.log(`[MercadoPago] PIX Gerado com sucesso. ID: ${chargeId}`);
+        console.log(`✅ [MercadoPago] PIX Gerado com sucesso. ID: ${chargeId} para Usuário: ${userId}`);
 
         // Salva na tabela pagamentos_pix
         const { error: dbError } = await supabase.from('pagamentos_pix').insert({
@@ -776,10 +779,12 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
         });
 
         if (dbError) {
-            console.error('[Supabase DB Error]', dbError);
+            console.error('❌ [Supabase DB Error] Falha ao registrar PIX:', dbError.message);
+            // Mesmo se falhar ao salvar no banco, retornamos o QR Code para o usuário poder pagar
         }
 
         res.json({
+            success: true,
             qrCode: `data:image/png;base64,${pointOfInteraction.qr_code_base64}`,
             qrCodeText: pointOfInteraction.qr_code,
             chargeId: chargeId,
@@ -787,8 +792,8 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
         });
 
     } catch (error) {
-        console.error('❌ Erro crítico ao gerar PIX Mercado Pago:', error);
-        res.status(500).json({ error: 'Erro interno ao processar cobrança PIX.' });
+        console.error('💥 [CRITICAL ERROR] Falha ao gerar PIX Mercado Pago:', error);
+        res.status(500).json({ error: 'Erro interno ao processar cobrança PIX. Tente novamente em instantes.' });
     }
 });
 
@@ -827,7 +832,9 @@ app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) 
                 .maybeSingle();
 
             if (updateError) {
-                console.error('[Webhook DB Update Error]', updateError);
+                console.error(`❌ [Webhook DB Update Error] Falha ao atualizar status do PIX ${paymentId}:`, updateError.message);
+            } else {
+                console.log(`📝 [Webhook DB Update] Status do PIX ${paymentId} atualizado para ${dbStatus}`);
             }
 
             // 2. Se aprovado, ativa o plano Pro
@@ -835,7 +842,7 @@ app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) 
                 const dataExpiracao = new Date();
                 dataExpiracao.setMonth(dataExpiracao.getMonth() + 1);
 
-                await supabase
+                const { error: userUpdateError } = await supabase
                     .from('users')
                     .update({ 
                         plano: 'pro', 
@@ -844,7 +851,11 @@ app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) 
                     })
                     .eq('id', pixData.user_id);
                 
-                console.log(`[MercadoPago Webhook] Usuário ${pixData.user_id} ativado via PIX MP.`);
+                if (userUpdateError) {
+                    console.error(`❌ [Webhook User Update Error] Falha ao ativar Pro para usuário ${pixData.user_id}:`, userUpdateError.message);
+                } else {
+                    console.log(`🚀 [MercadoPago Webhook] Usuário ${pixData.user_id} ativado via PIX MP com sucesso!`);
+                }
             }
         }
 
