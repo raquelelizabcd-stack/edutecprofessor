@@ -770,7 +770,7 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
         // Salva na tabela pagamentos_pix
         const { error: dbError } = await supabase.from('pagamentos_pix').insert({
             user_id: userId,
-            pagbank_charge_id: chargeId,
+            charge_id: chargeId,
             qr_code: pointOfInteraction.qr_code_base64,
             qr_code_text: pointOfInteraction.qr_code,
             amount: amount,
@@ -787,6 +787,8 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
             success: true,
             qrCode: `data:image/png;base64,${pointOfInteraction.qr_code_base64}`,
             qrCodeText: pointOfInteraction.qr_code,
+            qr_code: `data:image/png;base64,${pointOfInteraction.qr_code_base64}`,
+            qr_code_text: pointOfInteraction.qr_code,
             chargeId: chargeId,
             status: data.status
         });
@@ -819,15 +821,15 @@ app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) 
             console.log(`[MercadoPago Webhook] Payment ${paymentId} -> ${payment.status}`);
 
             let dbStatus = 'Aguardando';
-            if (payment.status === 'approved') dbStatus = 'Pago';
-            if (payment.status === 'pending') dbStatus = 'Aguardando';
-            if (payment.status === 'rejected' || payment.status === 'cancelled') dbStatus = 'Cancelado';
+            if (payment.status === 'approved') dbStatus = 'approved';
+            if (payment.status === 'pending') dbStatus = 'pending';
+            if (payment.status === 'rejected' || payment.status === 'cancelled') dbStatus = 'rejected';
 
             // 1. Atualiza a tabela pagamentos_pix
             const { data: pixData, error: updateError } = await supabase
                 .from('pagamentos_pix')
                 .update({ status: dbStatus })
-                .eq('pagbank_charge_id', paymentId.toString())
+                .eq('charge_id', paymentId.toString())
                 .select('user_id')
                 .maybeSingle();
 
@@ -837,8 +839,8 @@ app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) 
                 console.log(`📝 [Webhook DB Update] Status do PIX ${paymentId} atualizado para ${dbStatus}`);
             }
 
-            // 2. Se aprovado, ativa o plano Pro
-            if (dbStatus === 'Pago' && pixData?.user_id) {
+            // 2. Se approved, ativa o plano Pro
+            if (dbStatus === 'approved' && pixData?.user_id) {
                 const dataExpiracao = new Date();
                 dataExpiracao.setMonth(dataExpiracao.getMonth() + 1);
 
