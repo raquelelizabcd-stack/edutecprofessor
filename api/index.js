@@ -747,7 +747,6 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
         });
 
         const data = await mpResponse.json();
-        const requestId = `pix-${userId}-${Date.now()}`;
 
         if (!mpResponse.ok) {
             console.error(`❌ [MercadoPago Error] HTTP ${mpResponse.status}:`, JSON.stringify(data, null, 2));
@@ -767,8 +766,8 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
 
         console.log(`✅ [MercadoPago] PIX Gerado com sucesso. ID: ${chargeId} para Usuário: ${userId}`);
 
-        // Salva na tabela pagamentos_pix
-        const { error: dbError } = await supabase.from('pagamentos_pix').insert({
+        // Salva na tabela pagamentos_pix com resiliência de nome de coluna
+        let { error: dbError } = await supabase.from('pagamentos_pix').insert({
             user_id: userId,
             charge_id: chargeId,
             qr_code: pointOfInteraction.qr_code_base64,
@@ -777,6 +776,21 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
             status: 'Aguardando',
             expires_at: data.date_of_expiration
         });
+
+        // Se falhar por coluna inexistente, tenta o nome antigo (pagbank_charge_id)
+        if (dbError && dbError.message.includes('column "charge_id" does not exist')) {
+            console.log('ℹ️ Coluna "charge_id" não encontrada, tentando "pagbank_charge_id"...');
+            const { error: retryError } = await supabase.from('pagamentos_pix').insert({
+                user_id: userId,
+                pagbank_charge_id: chargeId,
+                qr_code: pointOfInteraction.qr_code_base64,
+                qr_code_text: pointOfInteraction.qr_code,
+                amount: amount,
+                status: 'Aguardando',
+                expires_at: data.date_of_expiration
+            });
+            dbError = retryError;
+        }
 
         if (dbError) {
             console.error('❌ [Supabase DB Error] Falha ao registrar PIX:', dbError.message);
@@ -825,13 +839,24 @@ app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) 
             if (payment.status === 'pending') dbStatus = 'pending';
             if (payment.status === 'rejected' || payment.status === 'cancelled') dbStatus = 'rejected';
 
-            // 1. Atualiza a tabela pagamentos_pix
-            const { data: pixData, error: updateError } = await supabase
+            // 1. Atualiza a tabela pagamentos_pix com resiliência
+            let updateResult = await supabase
                 .from('pagamentos_pix')
                 .update({ status: dbStatus })
                 .eq('charge_id', paymentId.toString())
                 .select('user_id')
                 .maybeSingle();
+
+            if (updateResult.error && updateResult.error.message.includes('column "charge_id" does not exist')) {
+                updateResult = await supabase
+                    .from('pagamentos_pix')
+                    .update({ status: dbStatus })
+                    .eq('pagbank_charge_id', paymentId.toString())
+                    .select('user_id')
+                    .maybeSingle();
+            }
+
+            const { data: pixData, error: updateError } = updateResult;
 
             if (updateError) {
                 console.error(`❌ [Webhook DB Update Error] Falha ao atualizar status do PIX ${paymentId}:`, updateError.message);
@@ -1034,4 +1059,3 @@ if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
 }
 
 export default app;
-
