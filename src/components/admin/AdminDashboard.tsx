@@ -161,6 +161,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [pixPayments, setPixPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'stripe' | 'pix'>('all');
+  const [stripeFinancials, setStripeFinancials] = useState<any>(null);
+  const [financialsLoading, setFinancialsLoading] = useState(false);
 
   const [revenueStats, setRevenueStats] = useState({
     monthly: 0,
@@ -178,6 +180,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [limitFree, setLimitFree] = useState(1);
   const [limitPro, setLimitPro] = useState(10);
   const [limitsSuccess, setLimitsSuccess] = useState(false);
+  const [promoStart, setPromoStart] = useState('');
+  const [promoEnd, setPromoEnd] = useState('');
+  const [promoStatus, setPromoStatus] = useState<'standard' | 'promo' | 'auto'>('standard');
+  const [promoSuccess, setPromoSuccess] = useState(false);
   
   // Estados de Suporte
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
@@ -229,6 +235,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     fetchData();
     if (activeTab === 'settings') {
       fetchLimits();
+    }
+    if (activeTab === 'payments') {
+      fetchStripeFinancials();
     }
   }, [activeTab]);
 
@@ -284,6 +293,20 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     };
   }, [soundConfig]);
 
+  const fetchStripeFinancials = async () => {
+    setFinancialsLoading(true);
+    try {
+      const apiUrl = (import.meta as any).env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/admin/stripe-financials`);
+      const data = await response.json();
+      setStripeFinancials(data);
+    } catch (err) {
+      console.error("Erro ao carregar dados financeiros do Stripe:", err);
+    } finally {
+      setFinancialsLoading(false);
+    }
+  };
+
   const fetchLimits = async () => {
     try {
       const { data } = await supabase
@@ -296,6 +319,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         const parsed = JSON.parse(data.nome);
         if (parsed.limit_free !== undefined) setLimitFree(parsed.limit_free);
         if (parsed.limit_pro !== undefined) setLimitPro(parsed.limit_pro);
+        if (parsed.promo_start !== undefined) setPromoStart(parsed.promo_start);
+        if (parsed.promo_end !== undefined) setPromoEnd(parsed.promo_end);
+        if (parsed.promo_status !== undefined) setPromoStatus(parsed.promo_status);
       }
     } catch (e) {
       console.error("Erro ao carregar limites:", e);
@@ -304,12 +330,29 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   const saveLimits = async () => {
     try {
+      const { data } = await supabase
+        .from('users')
+        .select('nome')
+        .eq('email', 'system_settings@edutec.com')
+        .maybeSingle();
+
+      let existing = {};
+      if (data && data.nome) {
+        existing = JSON.parse(data.nome);
+      }
+
+      const updated = {
+        ...existing,
+        limit_free: limitFree,
+        limit_pro: limitPro
+      };
+
       const { error } = await supabase
         .from('users')
         .upsert({
           id: '00000000-0000-0000-0000-000000000000',
           email: 'system_settings@edutec.com',
-          nome: JSON.stringify({ limit_free: limitFree, limit_pro: limitPro }),
+          nome: JSON.stringify(updated),
           plano: 'pro',
           status_pagamento: 'active',
           role: 'admin'
@@ -323,6 +366,82 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       console.error("Erro ao salvar limites:", e);
       alert("Erro ao salvar limites diários.");
     }
+  };
+
+  const savePromoSettings = async (status: 'standard' | 'promo' | 'auto', startVal?: string, endVal?: string) => {
+    try {
+      const start = startVal !== undefined ? startVal : promoStart;
+      const end = endVal !== undefined ? endVal : promoEnd;
+      const finalStatus = status;
+
+      const { data } = await supabase
+        .from('users')
+        .select('nome')
+        .eq('email', 'system_settings@edutec.com')
+        .maybeSingle();
+
+      let existing = {};
+      if (data && data.nome) {
+        existing = JSON.parse(data.nome);
+      }
+
+      const updated = {
+        ...existing,
+        promo_start: start,
+        promo_end: end,
+        promo_status: finalStatus
+      };
+
+      const { error } = await supabase
+        .from('users')
+        .upsert({
+          id: '00000000-0000-0000-0000-000000000000',
+          email: 'system_settings@edutec.com',
+          nome: JSON.stringify(updated),
+          plano: 'pro',
+          status_pagamento: 'active',
+          role: 'admin'
+        });
+
+      if (error) throw error;
+
+      setPromoStatus(finalStatus);
+      setPromoStart(start);
+      setPromoEnd(end);
+      setPromoSuccess(true);
+      setTimeout(() => setPromoSuccess(false), 3000);
+    } catch (e) {
+      console.error("Erro ao salvar configurações de promoção:", e);
+      alert("Erro ao salvar configurações de promoção.");
+    }
+  };
+
+  const getPromoStatusDescription = () => {
+    const now = new Date();
+    
+    if (promoStatus === 'promo') {
+      return { text: 'Promoção ativa (Forçada Manualmente)', color: 'text-green-600 bg-green-50 border border-green-200' };
+    }
+    
+    if (promoStatus === 'standard') {
+      return { text: 'Preço padrão ativo', color: 'text-slate-600 bg-slate-50 border border-slate-200' };
+    }
+    
+    if (promoStart && promoEnd) {
+      const start = new Date(promoStart);
+      const end = new Date(promoEnd);
+      end.setHours(23, 59, 59, 999);
+      
+      if (now >= start && now <= end) {
+        return { text: `Promoção ativa até ${new Date(promoEnd).toLocaleDateString('pt-BR')}`, color: 'text-green-600 bg-green-50 border border-green-200' };
+      } else if (now < start) {
+        return { text: `Agendada: Promoção inicia em ${new Date(promoStart).toLocaleDateString('pt-BR')}`, color: 'text-amber-600 bg-amber-50 border border-amber-200' };
+      } else {
+        return { text: 'Preço padrão ativo (Promoção expirada)', color: 'text-slate-600 bg-slate-50 border border-slate-200' };
+      }
+    }
+    
+    return { text: 'Preço padrão ativo', color: 'text-slate-600 bg-slate-50 border border-slate-200' };
   };
 
   const fetchData = async () => {
@@ -1155,7 +1274,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'Usuários', icon: Users },
     { id: 'pedagogia', label: 'Pedagogia', icon: GraduationCap },
-    { id: 'payments', label: 'Pagamentos', icon: CreditCard },
+    { id: 'payments', label: 'Financeiro', icon: CreditCard },
     { id: 'logs', label: 'Monitoramento', icon: Activity },
     { id: 'support', label: 'Suporte', icon: LifeBuoy },
     { id: 'settings', label: 'Configurações', icon: Settings },
@@ -2242,13 +2361,120 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           )}
 
           {activeTab === 'payments' && (
-             <div className="space-y-6">
-                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {/* Resumo Financeiro Header */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
-                    <h2 className="text-lg font-bold text-slate-800">Histórico de Pagamentos</h2>
-                    <p className="text-sm text-slate-500">Acompanhe todas as transações via Stripe e PIX.</p>
+                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                      <CreditCard className="text-blue-600 w-5 h-5 shrink-0" /> Gestão Financeira (Stripe)
+                    </h2>
+                    <p className="text-xs text-slate-500">Acompanhe saldos, repasses automáticos e conciliações em tempo real.</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button 
+                      onClick={fetchStripeFinancials}
+                      disabled={financialsLoading}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Activity size={14} className={financialsLoading ? 'animate-spin' : ''} />
+                      Sincronizar Stripe
+                    </button>
+                    <a 
+                      href="https://dashboard.stripe.com" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-1.5"
+                    >
+                      <ShieldCheck size={14} /> Ver Detalhes no Stripe
+                    </a>
+                  </div>
+                </div>
+
+                {/* Cards Visuais */}
+                {financialsLoading && !stripeFinancials ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4].map((n) => (
+                      <div key={n} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-pulse space-y-3">
+                        <div className="h-4 w-24 bg-slate-100 rounded" />
+                        <div className="h-6 w-32 bg-slate-100 rounded" />
+                        <div className="h-3 w-16 bg-slate-100 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {/* Card 1: Saldo Disponível */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">💰 Saldo Disponível</span>
+                        <span className="text-[9px] bg-green-50 text-green-700 font-extrabold px-1.5 py-0.5 rounded-full uppercase">Líquido</span>
+                      </div>
+                      <div className="mt-2">
+                        <h3 className="text-2xl font-black text-slate-900">
+                          R$ {((stripeFinancials?.balance?.available?.[0]?.amount || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Pendente: R$ {((stripeFinancials?.balance?.pending?.[0]?.amount || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Entradas Recentes */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">📈 Entradas Recentes</span>
+                        <span className="text-[9px] bg-blue-50 text-blue-700 font-extrabold px-1.5 py-0.5 rounded-full uppercase">Repasses</span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {stripeFinancials?.payouts?.slice(0, 2).map((po: any, idx: number) => (
+                          <div key={po.id || idx} className="flex justify-between items-center text-xs">
+                            <span className="text-slate-500">{new Date((po.arrival_date || po.created) * 1000).toLocaleDateString('pt-BR')}</span>
+                            <span className="font-bold text-green-600">R$ {(po.amount / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
+                        {(!stripeFinancials?.payouts || stripeFinancials.payouts.length === 0) && (
+                          <p className="text-xs text-slate-400">Nenhum repasse recente</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card 3: Repasses Automáticos */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">🔄 Repasses Automáticos</span>
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase ${stripeFinancials?.payoutSettings?.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                          {stripeFinancials?.payoutSettings?.enabled ? 'Ativo' : 'Manual'}
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-xs font-bold text-slate-800">Frequência da Conta</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5 capitalize">Intervalo: {stripeFinancials?.payoutSettings?.interval || 'Diário'}</p>
+                      </div>
+                    </div>
+
+                    {/* Card 4: Relatórios Financeiros */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">📊 Relatórios Financeiros</span>
+                        <span className="text-[9px] bg-purple-50 text-purple-700 font-extrabold px-1.5 py-0.5 rounded-full uppercase">Conciliado</span>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-xs font-bold text-slate-800">
+                          {stripeFinancials?.transactions?.length || 0} Lançamentos Recentes
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Taxas e tarifas reconciliadas</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Filtros e Histórico */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-800">Histórico de Transações</h3>
+                    <p className="text-xs text-slate-500">Transações de assinantes processadas no Supabase.</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
                     <button 
                       onClick={() => setPaymentFilter('all')}
                       className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${paymentFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
@@ -2431,6 +2657,106 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     >
                       <CheckCircle2 size={16} /> Salvar Alterações
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Controle de Promoções */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                      <Zap className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-slate-800">Controle de Promoções</h2>
+                      <p className="text-xs text-slate-500">Defina e ative promoções para o Plano Pro diretamente pelo painel</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Preços Cadastrados */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Preço Padrão</span>
+                      <h4 className="text-sm font-black text-slate-700 mt-1">R$ 29,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
+                    </div>
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Preço Promocional</span>
+                      <h4 className="text-sm font-black text-indigo-600 mt-1">R$ 19,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
+                    </div>
+                  </div>
+
+                  {/* Inputs de Data */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2">Data de início da promoção</label>
+                      <input 
+                        type="date" 
+                        value={promoStart}
+                        onChange={(e) => setPromoStart(e.target.value)}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold text-sm text-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2">Data de término da promoção</label>
+                      <input 
+                        type="date" 
+                        value={promoEnd}
+                        onChange={(e) => setPromoEnd(e.target.value)}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold text-sm text-slate-700"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status Atual */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl border border-slate-200 gap-3 bg-slate-50">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-xs font-bold text-slate-500">Status Atual do Preço:</span>
+                      {(() => {
+                        const desc = getPromoStatusDescription();
+                        return (
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${desc.color}`}>
+                            {desc.text}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    {promoStart && promoEnd && (
+                      <button 
+                        onClick={() => savePromoSettings('auto')}
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                      >
+                        Aplicar Regra de Datas
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Botões de Ação */}
+                  <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                    {promoSuccess ? (
+                      <div className="flex items-center gap-2 text-green-600 font-bold animate-bounce text-sm">
+                        <CheckCircle2 size={18} />
+                        Promoção atualizada com sucesso.
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">Altere manualmente o status do preço ou use a regra de datas.</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button 
+                        onClick={() => savePromoSettings('standard')}
+                        className="px-5 py-2.5 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg active:scale-95 transition-all text-xs flex items-center gap-1.5"
+                      >
+                        <XCircle size={14} /> Ativar Preço Padrão
+                      </button>
+                      <button 
+                        onClick={() => savePromoSettings('promo')}
+                        className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg active:scale-95 transition-all text-xs flex items-center gap-1.5"
+                      >
+                        <Zap size={14} /> Ativar Promoção
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
