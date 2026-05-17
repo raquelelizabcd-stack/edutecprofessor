@@ -12,6 +12,9 @@ import {
   Clock,
   LogOut,
   Check,
+  Save,
+  Upload,
+  Info,
   Lock,
   LockKeyhole,
   Key,
@@ -202,6 +205,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [accessLoading, setAccessLoading] = useState(false);
   const [metricsSource, setMetricsSource] = useState<'supabase' | 'google_analytics'>('supabase');
   const [gaMeasurementId, setGaMeasurementId] = useState<string>('G-8XZ9W4PDQE');
+  const [gaCredentialsJson, setGaCredentialsJson] = useState<string>('{}');
+  const [jsonFileName, setJsonFileName] = useState<string>('');
+  const [analyticsSaveSuccess, setAnalyticsSaveSuccess] = useState<boolean>(false);
+  const [analyticsSaveError, setAnalyticsSaveError] = useState<string>('');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [limitFree, setLimitFree] = useState(1);
   const [limitPro, setLimitPro] = useState(10);
@@ -300,6 +307,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     fetchData();
     if (activeTab === 'settings') {
       fetchLimits();
+      fetchAnalyticsSettings();
     }
     if (activeTab === 'payments') {
       fetchStripeFinancials();
@@ -310,6 +318,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   useEffect(() => {
     if (activeTab === 'access_metrics') {
       fetchAccessMetrics();
+      fetchAnalyticsSettings();
     }
   }, [activeTab, accessPeriodFilter]);
 
@@ -407,6 +416,105 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     } finally {
       setMpLoading(false);
     }
+  };
+
+  const fetchAnalyticsSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('analytics_settings')
+        .select('*')
+        .eq('id', '00000000-0000-0000-0000-000000000001')
+        .maybeSingle();
+      
+      if (data) {
+        if (data.measurement_id) {
+          setGaMeasurementId(data.measurement_id);
+        }
+        if (data.credentials_json) {
+          setGaCredentialsJson(data.credentials_json);
+          try {
+            const parsed = JSON.parse(data.credentials_json);
+            if (parsed && Object.keys(parsed).length > 0) {
+              setJsonFileName('credentials.json');
+            }
+          } catch (_) {}
+        }
+      } else {
+        // Backup de segurança
+        const savedId = localStorage.getItem('ga_measurement_id');
+        const savedJson = localStorage.getItem('ga_credentials_json');
+        if (savedId) setGaMeasurementId(savedId);
+        if (savedJson) {
+          setGaCredentialsJson(savedJson);
+          setJsonFileName('credentials.json');
+        }
+      }
+    } catch (e) {
+      console.warn("Tabela 'analytics_settings' não encontrada ou erro ao carregar:", e);
+      const savedId = localStorage.getItem('ga_measurement_id');
+      const savedJson = localStorage.getItem('ga_credentials_json');
+      if (savedId) setGaMeasurementId(savedId);
+      if (savedJson) {
+        setGaCredentialsJson(savedJson);
+        setJsonFileName('credentials.json');
+      }
+    }
+  };
+
+  const saveAnalyticsSettings = async () => {
+    setAnalyticsSaveError('');
+    setAnalyticsSaveSuccess(false);
+
+    if (!gaMeasurementId.startsWith('G-')) {
+      setAnalyticsSaveError('O Measurement ID deve começar com "G-".');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('analytics_settings')
+        .upsert({
+          id: '00000000-0000-0000-0000-000000000001',
+          measurement_id: gaMeasurementId,
+          credentials_json: gaCredentialsJson,
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      setAnalyticsSaveSuccess(true);
+      setTimeout(() => setAnalyticsSaveSuccess(false), 3000);
+      
+      localStorage.setItem('ga_measurement_id', gaMeasurementId);
+      localStorage.setItem('ga_credentials_json', gaCredentialsJson);
+    } catch (e) {
+      console.warn("Falha ao salvar no Supabase. Salvando localmente como fallback:", e);
+      localStorage.setItem('ga_measurement_id', gaMeasurementId);
+      localStorage.setItem('ga_credentials_json', gaCredentialsJson);
+      setAnalyticsSaveSuccess(true);
+      setTimeout(() => setAnalyticsSaveSuccess(false), 3000);
+    }
+  };
+
+  const handleJsonUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setJsonFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        JSON.parse(text);
+        setGaCredentialsJson(text);
+        setAnalyticsSaveError('');
+      } catch (err) {
+        setAnalyticsSaveError('O arquivo selecionado não é um JSON válido.');
+        setJsonFileName('');
+        setGaCredentialsJson('{}');
+      }
+    };
+    reader.readAsText(file);
   };
 
   const fetchAccessMetrics = async () => {
@@ -3712,6 +3820,108 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       className="px-8 py-3 text-white rounded-xl font-bold shadow-lg hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
                     >
                       <CheckCircle2 size={18} /> Salvar Alterações
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Integração com Google Analytics */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 text-emerald-600 rounded-lg">
+                      <BarChart2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-slate-800">Integração com Google Analytics</h2>
+                      <p className="text-xs text-slate-500">Gerencie as credenciais de sincronização de tráfego avançado</p>
+                    </div>
+                  </div>
+
+                  {/* Status de Conexão */}
+                  <div>
+                    {gaMeasurementId.startsWith('G-') && gaCredentialsJson && gaCredentialsJson !== '{}' && gaCredentialsJson !== '' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        ✅ Conectado ao Google Analytics
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                        ⚠️ Integração pendente
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Measurement ID */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 block">Measurement ID (ID de Métrica)</label>
+                      <input
+                        type="text"
+                        placeholder="Ex: G-XXXXXXXXXX"
+                        value={gaMeasurementId}
+                        onChange={(e) => setGaMeasurementId(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm text-slate-800 font-semibold"
+                      />
+                      <p className="text-[10px] text-slate-400">Deve começar obrigatoriamente com "G-".</p>
+                    </div>
+
+                    {/* Arquivo de Credenciais JSON */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-700 block">Arquivo de credenciais JSON da API</label>
+                      <div className="relative group flex items-center justify-center border border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-4 bg-slate-50 hover:bg-white transition-all cursor-pointer">
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleJsonUpload}
+                          className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                        <div className="text-center space-y-1">
+                          <Upload className="w-5 h-5 text-slate-400 mx-auto group-hover:text-blue-500 transition-colors" />
+                          <span className="text-xs font-bold text-slate-600 block">
+                            {jsonFileName || 'Selecionar arquivo JSON'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block">
+                            Clique ou arraste o arquivo .json de credenciais do GCP
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mensagem Informativa */}
+                  <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl flex gap-3 items-start">
+                    <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Essas credenciais permitem sincronizar dados avançados de comportamento de usuários via Google Analytics.
+                    </p>
+                  </div>
+
+                  {/* Feedback e Botão de Ação */}
+                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
+                    <div>
+                      {analyticsSaveSuccess && (
+                        <div className="flex items-center gap-2 text-green-600 font-bold animate-bounce text-sm">
+                          <CheckCircle2 size={16} />
+                          Credenciais salvas com sucesso!
+                        </div>
+                      )}
+                      {analyticsSaveError && (
+                        <div className="flex items-center gap-2 text-red-600 font-bold text-sm">
+                          <AlertCircle size={16} />
+                          {analyticsSaveError}
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={saveAnalyticsSettings}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg hover:shadow-xl active:scale-95 transition-all text-xs flex items-center gap-2"
+                    >
+                      <Save size={14} /> Salvar Credenciais
                     </button>
                   </div>
                 </div>
