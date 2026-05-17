@@ -204,7 +204,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [accessMetricsData, setAccessMetricsData] = useState<any>(null);
   const [accessLoading, setAccessLoading] = useState(false);
   const [metricsSource, setMetricsSource] = useState<'supabase' | 'google_analytics'>('supabase');
-  const [gaMeasurementId, setGaMeasurementId] = useState<string>('G-8XZ9W4PDQE');
+  const [gaMeasurementId, setGaMeasurementId] = useState<string>('');
   const [gaCredentialsJson, setGaCredentialsJson] = useState<string>('{}');
   const [jsonFileName, setJsonFileName] = useState<string>('');
   const [analyticsSaveSuccess, setAnalyticsSaveSuccess] = useState<boolean>(false);
@@ -419,6 +419,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   };
 
   const fetchAnalyticsSettings = async () => {
+    const isInvalidId = (id: string | null | undefined) => {
+      if (!id) return true;
+      const invalidIds = ['G-8XZ9W4PDQE', 'G-6XE8WFOE8E'];
+      return invalidIds.includes(id) || !id.startsWith('G-');
+    };
+
     try {
       const { data } = await supabase
         .from('analytics_settings')
@@ -426,10 +432,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         .eq('id', '00000000-0000-0000-0000-000000000001')
         .maybeSingle();
       
-      if (data) {
-        if (data.measurement_id) {
-          setGaMeasurementId(data.measurement_id);
-        }
+      if (data && data.measurement_id && !isInvalidId(data.measurement_id)) {
+        setGaMeasurementId(data.measurement_id);
         if (data.credentials_json) {
           setGaCredentialsJson(data.credentials_json);
           try {
@@ -440,23 +444,34 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           } catch (_) {}
         }
       } else {
-        // Backup de segurança
         const savedId = localStorage.getItem('ga_measurement_id');
-        const savedJson = localStorage.getItem('ga_credentials_json');
-        if (savedId) setGaMeasurementId(savedId);
-        if (savedJson) {
-          setGaCredentialsJson(savedJson);
-          setJsonFileName('credentials.json');
+        if (savedId && !isInvalidId(savedId)) {
+          setGaMeasurementId(savedId);
+          const savedJson = localStorage.getItem('ga_credentials_json');
+          if (savedJson) {
+            setGaCredentialsJson(savedJson);
+            setJsonFileName('credentials.json');
+          }
+        } else {
+          setGaMeasurementId('');
+          setGaCredentialsJson('{}');
+          setJsonFileName('');
         }
       }
     } catch (e) {
       console.warn("Tabela 'analytics_settings' não encontrada ou erro ao carregar:", e);
       const savedId = localStorage.getItem('ga_measurement_id');
-      const savedJson = localStorage.getItem('ga_credentials_json');
-      if (savedId) setGaMeasurementId(savedId);
-      if (savedJson) {
-        setGaCredentialsJson(savedJson);
-        setJsonFileName('credentials.json');
+      if (savedId && !isInvalidId(savedId)) {
+        setGaMeasurementId(savedId);
+        const savedJson = localStorage.getItem('ga_credentials_json');
+        if (savedJson) {
+          setGaCredentialsJson(savedJson);
+          setJsonFileName('credentials.json');
+        }
+      } else {
+        setGaMeasurementId('');
+        setGaCredentialsJson('{}');
+        setJsonFileName('');
       }
     }
   };
@@ -4332,16 +4347,23 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         <input
                           type="text"
                           value={gaMeasurementId}
-                          onChange={(e) => setGaMeasurementId(e.target.value)}
-                          className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                          placeholder="Ex: G-XXXXXXXXXX"
+                          readOnly
+                          className="w-full p-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-500 cursor-not-allowed focus:outline-none"
+                          placeholder="Integração pendente"
                         />
                       </div>
                       <div className="flex items-end">
-                        <div className="w-full bg-emerald-50 border border-emerald-200 text-emerald-800 p-2.5 rounded-xl text-[10px] font-semibold text-center flex items-center justify-center gap-1.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                          Status: Conectado e Sincronizado
-                        </div>
+                        {gaMeasurementId.startsWith('G-') && gaCredentialsJson && gaCredentialsJson !== '{}' && gaCredentialsJson !== '' ? (
+                          <div className="w-full bg-emerald-50 border border-emerald-200 text-emerald-800 p-2.5 rounded-xl text-[10px] font-semibold text-center flex items-center justify-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                            ✅ Conectado ao Google Analytics
+                          </div>
+                        ) : (
+                          <div className="w-full bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-xl text-[10px] font-semibold text-center flex items-center justify-center gap-1.5">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                            ⚠️ Integração pendente
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
