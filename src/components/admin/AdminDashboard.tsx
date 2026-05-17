@@ -28,6 +28,7 @@ import {
   Calendar,
   Activity,
   History,
+  QrCode,
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
@@ -184,6 +185,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [promoEnd, setPromoEnd] = useState('');
   const [promoStatus, setPromoStatus] = useState<'standard' | 'promo' | 'auto'>('standard');
   const [promoSuccess, setPromoSuccess] = useState(false);
+  const [pixPromoStart, setPixPromoStart] = useState('');
+  const [pixPromoEnd, setPixPromoEnd] = useState('');
+  const [pixPromoStatus, setPixPromoStatus] = useState<'standard' | 'promo' | 'auto'>('standard');
+  const [pixPromoSuccess, setPixPromoSuccess] = useState(false);
   
   // Estados de Suporte
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
@@ -196,6 +201,32 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [supportSearch, setSupportSearch] = useState('');
   const [newEmailData, setNewEmailData] = useState({ to: '', subject: '', message: '' });
   
+  const isPromoActive = (() => {
+    const now = new Date();
+    if (promoStatus === 'promo') return true;
+    if (promoStatus === 'standard') return false;
+    if (promoStart && promoEnd) {
+      const start = new Date(promoStart);
+      const end = new Date(promoEnd);
+      end.setHours(23, 59, 59, 999);
+      return now >= start && now <= end;
+    }
+    return false;
+  })();
+
+  const isPixPromoActive = (() => {
+    const now = new Date();
+    if (pixPromoStatus === 'promo') return true;
+    if (pixPromoStatus === 'standard') return false;
+    if (pixPromoStart && pixPromoEnd) {
+      const start = new Date(pixPromoStart);
+      const end = new Date(pixPromoEnd);
+      end.setHours(23, 59, 59, 999);
+      return now >= start && now <= end;
+    }
+    return false;
+  })();
+
   // Notificações Sonoras
   const [soundConfig, setSoundConfig] = useState(() => {
     const saved = localStorage.getItem('edutec_sound_config');
@@ -322,6 +353,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         if (parsed.promo_start !== undefined) setPromoStart(parsed.promo_start);
         if (parsed.promo_end !== undefined) setPromoEnd(parsed.promo_end);
         if (parsed.promo_status !== undefined) setPromoStatus(parsed.promo_status);
+        if (parsed.pix_promo_start !== undefined) setPixPromoStart(parsed.pix_promo_start);
+        if (parsed.pix_promo_end !== undefined) setPixPromoEnd(parsed.pix_promo_end);
+        if (parsed.pix_promo_status !== undefined) setPixPromoStatus(parsed.pix_promo_status);
       }
     } catch (e) {
       console.error("Erro ao carregar limites:", e);
@@ -436,6 +470,82 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         return { text: `Promoção ativa até ${new Date(promoEnd).toLocaleDateString('pt-BR')}`, color: 'text-green-600 bg-green-50 border border-green-200' };
       } else if (now < start) {
         return { text: `Agendada: Promoção inicia em ${new Date(promoStart).toLocaleDateString('pt-BR')}`, color: 'text-amber-600 bg-amber-50 border border-amber-200' };
+      } else {
+        return { text: 'Preço padrão ativo (Promoção expirada)', color: 'text-slate-600 bg-slate-50 border border-slate-200' };
+      }
+    }
+    
+    return { text: 'Preço padrão ativo', color: 'text-slate-600 bg-slate-50 border border-slate-200' };
+  };
+
+  const savePixPromoSettings = async (status: 'standard' | 'promo' | 'auto', startVal?: string, endVal?: string) => {
+    try {
+      const start = startVal !== undefined ? startVal : pixPromoStart;
+      const end = endVal !== undefined ? endVal : pixPromoEnd;
+      const finalStatus = status;
+
+      const { data } = await supabase
+        .from('users')
+        .select('nome')
+        .eq('email', 'system_settings@edutec.com')
+        .maybeSingle();
+
+      let existing = {};
+      if (data && data.nome) {
+        existing = JSON.parse(data.nome);
+      }
+
+      const updated = {
+        ...existing,
+        pix_promo_start: start,
+        pix_promo_end: end,
+        pix_promo_status: finalStatus
+      };
+
+      const { error } = await supabase
+        .from('users')
+        .upsert({
+          id: '00000000-0000-0000-0000-000000000000',
+          email: 'system_settings@edutec.com',
+          nome: JSON.stringify(updated),
+          plano: 'pro',
+          status_pagamento: 'active',
+          role: 'admin'
+        });
+
+      if (error) throw error;
+
+      setPixPromoStatus(finalStatus);
+      setPixPromoStart(start);
+      setPixPromoEnd(end);
+      setPixPromoSuccess(true);
+      setTimeout(() => setPixPromoSuccess(false), 3000);
+    } catch (e) {
+      console.error("Erro ao salvar configurações de promoção Pix:", e);
+      alert("Erro ao salvar configurações de promoção Pix.");
+    }
+  };
+
+  const getPixPromoStatusDescription = () => {
+    const now = new Date();
+    
+    if (pixPromoStatus === 'promo') {
+      return { text: 'Promoção ativa (Forçada Manualmente)', color: 'text-green-600 bg-green-50 border border-green-200' };
+    }
+    
+    if (pixPromoStatus === 'standard') {
+      return { text: 'Preço padrão ativo', color: 'text-slate-600 bg-slate-50 border border-slate-200' };
+    }
+    
+    if (pixPromoStart && pixPromoEnd) {
+      const start = new Date(pixPromoStart);
+      const end = new Date(pixPromoEnd);
+      end.setHours(23, 59, 59, 999);
+      
+      if (now >= start && now <= end) {
+        return { text: `Promoção ativa até ${new Date(pixPromoEnd).toLocaleDateString('pt-BR')}`, color: 'text-green-600 bg-green-50 border border-green-200' };
+      } else if (now < start) {
+        return { text: `Agendada: Promoção inicia em ${new Date(pixPromoStart).toLocaleDateString('pt-BR')}`, color: 'text-amber-600 bg-amber-50 border border-amber-200' };
       } else {
         return { text: 'Preço padrão ativo (Promoção expirada)', color: 'text-slate-600 bg-slate-50 border border-slate-200' };
       }
@@ -2669,8 +2779,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       <Zap className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="font-bold text-slate-800">Controle de Promoções</h2>
-                      <p className="text-xs text-slate-500">Defina e ative promoções para o Plano Pro diretamente pelo painel</p>
+                      <h2 className="font-bold text-slate-800">Controle de Promoções (Stripe)</h2>
+                      <p className="text-xs text-slate-500">Defina e ative promoções do Stripe para o Plano Pro diretamente pelo painel</p>
                     </div>
                   </div>
                 </div>
@@ -2678,13 +2788,36 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <div className="p-6 space-y-6">
                   {/* Preços Cadastrados */}
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Preço Padrão</span>
-                      <h4 className="text-sm font-black text-slate-700 mt-1">R$ 29,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
+                    <div className={`p-4 rounded-xl flex flex-col justify-between transition-all duration-300 border-2 ${
+                      !isPromoActive 
+                        ? 'bg-green-50 border-green-500 shadow-md ring-4 ring-green-500/10' 
+                        : 'bg-white border-slate-200 opacity-60'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Preço Padrão</span>
+                        {!isPromoActive && (
+                          <span className="text-[9px] bg-green-200 text-green-800 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Selecionado
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-black text-slate-700 mt-2">R$ 29,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
                     </div>
-                    <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Preço Promocional</span>
-                      <h4 className="text-sm font-black text-indigo-600 mt-1">R$ 19,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
+
+                    <div className={`p-4 rounded-xl flex flex-col justify-between transition-all duration-300 border-2 ${
+                      isPromoActive 
+                        ? 'bg-green-50 border-green-500 shadow-md ring-4 ring-green-500/10' 
+                        : 'bg-white border-slate-200 opacity-60'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Preço Promocional</span>
+                        {isPromoActive && (
+                          <span className="text-[9px] bg-green-200 text-green-800 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Selecionado
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-black text-indigo-600 mt-2">R$ 19,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
                     </div>
                   </div>
 
@@ -2752,6 +2885,129 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       </button>
                       <button 
                         onClick={() => savePromoSettings('promo')}
+                        className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg active:scale-95 transition-all text-xs flex items-center gap-1.5"
+                      >
+                        <Zap size={14} /> Ativar Promoção
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Controle de Promoções (Pix Mercado Pago) */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-teal-100 text-teal-600 rounded-lg">
+                      <QrCode className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-slate-800">Controle de Promoções (Pix Mercado Pago)</h2>
+                      <p className="text-xs text-slate-500">Defina e ative promoções do Mercado Pago via Pix para o Plano Pro diretamente pelo painel</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Preços Cadastrados */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className={`p-4 rounded-xl flex flex-col justify-between transition-all duration-300 border-2 ${
+                      !isPixPromoActive 
+                        ? 'bg-green-50 border-green-500 shadow-md ring-4 ring-green-500/10' 
+                        : 'bg-white border-slate-200 opacity-60'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Preço Padrão</span>
+                        {!isPixPromoActive && (
+                          <span className="text-[9px] bg-green-200 text-green-800 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Selecionado
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-black text-slate-700 mt-2">R$ 29,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
+                    </div>
+
+                    <div className={`p-4 rounded-xl flex flex-col justify-between transition-all duration-300 border-2 ${
+                      isPixPromoActive 
+                        ? 'bg-green-50 border-green-500 shadow-md ring-4 ring-green-500/10' 
+                        : 'bg-white border-slate-200 opacity-60'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Preço Promocional</span>
+                        {isPixPromoActive && (
+                          <span className="text-[9px] bg-green-200 text-green-800 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                            Selecionado
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="text-sm font-black text-teal-600 mt-2">R$ 19,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
+                    </div>
+                  </div>
+
+                  {/* Inputs de Data */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2">Data de início da promoção</label>
+                      <input 
+                        type="date" 
+                        value={pixPromoStart}
+                        onChange={(e) => setPixPromoStart(e.target.value)}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold text-sm text-slate-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-2">Data de término da promoção</label>
+                      <input 
+                        type="date" 
+                        value={pixPromoEnd}
+                        onChange={(e) => setPixPromoEnd(e.target.value)}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold text-sm text-slate-700"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Status Atual */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between p-4 rounded-xl border border-slate-200 gap-3 bg-slate-50">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-xs font-bold text-slate-500">Status Atual do Preço:</span>
+                      {(() => {
+                        const desc = getPixPromoStatusDescription();
+                        return (
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${desc.color}`}>
+                            {desc.text}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    {pixPromoStart && pixPromoEnd && (
+                      <button 
+                        onClick={() => savePixPromoSettings('auto')}
+                        className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                      >
+                        Aplicar Regra de Datas
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Botões de Ação */}
+                  <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                    {pixPromoSuccess ? (
+                      <div className="flex items-center gap-2 text-green-600 font-bold animate-bounce text-sm">
+                        <CheckCircle2 size={18} />
+                        Promoção Pix atualizada com sucesso.
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">Altere manualmente o status do preço ou use a regra de datas.</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      <button 
+                        onClick={() => savePixPromoSettings('standard')}
+                        className="px-5 py-2.5 bg-slate-600 hover:bg-slate-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg active:scale-95 transition-all text-xs flex items-center gap-1.5"
+                      >
+                        <XCircle size={14} /> Ativar Preço Padrão
+                      </button>
+                      <button 
+                        onClick={() => savePixPromoSettings('promo')}
                         className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg active:scale-95 transition-all text-xs flex items-center gap-1.5"
                       >
                         <Zap size={14} /> Ativar Promoção

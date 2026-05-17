@@ -751,8 +751,8 @@ app.post('/api/webhook/pagbank', async (req, res) => {
 app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
     const { userId, amount, description, email } = req.body;
 
-    if (!userId || !amount) {
-        return res.status(400).json({ error: 'Dados incompletos (userId e amount são obrigatórios).' });
+    if (!userId) {
+        return res.status(400).json({ error: 'Dados incompletos (userId é obrigatório).' });
     }
 
     if (!MERCADOPAGO_ACCESS_TOKEN) {
@@ -761,10 +761,45 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
     }
 
     try {
-        console.log(`[MercadoPago] Iniciando geração de PIX para usuário ${userId} no valor de ${amount}`);
+        let finalAmount = Number(amount || 29.90);
+        try {
+            const { data: settings } = await supabase
+                .from('users')
+                .select('nome')
+                .eq('email', 'system_settings@edutec.com')
+                .maybeSingle();
+
+            if (settings && settings.nome) {
+                const parsed = JSON.parse(settings.nome);
+                const pixPromoStatus = parsed.pix_promo_status || 'standard';
+                const pixPromoStart = parsed.pix_promo_start;
+                const pixPromoEnd = parsed.pix_promo_end;
+
+                let isPixPromoActive = false;
+                if (pixPromoStatus === 'promo') {
+                    isPixPromoActive = true;
+                } else if (pixPromoStatus === 'auto' && pixPromoStart && pixPromoEnd) {
+                    const now = new Date();
+                    const start = new Date(pixPromoStart);
+                    const end = new Date(pixPromoEnd);
+                    end.setHours(23, 59, 59, 999);
+                    isPixPromoActive = now >= start && now <= end;
+                }
+
+                if (isPixPromoActive) {
+                    finalAmount = 19.90;
+                } else {
+                    finalAmount = 29.90;
+                }
+            }
+        } catch (e) {
+            console.error('Erro ao obter preço promocional Pix do Supabase:', e);
+        }
+
+        console.log(`[MercadoPago] Geração de PIX para ${userId} no valor final calculado de ${finalAmount}`);
         
         const paymentData = {
-            transaction_amount: Number(amount),
+            transaction_amount: Number(finalAmount),
             description: description || 'Assinatura EduTec Pro',
             payment_method_id: 'pix',
             payer: {

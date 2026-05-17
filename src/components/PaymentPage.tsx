@@ -33,6 +33,7 @@ export default function PaymentPage({
     const [cpf, setCpf] = useState('');
     const [pixData, setPixData] = useState<{ qrCode: string, qrCodeText: string, chargeId: string } | null>(null);
     const [copied, setCopied] = useState(false);
+    const [price, setPrice] = useState(monthlyPrice);
     
     // Verificamos se o usuário já é um "experimental" ou já está no trial para esconder as frases de teste
     const isAlreadyInTrial = statusPagamento === 'teste' || statusPagamento === 'trial';
@@ -41,6 +42,63 @@ export default function PaymentPage({
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isDowngrading, setIsDowngrading] = useState(false);
+
+    React.useEffect(() => {
+        const fetchSettings = async () => {
+            try {
+                const { data } = await supabase
+                    .from('users')
+                    .select('nome')
+                    .eq('email', 'system_settings@edutec.com')
+                    .maybeSingle();
+
+                if (data && data.nome) {
+                    const parsed = JSON.parse(data.nome);
+                    const now = new Date();
+                    
+                    if (paymentMethod === 'mercadopago') {
+                        // Pix Promo Check
+                        const pixPromoStatus = parsed.pix_promo_status || 'standard';
+                        const pixPromoStart = parsed.pix_promo_start;
+                        const pixPromoEnd = parsed.pix_promo_end;
+
+                        let isPixPromoActive = false;
+                        if (pixPromoStatus === 'promo') {
+                            isPixPromoActive = true;
+                        } else if (pixPromoStatus === 'auto' && pixPromoStart && pixPromoEnd) {
+                            const start = new Date(pixPromoStart);
+                            const end = new Date(pixPromoEnd);
+                            end.setHours(23, 59, 59, 999);
+                            isPixPromoActive = now >= start && now <= end;
+                        }
+
+                        setPrice(isPixPromoActive ? 19.90 : 29.90);
+                    } else {
+                        // Stripe Promo Check
+                        const promoStatus = parsed.promo_status || 'standard';
+                        const promoStart = parsed.promo_start;
+                        const promoEnd = parsed.promo_end;
+
+                        let isPromoActive = false;
+                        if (promoStatus === 'promo') {
+                            isPromoActive = true;
+                        } else if (promoStatus === 'auto' && promoStart && promoEnd) {
+                            const start = new Date(promoStart);
+                            const end = new Date(promoEnd);
+                            end.setHours(23, 59, 59, 999);
+                            isPromoActive = now >= start && now <= end;
+                        }
+
+                        setPrice(isPromoActive ? 19.90 : 29.90);
+                    }
+                }
+            } catch (e) {
+                console.error("Erro ao buscar preços dinâmicos em PaymentPage:", e);
+            }
+        };
+
+        fetchSettings();
+    }, [paymentMethod]);
 
     const handleCreateStripeSession = async () => {
         setIsProcessing(true);
@@ -126,7 +184,7 @@ export default function PaymentPage({
                 body: JSON.stringify({
                     userId: activeUserId,
                     email: activeEmail,
-                    amount: 29.90,
+                    amount: price,
                     description: 'Assinatura EduTec Pro'
                 })
             });
@@ -412,7 +470,7 @@ export default function PaymentPage({
                                                 {paymentMethod === 'mercadopago' ? "Pagamento Único PIX" : "Assinatura Plano Pro"}
                                             </p>
                                         </div>
-                                        <span className="text-3xl font-bold">R$ {monthlyPrice.toFixed(2).replace('.', ',')}</span>
+                                        <span className="text-3xl font-bold">R$ {price.toFixed(2).replace('.', ',')}</span>
                                     </div>
 
 
