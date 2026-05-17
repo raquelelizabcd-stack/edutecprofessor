@@ -158,6 +158,48 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Registrar logs de acesso reais na tabela access_logs
+  useEffect(() => {
+    const recordAccessLog = async () => {
+      try {
+        const ua = navigator.userAgent;
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+        const deviceType = isMobile ? 'mobile' : 'desktop';
+
+        let source = 'direto';
+        const referrer = document.referrer;
+        if (referrer) {
+          if (referrer.includes('facebook.com') || referrer.includes('t.co') || referrer.includes('instagram.com') || referrer.includes('linkedin.com') || referrer.includes('whatsapp.com')) {
+            source = 'redes sociais';
+          } else if (referrer.includes('google.com') || referrer.includes('bing.com') || referrer.includes('yahoo.com')) {
+            source = 'busca';
+          }
+        }
+
+        const path = location.pathname;
+        let pageName = 'Landing Page';
+        if (path.includes('/login')) pageName = 'Login';
+        else if (path.includes('/payment')) pageName = 'Pagamento';
+        else if (path.includes('/dashboard')) pageName = 'Painel do Professor';
+        else if (path.includes('/admin')) pageName = 'Painel Admin';
+
+        const userId = session?.user.id || null;
+
+        // Fazer insert resiliente (com try/catch silenciado caso o usuário não tenha rodado a migration ainda)
+        await supabase.from('access_logs').insert({
+          user_id: userId,
+          device_type: deviceType,
+          source: source,
+          page: pageName
+        });
+      } catch (err) {
+        console.warn('Erro ao gravar log de acesso:', err);
+      }
+    };
+
+    recordAccessLog();
+  }, [location.pathname, session]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/');
