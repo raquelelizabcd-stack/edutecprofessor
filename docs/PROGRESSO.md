@@ -8,7 +8,12 @@ Este documento resume as principais implementações e melhorias realizadas rece
 - **Backend Sync:** Configuração de webhooks para ativação automática do plano Pro após a confirmação do pagamento.
 - **Resiliência:** Tratamento de erros para garantir que o backend esteja rodando e pronto para processar as transações.
 
-## 2. SOS Adaptação
+## 2. Validação e Setup Stripe (Produção)
+- **Chaves de Produção:** Configuração e validação automática das chaves `sk_live` e `pk_live` no ambiente.
+- **Link Oficial:** Atualização do link de pagamento para a versão final de produção.
+- **Webhook:** Validação da recepção dos eventos simulados de checkout.
+
+## 3. SOS Adaptação
 - **Suporte Pedagógico:** Implementação de uma ferramenta que sugere estratégias de inclusão e códigos da BNCC com base na deficiência registrada para o aluno.
 - **Integração com Dashboard:** Botão de acesso rápido no gerenciamento de alunos.
 
