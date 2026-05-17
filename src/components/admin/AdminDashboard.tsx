@@ -175,6 +175,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     bgImage: ''
   });
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [limitFree, setLimitFree] = useState(1);
+  const [limitPro, setLimitPro] = useState(10);
+  const [limitsSuccess, setLimitsSuccess] = useState(false);
   
   // Estados de Suporte
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
@@ -224,6 +227,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       setLayoutConfig(JSON.parse(saved));
     }
     fetchData();
+    if (activeTab === 'settings') {
+      fetchLimits();
+    }
   }, [activeTab]);
 
   // Suporte Realtime
@@ -277,6 +283,47 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       supabase.removeChannel(planningChannel);
     };
   }, [soundConfig]);
+
+  const fetchLimits = async () => {
+    try {
+      const { data } = await supabase
+        .from('users')
+        .select('nome')
+        .eq('email', 'system_settings@edutec.com')
+        .maybeSingle();
+
+      if (data && data.nome) {
+        const parsed = JSON.parse(data.nome);
+        if (parsed.limit_free !== undefined) setLimitFree(parsed.limit_free);
+        if (parsed.limit_pro !== undefined) setLimitPro(parsed.limit_pro);
+      }
+    } catch (e) {
+      console.error("Erro ao carregar limites:", e);
+    }
+  };
+
+  const saveLimits = async () => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .upsert({
+          id: '00000000-0000-0000-0000-000000000000',
+          email: 'system_settings@edutec.com',
+          nome: JSON.stringify({ limit_free: limitFree, limit_pro: limitPro }),
+          plano: 'pro',
+          status_pagamento: 'active',
+          role: 'admin'
+        });
+
+      if (error) throw error;
+
+      setLimitsSuccess(true);
+      setTimeout(() => setLimitsSuccess(false), 3000);
+    } catch (e) {
+      console.error("Erro ao salvar limites:", e);
+      alert("Erro ao salvar limites diários.");
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -2329,6 +2376,61 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Controle de Limites */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-rose-100 text-rose-600 rounded-lg">
+                      <LockKeyhole className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-slate-800">Controle de Limites</h2>
+                      <p className="text-xs text-slate-500">Defina o limite diário de novos registros criados por usuário</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Limite diário para plano Free</label>
+                      <input 
+                        type="number" 
+                        value={limitFree}
+                        onChange={(e) => setLimitFree(parseInt(e.target.value) || 0)}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none transition-all font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Limite diário para plano Pro</label>
+                      <input 
+                        type="number" 
+                        value={limitPro}
+                        onChange={(e) => setLimitPro(parseInt(e.target.value) || 0)}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none transition-all font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                    {limitsSuccess ? (
+                      <div className="flex items-center gap-2 text-green-600 font-bold animate-bounce text-sm">
+                        <CheckCircle2 size={18} />
+                        Limites atualizados com sucesso.
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400">Esses limites serão aplicados em tempo real para todos os professores do sistema.</p>
+                    )}
+                    <button 
+                      onClick={saveLimits}
+                      className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-md hover:shadow-lg active:scale-95 transition-all flex items-center gap-2 text-sm"
+                    >
+                      <CheckCircle2 size={16} /> Salvar Alterações
+                    </button>
                   </div>
                 </div>
               </div>

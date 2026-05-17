@@ -109,6 +109,8 @@ export default function Dashboard({
   const [showBnccPicker, setShowBnccPicker] = useState(false);
   const [activePickerContext, setActivePickerContext] = useState<'global' | string>('global');
   const [professorNome, setProfessorNome] = useState<string>('');
+  const [dynamicLimitFree, setDynamicLimitFree] = useState(1);
+  const [dynamicLimitPro, setDynamicLimitPro] = useState(10);
   const [professorWhatsapp, setProfessorWhatsapp] = useState<string>('');
   const [robotName, setRobotName] = useState<string>('EduBot');
   const [userPassword, setUserPassword] = useState<string>('');
@@ -142,6 +144,26 @@ export default function Dashboard({
     if (!hasSeen) {
       setIsTourActive(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const fetchDynamicLimits = async () => {
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('nome')
+          .eq('email', 'system_settings@edutec.com')
+          .maybeSingle();
+        if (data && data.nome) {
+          const parsed = JSON.parse(data.nome);
+          if (parsed.limit_free !== undefined) setDynamicLimitFree(parsed.limit_free);
+          if (parsed.limit_pro !== undefined) setDynamicLimitPro(parsed.limit_pro);
+        }
+      } catch (e) {
+        console.error("Erro ao buscar limites dinâmicos:", e);
+      }
+    };
+    fetchDynamicLimits();
   }, []);
 
   useEffect(() => {
@@ -489,29 +511,10 @@ export default function Dashboard({
 
       // 1. Lógica para Plano Free
       if (isFree) {
-          if (activeTab === 'relatorio-individual' || activeTab === 'planejamento-diario') {
-              const todayCount = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfDay).length;
-              if (todayCount >= 1) {
-                  alert("Limite Plano Free: 1 registro por dia. Mude para o Pro!");
-                  return;
-              }
-          } else if (activeTab === 'planejamento-semanal') {
-              const weekCount = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfWeek).length;
-              if (weekCount >= 1) {
-                  alert("Limite Plano Free: 1 planejamento semanal por semana. Mude para o Pro!");
-                  return;
-              }
-          } else if (activeTab === 'planejamento-mensal') {
-              const monthCount = moduleRecords.filter(r => new Date(r.createdAt).getTime() >= startOfMonth).length;
-              if (monthCount >= 1) {
-                  alert("Limite Plano Free: 1 planejamento mensal por mês. Mude para o Pro!");
-                  return;
-              }
-          } else {
-              if (moduleRecords.length >= 1) {
-                  alert("Limite Plano Free atingido para este módulo. Mude para o Pro!");
-                  return;
-              }
+          const todayTotal = records.filter(r => new Date(r.createdAt || 0).getTime() >= startOfDay).length;
+          if (todayTotal >= dynamicLimitFree) {
+              alert(`Limite Plano Free: Limite diário de ${dynamicLimitFree} novos registros atingido. Mude para o Pro!`);
+              return;
           }
       }
 
@@ -546,11 +549,11 @@ export default function Dashboard({
           }
       }
 
-      // 3. Lógica para Pro Pago (Anti-compartilhamento: 3-4 registros por dia)
+      // 3. Lógica para Pro Pago (Anti-compartilhamento: limite dinâmico por dia)
       if (isPro) {
           const todayTotal = records.filter(r => new Date(r.createdAt || 0).getTime() >= startOfDay).length;
-          if (todayTotal >= 4) {
-              alert("Segurança Pro: Limite diário de 4 novos registros atingido. O uso abusivo ou compartilhamento de conta é monitorado.");
+          if (todayTotal >= dynamicLimitPro) {
+              alert(`Segurança Pro: Limite diário de ${dynamicLimitPro} novos registros atingido. O uso abusivo ou compartilhamento de conta é monitorado.`);
               return;
           }
       }
