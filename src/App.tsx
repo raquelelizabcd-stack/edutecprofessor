@@ -47,8 +47,24 @@ export default function App() {
 
       if (!data) {
         const isProIntent = userIntent === 'pro';
+        
+        let trialDaysConfig = 7;
+        const { data: settingsData } = await supabase
+          .from('users')
+          .select('nome')
+          .eq('email', 'system_settings@edutec.com')
+          .maybeSingle();
+        if (settingsData && settingsData.nome) {
+          try {
+            const parsed = JSON.parse(settingsData.nome);
+            if (parsed.trial_days !== undefined) {
+              trialDaysConfig = parsed.trial_days;
+            }
+          } catch (_) {}
+        }
+
         const trialDate = isProIntent ? new Date() : null;
-        if (isProIntent && trialDate) trialDate.setDate(trialDate.getDate() + 7);
+        if (isProIntent && trialDate) trialDate.setDate(trialDate.getDate() + trialDaysConfig);
         const expIso = trialDate ? trialDate.toISOString().split('T')[0] : null;
 
         await supabase.from('users').upsert({
@@ -72,7 +88,7 @@ export default function App() {
         console.log('[App] Perfil carregado do DB:', { plano: matchedPlano, status: data.status_pagamento });
         
         setCurrentProfile(matchedPlano);
-        setUserRole(data.role as 'admin' | 'professor');
+        setUserRole(data.role === 'admin_geral' ? 'admin' : (data.role as 'admin' | 'professor'));
         setUserCreatedAt(data.created_at);
         setUserDataExpiracao(data.data_expiracao);
         setUserStatusPagamento(data.status_pagamento);
@@ -96,7 +112,7 @@ export default function App() {
         // Mas por segurança, respeitamos o banco se ele já existe.
 
         // Lógica de redirecionamento
-        if (data.role === 'admin') {
+        if (data.role === 'admin' || data.role === 'admin_geral') {
           setUserRole('admin');
           setCurrentProfile('admin');
           if (location.pathname === '/' || location.pathname === '/login' || location.pathname === '/dashboard') {
@@ -162,8 +178,23 @@ export default function App() {
       const isProIntent = userIntent === 'pro';
       console.log('[App] Aceitando termos. Intenção Pro:', isProIntent, 'Perfil atual:', currentProfile);
 
+      let trialDaysConfig = 7;
+      const { data: settingsData } = await supabase
+        .from('users')
+        .select('nome')
+        .eq('email', 'system_settings@edutec.com')
+        .maybeSingle();
+      if (settingsData && settingsData.nome) {
+        try {
+          const parsed = JSON.parse(settingsData.nome);
+          if (parsed.trial_days !== undefined) {
+            trialDaysConfig = parsed.trial_days;
+          }
+        } catch (_) {}
+      }
+
       const trialDate = isProIntent ? new Date() : null;
-      if (isProIntent && trialDate) trialDate.setDate(trialDate.getDate() + 7);
+      if (isProIntent && trialDate) trialDate.setDate(trialDate.getDate() + trialDaysConfig);
       const expIso = trialDate ? trialDate.toISOString().split('T')[0] : null;
 
       const nowIso = new Date().toISOString();
@@ -231,7 +262,21 @@ export default function App() {
 
       <Route path="/login" element={
         <LoginPage 
-          onSuccess={() => navigate('/dashboard')} 
+          onSuccess={async () => {
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            if (currentSession) {
+              const { data } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', currentSession.user.id)
+                .maybeSingle();
+              if (data?.role === 'admin' || data?.role === 'admin_geral') {
+                navigate('/admin', { replace: true });
+                return;
+              }
+            }
+            navigate('/dashboard', { replace: true });
+          }} 
           onBack={() => navigate('/')}
           initialIntent={userIntent} 
         />

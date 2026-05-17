@@ -19,6 +19,8 @@ import {
   UserCircle,
   AlertCircle,
   Eye,
+  EyeOff,
+  Copy,
   Menu,
   X,
   CreditCard,
@@ -164,6 +166,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'stripe' | 'pix'>('all');
   const [stripeFinancials, setStripeFinancials] = useState<any>(null);
   const [financialsLoading, setFinancialsLoading] = useState(false);
+  const [mpFinancials, setMpFinancials] = useState<any>(null);
+  const [mpLoading, setMpLoading] = useState(false);
 
   const [revenueStats, setRevenueStats] = useState({
     monthly: 0,
@@ -181,6 +185,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [limitFree, setLimitFree] = useState(1);
   const [limitPro, setLimitPro] = useState(10);
   const [limitsSuccess, setLimitsSuccess] = useState(false);
+  const [trialDays, setTrialDays] = useState(7);
   const [promoStart, setPromoStart] = useState('');
   const [promoEnd, setPromoEnd] = useState('');
   const [promoStatus, setPromoStatus] = useState<'standard' | 'promo' | 'auto'>('standard');
@@ -189,6 +194,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [pixPromoEnd, setPixPromoEnd] = useState('');
   const [pixPromoStatus, setPixPromoStatus] = useState<'standard' | 'promo' | 'auto'>('standard');
   const [pixPromoSuccess, setPixPromoSuccess] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
+  const [copiedPassword, setCopiedPassword] = useState(false);
+  const [newAdminEmail, setNewAdminEmail] = useState('raquelduarteadmin@gmail.com');
+  const [newAdminPassword, setNewAdminPassword] = useState('Jean@21220300');
+  const [isSavingAdminCreds, setIsSavingAdminCreds] = useState(false);
+  const [saveCredsSuccess, setSaveCredsSuccess] = useState(false);
   
   // Estados de Suporte
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
@@ -269,8 +282,25 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
     if (activeTab === 'payments') {
       fetchStripeFinancials();
+      fetchMpFinancials();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (showCredentialsModal) {
+      const fetchAdminEmail = async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user && user.email) {
+            setNewAdminEmail(user.email);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      fetchAdminEmail();
+    }
+  }, [showCredentialsModal]);
 
   // Suporte Realtime
   useEffect(() => {
@@ -338,6 +368,20 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     }
   };
 
+  const fetchMpFinancials = async () => {
+    setMpLoading(true);
+    try {
+      const apiUrl = (import.meta as any).env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${apiUrl}/api/admin/mp-financials`);
+      const data = await response.json();
+      setMpFinancials(data);
+    } catch (err) {
+      console.error("Erro ao carregar dados financeiros do Mercado Pago:", err);
+    } finally {
+      setMpLoading(false);
+    }
+  };
+
   const fetchLimits = async () => {
     try {
       const { data } = await supabase
@@ -350,6 +394,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         const parsed = JSON.parse(data.nome);
         if (parsed.limit_free !== undefined) setLimitFree(parsed.limit_free);
         if (parsed.limit_pro !== undefined) setLimitPro(parsed.limit_pro);
+        if (parsed.trial_days !== undefined) setTrialDays(parsed.trial_days);
         if (parsed.promo_start !== undefined) setPromoStart(parsed.promo_start);
         if (parsed.promo_end !== undefined) setPromoEnd(parsed.promo_end);
         if (parsed.promo_status !== undefined) setPromoStatus(parsed.promo_status);
@@ -378,7 +423,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       const updated = {
         ...existing,
         limit_free: limitFree,
-        limit_pro: limitPro
+        limit_pro: limitPro,
+        trial_days: trialDays
       };
 
       const { error } = await supabase
@@ -1371,6 +1417,66 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     document.documentElement.style.setProperty('--admin-accent', layoutConfig.accentColor);
   };
 
+  const handleSaveAdminCredentials = async () => {
+    setIsSavingAdminCreds(true);
+    setSaveCredsSuccess(false);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Administrador não logado.');
+
+      const updates: any = {};
+      
+      if (newAdminEmail !== user.email) {
+        updates.email = newAdminEmail;
+      }
+      
+      // Tentamos atualizar a senha apenas se não for vazia
+      if (newAdminPassword && newAdminPassword.trim() !== '') {
+        updates.password = newAdminPassword;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        try {
+          const { error: authError } = await supabase.auth.updateUser(updates);
+          if (authError) {
+            const errMsg = authError.message || '';
+            // Ignorar erro se for apenas de senha idêntica
+            if (errMsg.toLowerCase().includes('should be different') || 
+                errMsg.toLowerCase().includes('same as')) {
+              console.log('Ignorando erro de senha idêntica no Auth');
+            } else {
+              throw authError;
+            }
+          }
+        } catch (authErr: any) {
+          const errMsg = authErr.message || '';
+          if (errMsg.toLowerCase().includes('should be different') || 
+              errMsg.toLowerCase().includes('same as')) {
+            console.log('Ignorando erro de senha idêntica na captura do Auth');
+          } else {
+            throw authErr;
+          }
+        }
+
+        if (updates.email) {
+          const { error: dbError } = await supabase
+            .from('users')
+            .update({ email: newAdminEmail })
+            .eq('id', user.id);
+          if (dbError) throw dbError;
+        }
+      }
+
+      setSaveCredsSuccess(true);
+      setTimeout(() => setSaveCredsSuccess(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      alert(`Erro ao salvar credenciais: ${err.message || JSON.stringify(err)}`);
+    } finally {
+      setIsSavingAdminCreds(false);
+    }
+  };
+
   const presetColors = [
     { name: 'Azul', value: '#2563EB' },
     { name: 'Verde', value: '#059669' },
@@ -1572,13 +1678,19 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               )}
             </div>
 
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium text-slate-900">Raquel Duarte</p>
-              <p className="text-xs text-slate-500">Administradora</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold">
-              RD
-            </div>
+            <button 
+              onClick={() => setShowCredentialsModal(true)}
+              className="flex items-center gap-3 hover:bg-slate-100 p-2 rounded-xl transition-all focus:outline-none select-none text-left border border-transparent hover:border-slate-200"
+              title="Ver minhas credenciais de acesso"
+            >
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-bold text-slate-900 leading-tight">Raquel Duarte</p>
+                <p className="text-xs text-slate-500 font-semibold">Administradora</p>
+              </div>
+              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold shadow-sm">
+                RD
+              </div>
+            </button>
           </div>
         </header>
 
@@ -2578,10 +2690,117 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 )}
 
+                {/* Gestão Financeira (Mercado Pago) */}
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                      <CreditCard className="text-teal-600 w-5 h-5 shrink-0" /> Gestão Financeira (Mercado Pago)
+                    </h2>
+                    <p className="text-xs text-slate-500">Acompanhe saldos, repasses automáticos e conciliações em tempo real.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button 
+                      onClick={fetchMpFinancials}
+                      disabled={mpLoading}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50"
+                    >
+                      <Activity size={14} className={mpLoading ? 'animate-spin' : ''} />
+                      Sincronizar Mercado Pago
+                    </button>
+                    <a 
+                      href="https://www.mercadopago.com.br" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center gap-1.5"
+                    >
+                      <ShieldCheck size={14} /> Ver Detalhes no Mercado Pago
+                    </a>
+                  </div>
+                </div>
+
+                {mpLoading && !mpFinancials ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                    {[1, 2, 3, 4].map((n) => (
+                      <div key={n} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm animate-pulse space-y-3">
+                        <div className="h-4 w-24 bg-slate-100 rounded" />
+                        <div className="h-6 w-32 bg-slate-100 rounded" />
+                        <div className="h-3 w-16 bg-slate-100 rounded" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4 animate-in fade-in duration-300">
+                    {/* Card 1: Saldo Disponível */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">💰 Saldo Disponível</span>
+                        <span className="text-[9px] bg-green-50 text-green-700 font-extrabold px-1.5 py-0.5 rounded-full uppercase">Líquido</span>
+                      </div>
+                      <div className="mt-2">
+                        <h3 className="text-2xl font-black text-slate-900">
+                          R$ {((mpFinancials?.balance?.available?.[0]?.amount || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </h3>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          Pendente: R$ {((mpFinancials?.balance?.pending?.[0]?.amount || 0) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Card 2: Entradas Recentes */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">📈 Entradas Recentes</span>
+                        <span className="text-[9px] bg-blue-50 text-blue-700 font-extrabold px-1.5 py-0.5 rounded-full uppercase">Repasses</span>
+                      </div>
+                      <div className="mt-2 space-y-1">
+                        {mpFinancials?.payouts?.slice(0, 2).map((po: any, idx: number) => (
+                          <div key={po.id || idx} className="flex justify-between items-center text-xs">
+                            <span className="text-slate-500">{new Date(po.arrival_date * 1000).toLocaleDateString('pt-BR')}</span>
+                            <span className="font-bold text-green-600">R$ {(po.amount / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
+                        {(!mpFinancials?.payouts || mpFinancials.payouts.length === 0) && (
+                          <p className="text-xs text-slate-400">Nenhum repasse recente</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card 3: Repasses Automáticos */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">🔄 Repasses Automáticos</span>
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase ${mpFinancials?.payoutSettings?.enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                          {mpFinancials?.payoutSettings?.enabled ? 'Ativo' : 'Manual'}
+                        </span>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-xs font-bold text-slate-800">Frequência da Conta</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5 capitalize">Intervalo: {mpFinancials?.payoutSettings?.interval || 'Diário'}</p>
+                      </div>
+                    </div>
+
+                    {/* Card 4: Relatórios Financeiros */}
+                    <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[130px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">📊 Relatórios Financeiros</span>
+                        <span className="text-[9px] bg-purple-50 text-purple-700 font-extrabold px-1.5 py-0.5 rounded-full uppercase">Conciliado</span>
+                      </div>
+                      <div className="mt-2">
+                        <p className="text-xs font-bold text-slate-800">
+                          {mpFinancials?.transactions?.length || 0} Lançamentos Recentes
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Taxas e tarifas reconciliadas</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Filtros e Histórico */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-6">
                   <div>
-                    <h3 className="text-base font-bold text-slate-800">Histórico de Transações</h3>
+                    <h3 className="text-base font-bold text-slate-800">
+                      {paymentFilter === 'stripe' ? 'Histórico de Transações (Stripe)' : paymentFilter === 'pix' ? 'Histórico de Transações (Mercado Pago)' : 'Histórico de Transações Geral'}
+                    </h3>
                     <p className="text-xs text-slate-500">Transações de assinantes processadas no Supabase.</p>
                   </div>
                   <div className="flex gap-2 shrink-0">
@@ -2692,30 +2911,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
           {activeTab === 'settings' && (
             <div className="max-w-4xl space-y-6 pb-20">
-              {/* Configurações Básicas */}
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                <div className="p-6 border-b border-slate-100">
-                  <h2 className="font-semibold text-slate-800">Assinaturas e Segurança</h2>
-                </div>
-                <div className="p-6 space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">Valor do Plano Pro (R$)</label>
-                      <input type="number" defaultValue={29.90} className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-2">2FA Administrativo</label>
-                      <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <span className="text-xs text-slate-500">Exigir código via App</span>
-                        <div className="w-10 h-5 bg-slate-200 rounded-full relative cursor-not-allowed">
-                          <div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* Controle de Limites */}
               <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
@@ -2740,6 +2935,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         onChange={(e) => setLimitFree(parseInt(e.target.value) || 0)}
                         className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none transition-all font-semibold"
                       />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Esse limite determina o número máximo de registros pedagógicos (planejamentos, relatórios, presenças) que um usuário Free pode criar por dia.
+                      </p>
                     </div>
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">Limite diário para plano Pro</label>
@@ -2749,6 +2947,24 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         onChange={(e) => setLimitPro(parseInt(e.target.value) || 0)}
                         className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none transition-all font-semibold"
                       />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Esse limite determina o número máximo de registros pedagógicos que um usuário Pro pode criar por dia.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-100">
+                    <div className="max-w-md">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Dias de acesso grátis do plano teste Pro</label>
+                      <input 
+                        type="number" 
+                        value={trialDays}
+                        onChange={(e) => setTrialDays(parseInt(e.target.value) || 0)}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-rose-500 outline-none transition-all font-semibold"
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        Esses dias determinam o período gratuito oferecido aos novos usuários do plano Pro antes da cobrança.
+                      </p>
                     </div>
                   </div>
 
@@ -3342,6 +3558,136 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           )}
         </div>
       </main>
+
+      {/* Modal de Credenciais da Administradora */}
+      {showCredentialsModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-slate-100 animate-in zoom-in-95 duration-300 text-slate-800">
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-blue-700 to-indigo-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/20">
+                  <ShieldCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-lg leading-tight">Minhas Credenciais</h3>
+                  <p className="text-[10px] text-blue-100 font-medium">Acesso Administrador EduTec</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowCredentialsModal(false);
+                  setShowAdminPassword(false);
+                }}
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              >
+                <X size={20} className="text-white" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Utilize as informações abaixo para realizar o login ou altere-as e salve as novas credenciais de acesso administrador.
+              </p>
+
+              {/* Email Card */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">E-mail de Cadastro</label>
+                <div className="relative flex items-center">
+                  <input 
+                    type="email"
+                    value={newAdminEmail}
+                    onChange={(e) => setNewAdminEmail(e.target.value)}
+                    className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-805 focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                    placeholder="E-mail de Cadastro"
+                  />
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(newAdminEmail);
+                      setCopiedEmail(true);
+                      setTimeout(() => setCopiedEmail(false), 2000);
+                    }}
+                    className={`absolute right-2 p-2 rounded-lg transition-colors ${copiedEmail ? 'bg-green-50 text-green-600' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-600'}`}
+                    title="Copiar e-mail"
+                  >
+                    {copiedEmail ? <Check size={16} /> : <Copy size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Password Card */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block pl-1">Senha de Cadastro</label>
+                <div className="relative flex items-center">
+                  <input 
+                    type={showAdminPassword ? 'text' : 'password'}
+                    value={newAdminPassword}
+                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    className="w-full pl-4 pr-20 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-805 font-mono focus:outline-none focus:border-blue-500 focus:bg-white transition-all"
+                    placeholder="Senha de Cadastro"
+                  />
+                  <div className="absolute right-2 flex items-center gap-1">
+                    <button 
+                      onClick={() => setShowAdminPassword(!showAdminPassword)}
+                      className="p-2 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition-colors"
+                      title={showAdminPassword ? "Ocultar senha" : "Ver senha"}
+                    >
+                      {showAdminPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        navigator.clipboard.writeText(newAdminPassword);
+                        setCopiedPassword(true);
+                        setTimeout(() => setCopiedPassword(false), 2000);
+                      }}
+                      className={`p-2 rounded-lg transition-colors ${copiedPassword ? 'bg-green-50 text-green-600' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-600'}`}
+                      title="Copiar senha"
+                    >
+                      {copiedPassword ? <Check size={16} /> : <Copy size={16} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {saveCredsSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-xs font-bold text-center animate-bounce">
+                  Credenciais atualizadas com sucesso!
+                </div>
+              )}
+
+              {/* Informational Banner */}
+              <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-2xl flex gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-blue-800 leading-relaxed text-left">
+                  <span className="font-bold block mb-0.5">Dica de Segurança</span>
+                  Mantenha estas credenciais seguras. Elas permitem acesso total de leitura e alteração a todos os professores e dados escolares da plataforma.
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+              <button 
+                onClick={() => {
+                  setShowCredentialsModal(false);
+                  setShowAdminPassword(false);
+                }}
+                className="flex-1 py-3 bg-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-300 transition-colors"
+              >
+                Fechar
+              </button>
+              <button 
+                onClick={handleSaveAdminCredentials}
+                disabled={isSavingAdminCreds}
+                className="flex-1 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-md shadow-green-600/10"
+              >
+                {isSavingAdminCreds ? 'Salvando...' : 'Salvar Alterações'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

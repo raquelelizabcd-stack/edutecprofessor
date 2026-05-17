@@ -38,6 +38,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       alert("Acesso negado: apenas administradores podem acessar esta área.");
       return <Navigate to="/dashboard" replace />;
     }
+    if (userRole === 'admin') {
+      return <Navigate to="/admin" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 

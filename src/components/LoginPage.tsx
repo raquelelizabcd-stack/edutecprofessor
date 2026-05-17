@@ -65,9 +65,25 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
           setIsLoginMode(true);
         } else if (data.user) {
           const isProIntent = initialIntent === 'pro';
+          
+          let trialDaysConfig = 7;
+          const { data: settingsData } = await supabase
+            .from('users')
+            .select('nome')
+            .eq('email', 'system_settings@edutec.com')
+            .maybeSingle();
+          if (settingsData && settingsData.nome) {
+            try {
+              const parsed = JSON.parse(settingsData.nome);
+              if (parsed.trial_days !== undefined) {
+                trialDaysConfig = parsed.trial_days;
+              }
+            } catch (_) {}
+          }
+
           const trialExpiration = isProIntent ? new Date() : null;
           if (isProIntent && trialExpiration) {
-            trialExpiration.setDate(trialExpiration.getDate() + 7);
+            trialExpiration.setDate(trialExpiration.getDate() + trialDaysConfig);
           }
 
           const { error: upsertError } = await supabase

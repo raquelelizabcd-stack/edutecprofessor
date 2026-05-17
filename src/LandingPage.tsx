@@ -94,8 +94,23 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
       if (error && error.code !== 'PGRST116') throw error;
 
       if (!userRecord || (userRecord.status_pagamento !== 'aprovado' && userRecord.status_pagamento !== 'pendente')) {
+        let trialDaysConfig = 7;
+        const { data: settingsData } = await supabase
+          .from('users')
+          .select('nome')
+          .eq('email', 'system_settings@edutec.com')
+          .maybeSingle();
+        if (settingsData && settingsData.nome) {
+          try {
+            const parsed = JSON.parse(settingsData.nome);
+            if (parsed.trial_days !== undefined) {
+              trialDaysConfig = parsed.trial_days;
+            }
+          } catch (_) {}
+        }
+
         const trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 7);
+        trialEnd.setDate(trialEnd.getDate() + trialDaysConfig);
         await supabase.from('users').upsert({
           id: session.user.id,
           plano: 'pro',
