@@ -27,6 +27,7 @@ interface DashboardProps {
   userCreatedAt?: string | null;
   userDataExpiracao?: string | null;
   statusPagamento?: string | null;
+  userWhatsapp?: string;
   onLogout: () => void;
   onGoToPayment: () => void;
 }
@@ -73,6 +74,7 @@ export default function Dashboard({
   userCreatedAt, 
   userDataExpiracao, 
   statusPagamento,
+  userWhatsapp,
   onLogout, 
   onGoToPayment
 }: DashboardProps) {
@@ -203,6 +205,7 @@ export default function Dashboard({
     title: '',
     description: '',
     date: new Date().toISOString().split('T')[0],
+    moduleId: 'planejamento-semanal',
     alunoId: '',
     alunoNome: '',
     yearGrade: '',
@@ -245,12 +248,8 @@ export default function Dashboard({
   const fetchRecords = async () => {
     if (!userId) return;
     try {
-      // 1. Buscar Diários
-      const { data: diario } = await supabase.from('planejamento_diario').select('*').eq('professor_id', userId).order('data', { ascending: false });
-      // 2. Buscar Semanais
-      const { data: semanal } = await supabase.from('planejamento_semanal').select('*').eq('professor_id', userId).order('data_ref', { ascending: true });
-      // 3. Buscar Mensais
-      const { data: mensal } = await supabase.from('planejamento_mensal').select('*').eq('professor_id', userId).order('data_ref', { ascending: true });
+      // 1. Buscar Todos os Planejamentos
+      const { data: planejamentosData } = await supabase.from('planejamentos').select('*').eq('professor_id', userId).order('created_at', { ascending: false });
       // 4. Buscar Reflexões
       const { data: reflexoes } = await supabase.from('diario_reflexoes').select('*').eq('professor_id', userId).order('data', { ascending: false });
       // 5. Buscar Relatórios Individuais
@@ -259,63 +258,32 @@ export default function Dashboard({
       const { data: portf_digital } = await supabase.from('portfolio_digital').select('*').eq('professor_id', userId).order('data_ref', { ascending: false });
 
       const allRecords: PedagogicalRecord[] = [
-        ...(diario || []).map(r => ({
-          id: r.id,
-          moduleId: 'planejamento-diario',
-          title: r.titulo_registro || `Plano Diário - ${formatDateDisplay(r.data)}`,
-          date: r.data,
-          description: r.conteudo || '',
-          objectives: r.objetivos,
-          resources: r.recursos,
-          evaluation: r.avaliacao,
-          curricularComponent: r.componente,
-          alunoNome: r.aluno_nome || '',
-          professorName: r.professor_nome || professorNome,
-          bnccCodes: r.bncc_codes || [],
-          bnccCodeText: r.bncc_code_text || '',
-          period: r.periodo || '',
-          yearGrade: r.ano_serie || '',
-          createdAt: r.created_at
-        })),
-        ...(semanal || []).map(r => ({
-          id: r.id,
-          moduleId: 'planejamento-semanal',
-          title: r.titulo_registro || `Semana - ${formatDateDisplay(r.data_ref || r.created_at)}`,
-          date: r.data_ref || r.created_at?.split('T')[0],
-          description: r.observacoes_adicionais || '',
-          objectives: r.objetivo_aprendizagem || '',
-          content: r.atividade || '',
-          resources: r.recursos_didaticos || '',
-          evaluation: r.avaliacao_acompanhamento || '',
-          curricularComponent: r.componentes_curriculares || '',
-          alunoNome: r.aluno_nome || '',
-          professorName: r.professor_nome || professorNome,
-          period: r.periodo || '',
-          bnccCodes: r.bncc_codes || [],
-          bnccCodeText: r.bncc_code_text || '',
-          yearGrade: r.ano_serie || '',
-          weeklyData: r.grade_semanal_json || {},
-          createdAt: r.created_at
-        })),
-        ...(mensal || []).map(r => ({
-          id: r.id,
-          moduleId: 'planejamento-mensal',
-          title: r.titulo_registro || `Plano Mensal - ${r.mes}/${r.ano}`,
-          date: r.data_ref || r.created_at?.split('T')[0],
-          description: r.observacoes || '',
-          objectives: r.objetivos,
-          content: r.atividades || '',
-          resources: r.recursos,
-          evaluation: r.avaliacao,
-          curricularComponent: r.componente_curricular,
-          period: r.periodo || '',
-          alunoNome: r.aluno_nome || '',
-          professorName: r.professor_nome || professorNome,
-          bnccCodes: r.bncc_codes || [],
-          bnccCodeText: r.bncc_code_text || '',
-          yearGrade: r.ano_serie || '',
-          createdAt: r.created_at
-        })),
+        ...(planejamentosData || []).map(r => {
+          const modId = r.tipo_planejamento === 'Diário' ? 'planejamento-diario' : 
+                        r.tipo_planejamento === 'Semanal' ? 'planejamento-semanal' : 'planejamento-mensal';
+          return {
+            id: r.id,
+            moduleId: modId,
+            title: r.titulo_registro || `Planejamento ${r.tipo_planejamento}`,
+            date: r.data || r.created_at?.split('T')[0],
+            description: r.observacoes_professor || '',
+            objectives: r.objetivos_aprendizagem || '',
+            content: r.atividades_planejadas || '',
+            resources: r.recursos_didaticos || '',
+            evaluation: r.avaliacao_acompanhamento || '',
+            curricularComponent: r.componente_curricular || '',
+            alunoNome: r.aluno || '',
+            professorName: r.professor || professorNome,
+            period: r.periodo || '',
+            bnccCodes: r.bncc_codes || [],
+            bnccCodeText: r.bncc_code_text || '',
+            yearGrade: r.ano_serie || '',
+            weeklyData: r.grade_semanal_json || {},
+            mesPlanejamento: r.mes || '',
+            anoPlanejamento: r.ano || new Date().getFullYear().toString(),
+            createdAt: r.created_at
+          };
+        }),
         ...(relatorios || []).map(r => ({
           id: r.id,
           moduleId: r.tipo || 'relatorio-individual',
@@ -459,6 +427,7 @@ export default function Dashboard({
         title: '',
         description: '',
         date: new Date().toISOString().split('T')[0],
+        moduleId: 'planejamento-semanal',
         alunoId: '',
         alunoNome: '',
         yearGrade: '',
@@ -500,7 +469,7 @@ export default function Dashboard({
       const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())).getTime();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
       
-      const moduleRecords = records.filter(r => r.moduleId === activeTab);
+      const moduleRecords = activeTab === 'planejamentos' ? records.filter(r => ['planejamento-diario', 'planejamento-semanal', 'planejamento-mensal'].includes(r.moduleId)) : records.filter(r => r.moduleId === activeTab);
       const isFree = role === 'free';
       const isTrial = statusPagamento === 'trial' || statusPagamento === 'pendente' || statusPagamento === 'trialing';
       const isPaidPro = role === 'pro' && (statusPagamento === 'paid' || statusPagamento === 'aprovado' || statusPagamento === 'ativo' || statusPagamento === 'active');
@@ -579,6 +548,7 @@ export default function Dashboard({
         title: '',
         description: '',
         date: new Date().toISOString().split('T')[0],
+        moduleId: 'planejamento-semanal',
         alunoId: '',
         alunoNome: '',
         yearGrade: '',
@@ -649,50 +619,42 @@ export default function Dashboard({
         created_at: new Date().toISOString()
       };
 
-      if (activeTab === 'planejamento-diario') {
-        targetTable = 'planejamento_diario';
+      const targetModule = activeTab === 'planejamentos' ? formData.moduleId : activeTab;
+
+      if (targetModule === 'planejamento-diario' || targetModule === 'planejamento-semanal' || targetModule === 'planejamento-mensal') {
+        targetTable = 'planejamentos';
+        let tipoPlan = 'Diário';
+        if (targetModule === 'planejamento-semanal') tipoPlan = 'Semanal';
+        if (targetModule === 'planejamento-mensal') tipoPlan = 'Mensal';
+
         recordData = {
           ...recordData,
           titulo_registro: formData.title,
           data: formData.date,
-          aluno_nome: formData.alunoNome || '',
-          professor_nome: formData.professorName || professorNome,
-          bncc_code_text: formData.bnccCodeText || '',
-          bncc_codes: formData.bnccCodes || [],
-          componente: formData.curricularComponent,
-          periodo: formData.period,
-          ano_serie: formData.yearGrade,
-          objetivos: formData.objectives,
-          conteudo: formData.content,
-          recursos: formData.resources,
-          avaliacao: formData.evaluation
-        };
-      } else if (activeTab === 'planejamento-semanal') {
-        targetTable = 'planejamento_semanal';
-        recordData = {
-          id: recordIdToSave,
-          professor_id: userId,
-          professor_nome: formData.professorName || professorNome,
-          data_ref: formData.date,
-          titulo_registro: formData.title,
-          aluno_nome: formData.alunoNome || '',
-          componentes_curriculares: formData.curricularComponent,
-          periodo: formData.period,
-          ano_serie: formData.yearGrade,
-          recursos_didaticos: formData.resources,
-          avaliacao_acompanhamento: formData.evaluation,
-          observacoes_adicionais: formData.description,
+          professor: formData.professorName || professorNome,
+          aluno: formData.alunoNome || '',
+          componente_curricular: formData.curricularComponent || '',
+          periodo: formData.period || '',
+          ano_serie: formData.yearGrade || '',
+          tom_texto: formData.tone || 'Formal',
+          observacoes_professor: formData.description || '',
+          tipo_planejamento: tipoPlan,
+          objetivos_aprendizagem: formData.objectives || '',
+          atividades_planejadas: formData.content || formData.atividades || '',
+          recursos_didaticos: formData.resources || '',
+          avaliacao_acompanhamento: formData.evaluation || '',
           bncc_codes: formData.bnccCodes || [],
           bncc_code_text: formData.bnccCodeText || '',
-          grade_semanal_json: formData.weeklyData || {},
-          objetivo_aprendizagem: formData.objectives,
-          atividade: formData.atividades
+          mes: formData.mesPlanejamento || '',
+          ano: parseInt(formData.anoPlanejamento || new Date().getFullYear().toString()),
+          grade_semanal_json: formData.weeklyData || {}
         };
       } else if (activeTab === 'relatorio-individual') {
         targetTable = 'relatorios';
         let bundledContent = formData.description || formData.content;
         recordData = {
-          ...recordData,
+          id: recordIdToSave,
+          professor_id: userId,
           tipo: activeTab,
           titulo_registro: formData.title,
           data_ref: formData.date || new Date().toISOString().split('T')[0],
@@ -702,29 +664,8 @@ export default function Dashboard({
           componente_curricular: formData.curricularComponent || '',
           periodo: formData.period || '',
           tom_texto: formData.tone || 'Formal',
-          ano_serie: formData.yearGrade || ''
-        };
-      } else if (activeTab === 'planejamento-mensal') {
-        targetTable = 'planejamento_mensal';
-        recordData = {
-          id: recordIdToSave,
-          professor_id: userId,
-          professor_nome: formData.professorName || professorNome,
-          mes: formData.mesPlanejamento || '',
-          ano: parseInt(formData.anoPlanejamento || new Date().getFullYear().toString()),
-          data_ref: formData.date,
-          titulo_registro: formData.title,
-          aluno_nome: formData.alunoNome || '',
-          bncc_code_text: formData.bnccCodeText || '',
-          bncc_codes: formData.bnccCodes || [],
-          componente_curricular: formData.curricularComponent || '',
-          periodo: formData.period || '',
           ano_serie: formData.yearGrade || '',
-          objetivos: formData.objectives || '',
-          atividades: formData.atividades || '',
-          recursos: formData.resources || '',
-          avaliacao: formData.evaluation || '',
-          observacoes: formData.description || '',
+          status: 'Rascunho',
           created_at: new Date().toISOString()
         };
       } else if (activeTab === 'reflexoes') {
@@ -799,9 +740,8 @@ export default function Dashboard({
             .map(b => b.id);
 
           if (selectedBnccIds.length > 0) {
-            let docType: 'planejamento_diario' | 'planejamento_mensal' | 'relatorio' | 'avaliacao' = 'relatorio';
-            if (targetTable === 'planejamento_diario') docType = 'planejamento_diario';
-            else if (targetTable === 'planejamento_mensal') docType = 'planejamento_mensal';
+            let docType: 'planejamento_diario' | 'planejamento_mensal' | 'relatorio' | 'avaliacao' | 'planejamentos' = 'relatorio';
+            if (targetTable === 'planejamentos') docType = 'planejamentos' as any;
             else if (targetTable === 'avaliacoes_alunos') docType = 'avaliacao';
             
             await supabase.from('documentos_bncc').delete().eq('documento_id', recordIdToSave);
@@ -887,16 +827,18 @@ export default function Dashboard({
     try {
       // Mapeamento de abas do Dashboard para tabelas do Supabase
       const tableMapping: Record<string, string> = {
-        'planejamento-diario': 'planejamento_diario',
-        'planejamento-semanal': 'planejamento_semanal',
-        'planejamento-mensal': 'planejamento_mensal',
+        'planejamento-diario': 'planejamentos',
+        'planejamento-semanal': 'planejamentos',
+        'planejamento-mensal': 'planejamentos',
+        'planejamentos': 'planejamentos',
         'relatorio-individual': 'relatorios',
         'parecer-pcd': 'relatorios',
         'reflexoes': 'diario_reflexoes',
         'portfolio': 'portfolio_digital'
       };
 
-      const tableName = tableMapping[activeTab] || activeTab.replace(/-/g, '_');
+      const targetModuleStr = activeTab === 'planejamentos' && recordToExport ? recordToExport.moduleId : activeTab;
+      const tableName = tableMapping[targetModuleStr] || targetModuleStr.replace(/-/g, '_');
 
       // Chamada para a Edge Function
       const { data, error } = await supabase.functions.invoke('generate-module-pdf', {
@@ -1090,7 +1032,7 @@ export default function Dashboard({
     doc.save(`Reflexao_${new Date().getTime()}.pdf`);
   };
 
-  const currentModuleRecords = records.filter(r => r.moduleId === activeTab);
+  const currentModuleRecords = activeTab === 'planejamentos' ? records.filter(r => ['planejamento-diario', 'planejamento-semanal', 'planejamento-mensal'].includes(r.moduleId)) : records.filter(r => r.moduleId === activeTab);
 
   const headerSubtitle = isFormOpen
     ? (editingRecord ? 'Editar Registro' : 'Novo Registro')
@@ -1200,12 +1142,12 @@ export default function Dashboard({
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-6">
+            <form onSubmit={handleSave} className="space-y-[12px] md:space-y-6 pb-24 md:pb-0">
               <>
                 {activeTab !== 'reflexoes' && (
-                  <div className="bg-white border border-slate-200 shadow-sm p-8 rounded-3xl space-y-8 relative overflow-hidden group">
+                  <div className="bg-white border border-slate-200 shadow-[0_2px_8px_rgba(0,0,0,0.1)] md:shadow-sm p-4 md:p-8 rounded-[10px] md:rounded-3xl space-y-[12px] md:space-y-8 relative overflow-hidden group w-[95%] md:w-full mx-auto">
                     <div className="absolute top-0 left-0 w-2 h-full bg-[#00A859] opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                    <div className="flex flex-col md:flex-row items-center gap-3 border-b border-slate-100 pb-4 text-center md:text-left">
                       <div className="bg-[#00A859]/10 p-2.5 rounded-2xl text-[#00A859]">
                         <Icons.FileText size={22} />
                       </div>
@@ -1215,7 +1157,27 @@ export default function Dashboard({
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[12px] md:gap-8">
+                      {activeTab === 'planejamentos' && (
+                        <div className="space-y-2.5">
+                          <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Tipo de Planejamento *</label>
+                          <div className="relative">
+                            <select
+                              required
+                              value={formData.moduleId || 'planejamento-semanal'}
+                              onChange={(e) => setFormData({ ...formData, moduleId: e.target.value })}
+                              className="w-full px-[12px] py-[10px] md:px-5 md:py-3.5 rounded-[10px] md:rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-semibold text-slate-700 appearance-none cursor-pointer"
+                            >
+                              <option value="planejamento-diario">Diário</option>
+                              <option value="planejamento-semanal">Semanal</option>
+                              <option value="planejamento-mensal">Mensal</option>
+                            </select>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                              <Icons.ChevronDown size={18} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       <div className="space-y-2.5">
                         <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Título do Registro *</label>
                         <input
@@ -1224,7 +1186,7 @@ export default function Dashboard({
                           value={formData.title}
                           onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                           placeholder="Ex: Registro do Aluno - João Silva"
-                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                          className="w-full px-[12px] py-[10px] md:px-5 md:py-3.5 rounded-[10px] md:rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
                         />
                       </div>
                       <div className="space-y-2.5">
@@ -1234,7 +1196,7 @@ export default function Dashboard({
                           required
                           value={formData.date}
                           onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-medium text-slate-600"
+                          className="w-full px-[12px] py-[10px] md:px-5 md:py-3.5 rounded-[10px] md:rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-medium text-slate-600"
                         />
                       </div>
                       <div className="space-y-2.5">
@@ -1245,25 +1207,25 @@ export default function Dashboard({
                           value={formData.professorName}
                           onChange={(e) => setFormData({ ...formData, professorName: e.target.value })}
                           placeholder="Nome completo do docente"
-                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                          className="w-full px-[12px] py-[10px] md:px-5 md:py-3.5 rounded-[10px] md:rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
                         />
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-3 gap-8 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-[12px] md:gap-8 pt-2">
                       {activeTab !== 'relatorio-individual' && activeTab !== 'planejamento-mensal' && (
                         <div className="space-y-2.5">
                           <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Aluno (Opcional)</label>
-                          <div className="relative flex items-center">
+                          <div className="relative flex flex-col md:flex-row md:items-center">
                             <input
                               type="text"
                               value={formData.alunoNome}
                               onChange={(e) => setFormData({ ...formData, alunoNome: e.target.value, alunoId: '' })}
-                              placeholder="Digite o nome ou selecione ao lado"
-                              className="w-full px-5 py-3.5 rounded-l-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                              placeholder="Digite o nome ou selecione"
+                              className="w-full px-[12px] py-[10px] md:px-5 md:py-3.5 rounded-t-[10px] md:rounded-t-none md:rounded-l-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
                             />
                             <select
-                              className="w-[120px] px-2 py-3.5 rounded-r-2xl border-y border-r border-slate-200 bg-slate-100/50 focus:border-[#00A859] outline-none transition-all font-bold text-[10px] uppercase tracking-wider text-slate-500 cursor-pointer appearance-none text-center"
+                              className="w-full md:w-[120px] px-2 py-[10px] md:py-3.5 rounded-b-[10px] md:rounded-b-none md:rounded-r-2xl border-x border-b md:border-y md:border-r md:border-l-0 border-slate-200 bg-slate-100/50 focus:border-[#00A859] outline-none transition-all font-bold text-[10px] uppercase tracking-wider text-slate-500 cursor-pointer appearance-none text-center"
                               onChange={(e) => {
                                 const selected = supabaseStudents.find(s => s.id === e.target.value);
                                 if (selected) {
@@ -1277,20 +1239,20 @@ export default function Dashboard({
                                 <option key={s.id} value={s.id}>{s.nome}</option>
                               ))}
                             </select>
-                            <div className="absolute right-3 pointer-events-none text-slate-300">
+                            <div className="absolute right-3 bottom-[12px] md:top-1/2 md:-translate-y-1/2 pointer-events-none text-slate-300">
                               <Icons.ChevronDown size={14} />
                             </div>
                           </div>
                         </div>
                       )}
-                      <div className={cn("space-y-2.5", (activeTab === 'relatorio-individual' || activeTab === 'planejamento-mensal') && "md:col-span-2")}>
+                      <div className={cn("space-y-2.5", (activeTab === 'relatorio-individual' || activeTab === 'planejamento-mensal' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-mensal')) && "md:col-span-2")}>
                         <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest pl-1">Componente Curricular</label>
                         <input
                           type="text"
                           value={formData.curricularComponent}
                           onChange={(e) => setFormData({ ...formData, curricularComponent: e.target.value })}
                           placeholder="Ex: Língua Portuguesa"
-                          className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
+                          className="w-full px-[12px] py-[10px] md:px-5 md:py-3.5 rounded-[10px] md:rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all placeholder:text-slate-300 font-medium"
                         />
                       </div>
                       <div className="space-y-2.5">
@@ -1299,14 +1261,15 @@ export default function Dashboard({
                           <select
                             value={formData.period}
                             onChange={(e) => setFormData({ ...formData, period: e.target.value })}
-                            className="w-full px-5 py-3.5 rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-semibold text-slate-700 appearance-none cursor-pointer"
+                            className="w-full px-[12px] py-[10px] md:px-5 md:py-3.5 rounded-[10px] md:rounded-2xl border border-slate-200 bg-slate-50/30 focus:bg-white focus:border-[#00A859] focus:ring-4 focus:ring-[#00A859]/5 outline-none transition-all font-semibold text-slate-700 appearance-none cursor-pointer"
                           >
                             <option value="">Selecione o período</option>
-                            {activeTab === 'planejamento-diario' ? (
+                            {(activeTab === 'planejamento-diario' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-diario')) ? (
                               <>
                                 <option value="Manhã">Manhã</option>
                                 <option value="Tarde">Tarde</option>
                                 <option value="Noite">Noite</option>
+                                <option value="Integral">Integral</option>
                               </>
                             ) : (
                               <>
@@ -1346,7 +1309,7 @@ export default function Dashboard({
                   />
                 ) : activeTab === 'indicadores' ? (
                   <PedagogicalIndicators records={records} />
-                ) : activeTab === 'planejamento-mensal' ? (
+                ) : (activeTab === 'planejamento-mensal' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-mensal')) ? (
                   <div className="space-y-6">
                     <div className="bg-white border border-slate-200 shadow-sm p-8 rounded-3xl space-y-6">
                       <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
@@ -1558,7 +1521,7 @@ export default function Dashboard({
                       </div>
                     </div>
                   </div>
-                ) : activeTab === 'planejamento-diario' ? (
+                ) : (activeTab === 'planejamento-diario' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-diario')) ? (
                   /* Planejamento Diário Specific Fields */
                   <div className="space-y-6">
                     <div className="bg-black/5 p-6 rounded-2xl space-y-6">
@@ -1746,7 +1709,7 @@ export default function Dashboard({
                       </div>
                     </div>
                   </div>
-                ) : activeTab === 'planejamento-semanal' ? (
+                ) : (activeTab === 'planejamento-semanal' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-semanal')) ? (
                   /* Planejamento Semanal - Vertical Wizard Grid */
                   <div className="space-y-6">
 
@@ -2074,6 +2037,7 @@ export default function Dashboard({
                                       <option value="Manhã">Manhã</option>
                                       <option value="Tarde">Tarde</option>
                                       <option value="Noite">Noite</option>
+                                      <option value="Integral">Integral</option>
                                     </select>
                                   </td>
                                   <td className="p-5 align-top">
@@ -2646,7 +2610,7 @@ export default function Dashboard({
                       !formData.title || 
                       !formData.date || 
                       !formData.professorName ||
-                      (activeTab === 'planejamento-diario' && (!formData.objectives || !formData.content || !formData.resources || !formData.evaluation))
+                      ((activeTab === 'planejamento-diario' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-diario')) && (!formData.objectives || !formData.content || !formData.resources || !formData.evaluation))
                     )
                   }
                   className="flex-1 py-4 bg-[#00A859] text-white rounded-full font-bold hover:bg-[#008F4C] transition-all shadow-lg shadow-[#00A859]/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:grayscale"
@@ -2696,21 +2660,21 @@ export default function Dashboard({
         ) : currentModuleRecords.length > 0 ? (
           /* List View */
           <div className="space-y-6">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-2xl font-bold">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-0 mb-8">
+              <h3 className="text-2xl font-bold text-center md:text-left w-full md:w-auto">
                 {`Registros em ${activeItem?.label}`}
               </h3>
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col md:flex-row items-center gap-[10px] md:gap-3 w-full md:w-auto">
                 <button
                   onClick={() => handleExport()}
-                  className="px-6 py-2.5 bg-black text-white rounded-full font-bold hover:bg-black/80 transition-all flex items-center gap-2 shadow-lg"
+                  className="w-full md:w-auto p-[12px] md:px-6 md:py-2.5 text-[14px] md:text-base bg-black text-white rounded-xl md:rounded-full font-bold hover:bg-black/80 transition-all flex items-center justify-center gap-2 shadow-[0_2px_6px_rgba(0,0,0,0.15)]"
                 >
                   <Icons.FileDown size={18} />
                   Baixar PDF (Todos)
                 </button>
                 <button
                   onClick={() => handleOpenForm()}
-                  className="px-6 py-2.5 bg-[#00A859] text-white rounded-full font-bold hover:bg-[#008F4C] transition-all flex items-center gap-2 shadow-lg shadow-[#00A859]/20"
+                  className="w-full md:w-auto p-[12px] md:px-6 md:py-2.5 text-[14px] md:text-base bg-[#00b37e] text-white rounded-xl md:rounded-full font-bold hover:bg-[#008F4C] transition-all flex items-center justify-center gap-2 shadow-[0_2px_6px_rgba(0,0,0,0.15)]"
                 >
                   <Icons.Plus size={18} />
                   Novo Registro

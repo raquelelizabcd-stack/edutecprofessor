@@ -260,9 +260,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     // Ouvinte Planejamentos
     const planningChannel = supabase
       .channel('planning_realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'planejamento_diario' }, () => playEventSound('planning'))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'planejamento_semanal' }, () => playEventSound('planning'))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'planejamento_mensal' }, () => playEventSound('planning'))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'planejamentos' }, () => playEventSound('planning'))
       .subscribe();
 
     return () => {
@@ -326,22 +324,18 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       // Estatísticas Pedagógicas Globais
       const [
         { count: alunosCount },
-        { count: diárioCount },
-        { count: semanalCount },
-        { count: mensalCount },
+        { count: planejamentosCount },
         { count: presencaCount }
       ] = await Promise.all([
         supabase.from('alunos').select('*', { count: 'exact', head: true }),
-        supabase.from('planejamento_diario').select('*', { count: 'exact', head: true }),
-        supabase.from('planejamento_semanal').select('*', { count: 'exact', head: true }),
-        supabase.from('planejamento_mensal').select('*', { count: 'exact', head: true }),
+        supabase.from('planejamentos').select('*', { count: 'exact', head: true }),
         supabase.from('presenca_alunos').select('*', { count: 'exact', head: true })
       ]);
 
       setStats(prev => ({
         ...prev,
         totalAlunos: alunosCount || 0,
-        totalPlanejamentos: (diárioCount || 0) + (semanalCount || 0) + (mensalCount || 0),
+        totalPlanejamentos: planejamentosCount || 0,
         totalPresencas: presencaCount || 0
       }));
 
@@ -355,7 +349,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       // Buscar Planejamentos Recentes (Global)
       const { data: planData } = await supabase
-        .from('planejamento_diario')
+        .from('planejamentos')
         .select('*, users(nome)')
         .order('created_at', { ascending: false })
         .limit(10);
@@ -951,8 +945,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setSelectedUser(user);
     // Buscar logs pedagógicos diversos
     const [{ data: plans }, { data: presencas }] = await Promise.all([
-      supabase.from('planejamento_diario').select('*').eq('user_id', user.id).limit(5),
-      supabase.from('presenca_alunos').select('*').eq('user_id', user.id).limit(5)
+      supabase.from('planejamentos').select('*').eq('professor_id', user.id).limit(5),
+      supabase.from('presenca_alunos').select('*').eq('professor_id', user.id).limit(5)
     ]);
     const mergedLogs = [
       ...(plans || []).map(p => ({ ...p, type: 'Planejamento' })),
@@ -974,18 +968,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
     try {
       const [
-        { data: diários },
-        { data: semanais },
-        { data: mensais },
+        { data: planejamentos },
         { data: relatorios },
         { data: reflexoes },
         { data: portfolio },
         { data: alunos },
         { data: presencas }
       ] = await Promise.all([
-        supabase.from('planejamento_diario').select('*').eq('professor_id', user.id).order('data', { ascending: false }),
-        supabase.from('planejamento_semanal').select('*').eq('professor_id', user.id).order('data_ref', { ascending: false }),
-        supabase.from('planejamento_mensal').select('*').eq('professor_id', user.id).order('data_ref', { ascending: false }),
+        supabase.from('planejamentos').select('*').eq('professor_id', user.id).order('created_at', { ascending: false }),
         supabase.from('relatorios').select('*').eq('professor_id', user.id).order('created_at', { ascending: false }),
         supabase.from('diario_reflexoes').select('*').eq('professor_id', user.id).order('data', { ascending: false }),
         supabase.from('portfolio_digital').select('*').eq('professor_id', user.id).order('data_ref', { ascending: false }),
@@ -993,10 +983,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         supabase.from('presenca_alunos').select('*').eq('professor_id', user.id).order('data', { ascending: false })
       ]);
 
+      const planos = planejamentos || [];
+
       setUserDetailedData({
-        planejamentoDiario: diários || [],
-        planejamentoSemanal: semanais || [],
-        planejamentoMensal: mensais || [],
+        planejamentoDiario: planos.filter(p => p.tipo_planejamento === 'Diário'),
+        planejamentoSemanal: planos.filter(p => p.tipo_planejamento === 'Semanal'),
+        planejamentoMensal: planos.filter(p => p.tipo_planejamento === 'Mensal'),
         relatorios: relatorios || [],
         diarioReflexoes: reflexoes || [],
         portfolioDigital: portfolio || [],

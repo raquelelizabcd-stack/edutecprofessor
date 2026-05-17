@@ -49,6 +49,8 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
         if (!userError && userData) {
           // O Dashboard informará o plano no Header
         }
+        
+        onSuccess();
       } else {
         // Sign Up
         const { data, error: signUpError } = await supabase.auth.signUp({

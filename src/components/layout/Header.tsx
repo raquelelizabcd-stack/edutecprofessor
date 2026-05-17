@@ -28,10 +28,15 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isCreatingSession, setIsCreatingSession] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
 
     // Proteção: Nome do professor a partir do email ou padrão
     const professorDisplayName = userEmail?.split('@')[0] || 'Professor';
     const professorInitials = professorDisplayName.slice(0, 2).toUpperCase() || 'P';
+
+    // Estados do formulário de edição de perfil
+    const [editName, setEditName] = useState(professorDisplayName);
+    const [editWhatsapp, setEditWhatsapp] = useState(userWhatsapp || '');
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -55,7 +60,6 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
         }
     }, [daysLeft, role, onGoToPayment]);
 
-    // Close dropdown on click outside
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -65,6 +69,34 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
+
+    const handleSaveProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSavingProfile(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Usuário não logado');
+
+            const updates = {
+                nome: editName,
+                telefone_whatsapp: editWhatsapp,
+                // Nota: Atualização de e-mail e senha exigiria uso de supabase.auth.updateUser()
+                // por segurança, estamos atualizando apenas os dados públicos na tabela users.
+            };
+
+            const { error } = await supabase.from('users').update(updates).eq('id', user.id);
+            if (error) throw error;
+
+            alert('Dados salvos com sucesso!');
+            setIsEditProfileOpen(false);
+            window.location.reload(); // Recarrega para atualizar o layout
+        } catch (err: any) {
+            console.error('Erro ao salvar perfil:', err);
+            alert('Não foi possível salvar os dados. Verifique a configuração do banco.');
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
 
     const handleCreateStripeSession = async () => {
         setIsCreatingSession(true);
@@ -334,31 +366,47 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                 </div>
             </div>
 
-            {/* Modals */}
             <Modal
                 isOpen={isEditProfileOpen}
                 onClose={() => setIsEditProfileOpen(false)}
                 title="Editar Dados Pessoais"
             >
-                <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); alert('Dados salvos com sucesso!'); setIsEditProfileOpen(false); }}>
+                <form className="space-y-4" onSubmit={handleSaveProfile}>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nome Completo</label>
-                        <input type="text" defaultValue="Raquel Duarte" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                        <input 
+                            type="text" 
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" 
+                        />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">E-mail</label>
-                        <input type="email" defaultValue={userEmail || "contato@raquelduarte.com"} className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">E-mail (Apenas Leitura)</label>
+                        <input 
+                            type="email" 
+                            value={userEmail || ""} 
+                            readOnly
+                            className="w-full px-4 py-3 rounded-xl border border-black/5 bg-black/5 outline-none transition-all cursor-not-allowed opacity-70" 
+                        />
+                        <p className="text-[10px] text-black/40 mt-1">O e-mail é vinculado à sua conta de acesso e não pode ser alterado aqui.</p>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Telefone de Contato</label>
-                        <input type="text" defaultValue={userWhatsapp || ""} placeholder="Ex: (21) 99999-9999" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Telefone de Contato (WhatsApp)</label>
+                        <input 
+                            type="text" 
+                            value={editWhatsapp}
+                            onChange={(e) => setEditWhatsapp(e.target.value)}
+                            placeholder="Ex: (21) 99999-9999" 
+                            className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" 
+                        />
                     </div>
-                    <div className="space-y-2">
-                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Nova Senha</label>
-                        <input type="password" defaultValue={userPassword || ""} placeholder="••••••••" className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all" />
-                    </div>
-                    <button type="submit" className="w-full py-4 bg-[#00A859] text-white rounded-xl font-bold mt-4 hover:bg-[#008F4C] transition-all shadow-lg shadow-[#00A859]/20">
-                        Salvar Alterações
+                    <button 
+                        type="submit" 
+                        disabled={isSavingProfile}
+                        className="w-full py-4 bg-[#00A859] text-white rounded-xl font-bold mt-4 hover:bg-[#008F4C] transition-all shadow-lg shadow-[#00A859]/20 disabled:opacity-50"
+                    >
+                        {isSavingProfile ? 'Salvando...' : 'Salvar Alterações'}
                     </button>
                 </form>
             </Modal>

@@ -23,6 +23,7 @@ export default function App() {
   const [userCreatedAt, setUserCreatedAt] = useState<string | null>(null);
   const [userDataExpiracao, setUserDataExpiracao] = useState<string | null>(null);
   const [userStatusPagamento, setUserStatusPagamento] = useState<string | null>(null);
+  const [userWhatsapp, setUserWhatsapp] = useState<string | undefined>(undefined);
   const [userIntent, setUserIntent] = useState<'free' | 'pro'>(() => {
     try {
       const saved = localStorage.getItem('edutec_user_intent');
@@ -38,7 +39,7 @@ export default function App() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('plano, role, status_pagamento, created_at, data_expiracao, aceitou_privacidade, data_aceite, is_blocked')
+        .select('plano, role, status_pagamento, created_at, data_expiracao, aceitou_privacidade, data_aceite, is_blocked, telefone_whatsapp')
         .eq('id', userId)
         .maybeSingle();
 
@@ -75,6 +76,7 @@ export default function App() {
         setUserCreatedAt(data.created_at);
         setUserDataExpiracao(data.data_expiracao);
         setUserStatusPagamento(data.status_pagamento);
+        setUserWhatsapp(data.telefone_whatsapp);
         
         const hasAccepted = data.aceitou_privacidade === true && data.data_aceite !== null;
         setAceitouPrivacidade(hasAccepted);
@@ -229,7 +231,7 @@ export default function App() {
 
       <Route path="/login" element={
         <LoginPage 
-          onSuccess={() => {}} // Handled by onAuthStateChange
+          onSuccess={() => navigate('/dashboard')} 
           onBack={() => navigate('/')}
           initialIntent={userIntent} 
         />
@@ -262,6 +264,7 @@ export default function App() {
             userCreatedAt={userCreatedAt}
             userDataExpiracao={userDataExpiracao}
             statusPagamento={userStatusPagamento}
+            userWhatsapp={userWhatsapp}
           />
         </ProtectedRoute>
       } />

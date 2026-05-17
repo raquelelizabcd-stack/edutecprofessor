@@ -108,10 +108,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard-evolucao', label: 'Dashboard de Evolução', icon: 'LayoutDashboard', category: '', roles: ['diretor', 'professor', 'pro', 'teste_pro'] },
 
   // Registros Pedagógicos
-  { id: 'planejamento-semanal', label: 'Planejamento Semanal', icon: 'Calendar', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro'] },
-  { id: 'planejamento-mensal', label: 'Planejamento Mensal', icon: 'CalendarDays', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro'] },
-
-  { id: 'planejamento-diario', label: 'Planejamento Diário', icon: 'FileEdit', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro'] },
+  { id: 'planejamentos', label: 'Planejamento Pedagógico', icon: 'Calendar', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro'] },
 
   // Relatórios
   { id: 'relatorio-individual', label: 'Relatório Individual', icon: 'FileText', category: 'Relatórios', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro'] },

@@ -70,17 +70,17 @@ export default function EvolutionDashboard({ onNavigate, records, userId, profes
     const fetchStats = async () => {
       if (!userId) return;
       try {
-        const [semanalRes, diarioRes, mensalRes, relRes, reflexRes] = await Promise.all([
-          supabase.from('planejamento_semanal').select('id', { count: 'exact', head: true }).eq('professor_id', userId),
-          supabase.from('planejamento_diario').select('id', { count: 'exact', head: true }).eq('professor_id', userId),
-          supabase.from('planejamento_mensal').select('id', { count: 'exact', head: true }).eq('professor_id', userId),
+        const [planejamentosRes, relRes, reflexRes] = await Promise.all([
+          supabase.from('planejamentos').select('tipo_planejamento').eq('professor_id', userId),
           supabase.from('relatorios').select('id', { count: 'exact', head: true }),
           supabase.from('diario_reflexoes').select('id', { count: 'exact', head: true }).eq('professor_id', userId),
         ]);
+        
+        const planos = planejamentosRes.data || [];
         setDbStats({
-          planejamentoSemanal: semanalRes.count || 0,
-          planejamentoDiario: diarioRes.count || 0,
-          planejamentoMensal: mensalRes.count || 0,
+          planejamentoSemanal: planos.filter(p => p.tipo_planejamento === 'Semanal').length,
+          planejamentoDiario: planos.filter(p => p.tipo_planejamento === 'Diário').length,
+          planejamentoMensal: planos.filter(p => p.tipo_planejamento === 'Mensal').length,
           relatorios: relRes.count || 0,
           reflexoes: reflexRes.count || 0,
         });
