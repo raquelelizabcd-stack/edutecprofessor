@@ -169,12 +169,14 @@ export default function Dashboard({
       try {
         const { data } = await supabase
           .from('users')
-          .select('nome, nome_robo, whatsapp')
+          .select('nome, nome_robo, whatsapp, telefone_whatsapp')
           .eq('id', userId)
           .single();
         if (data?.nome) setProfessorNome(data.nome);
         if (data?.nome_robo) setRobotName(data.nome_robo);
-        if (data?.whatsapp) setProfessorWhatsapp(data.whatsapp);
+        
+        const phone = data?.telefone_whatsapp || data?.whatsapp || '';
+        setProfessorWhatsapp(phone);
       } catch (err) {
         console.error('Erro ao buscar nome do professor:', err);
       }
@@ -367,7 +369,17 @@ export default function Dashboard({
 
   const filteredNav = NAV_ITEMS.filter(item => item.roles.includes(role as any));
   const categories = Array.from(new Set(filteredNav.map(item => item.category)));
-  const activeItem = NAV_ITEMS.find(item => item.id === activeTab);
+  const activeItem = NAV_ITEMS.find(item => item.id === activeTab) || {
+    id: activeTab,
+    label: activeTab === 'planejamento-diario' ? 'Planejamento Diário' :
+           activeTab === 'planejamento-semanal' ? 'Planejamento Semanal' :
+           activeTab === 'planejamento-mensal' ? 'Planejamento Mensal' :
+           activeTab === 'relatorios-turma' ? 'Relatório de Turma' :
+           activeTab === 'parecer-pcd' ? 'Parecer PCD' : 'Registro Pedagógico',
+    icon: 'FileText',
+    category: 'Registros Pedagógicos',
+    roles: []
+  };
 
   const renderIcon = (iconName: string, className?: string) => {
     const IconComponent = (Icons as any)[iconName];
@@ -584,25 +596,16 @@ export default function Dashboard({
     }
 
     // 2. Module specific validation
-    if (activeTab === 'planejamento-diario') {
-      if (!formData.objectives || !formData.content || !formData.resources || !formData.evaluation) {
-        alert("Por favor, preencha os campos obrigatórios do planejamento (Objetivos, Conteúdo, Recursos e Avaliação).");
-        return;
-      }
-    } else if (activeTab === 'planejamento-mensal') {
+    const targetModuleValidation = activeTab === 'planejamentos' ? formData.moduleId : activeTab;
+
+    if (targetModuleValidation === 'planejamento-mensal') {
       if (!formData.mesPlanejamento || !formData.anoPlanejamento) {
         alert("Por favor, preencha o Mês e o Ano do planejamento.");
         return;
       }
-    } else if (activeTab === 'planejamento-semanal') {
-      // Todos os campos são opcionais — professor pode salvar com qualquer combinação
-    } else if (activeTab === 'reflexoes') {
-      // Reflexões: campos agora opcionais por solicitação do usuário
-    } else if (activeTab === 'portfolio') {
-      // Portfólio: descrição opcional por solicitação do usuário
-    } else {
-      if (!formData.description) {
-        alert("Por favor, preencha a descrição do registro.");
+    } else if (targetModuleValidation === 'relatorio-individual') {
+      if (!formData.description && !formData.content) {
+        alert("Por favor, preencha o conteúdo do registro.");
         return;
       }
     }
@@ -665,7 +668,6 @@ export default function Dashboard({
           periodo: formData.period || '',
           tom_texto: formData.tone || 'Formal',
           ano_serie: formData.yearGrade || '',
-          status: 'Rascunho',
           created_at: new Date().toISOString()
         };
       } else if (activeTab === 'reflexoes') {
@@ -913,80 +915,145 @@ export default function Dashboard({
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(26);
     doc.setFont("helvetica", "bold");
-    doc.text("Currículo Pedagógico Consolidado", 14, 25);
+    doc.text("Portfólio Pedagógico Consolidado", 14, 25);
     doc.setFontSize(14);
     doc.setFont("helvetica", "normal");
-    doc.text(`EduTecPro — Professor: ${professorNome}`, 14, 38);
+    doc.text(`EduTecPro — Professor: ${formData.professorName || professorNome || 'Docente'}`, 14, 38);
     doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 45);
 
     let yPos = 65;
 
-    // Resumo Estatístico
-    const total = records.length;
+    // Seção 1: Informações do Registro de Portfólio
+    doc.setTextColor(0, 168, 89);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Dados de Identificação do Portfólio", 14, yPos);
+    yPos += 8;
+
+    const portfolioFields = [
+      { l: "Título do Registro", v: formData.title || "Portfólio" },
+      { l: "Data do Portfólio", v: formData.date ? new Date(formData.date).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR') },
+      { l: "Professor Responsável", v: formData.professorName || professorNome || "Docente" },
+      { l: "Aluno Vinculado", v: formData.alunoNome || "Nenhum aluno específico" },
+      { l: "Componente Curricular", v: formData.curricularComponent || "Não especificado" },
+      { l: "Período Pedagógico", v: formData.period || "Não especificado" },
+      { l: "Presença no Registro", v: formData.presenca || "Não registrada" },
+      { l: "Tom do Relatório", v: formData.tone || "Formal" }
+    ];
+
+    portfolioFields.forEach(field => {
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${field.l}:`, 14, yPos);
+      doc.setFont("helvetica", "normal");
+      doc.text(`${field.v}`, 65, yPos);
+      yPos += 6.5;
+    });
+
+    if (formData.description) {
+      yPos += 4;
+      doc.setTextColor(80, 80, 80);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Observações do Professor:", 14, yPos);
+      yPos += 5;
+
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(60, 60, 60);
+      const splitDesc = doc.splitTextToSize(formData.description, pageWidth - 28);
+      const boxHeight = (splitDesc.length * 5) + 6;
+      doc.setFillColor(245, 247, 245);
+      doc.rect(14, yPos - 3, pageWidth - 28, boxHeight, 'F');
+      doc.text(splitDesc, 16, yPos + 2);
+      yPos += boxHeight + 10;
+    } else {
+      yPos += 6;
+    }
+
+    doc.setDrawColor(230, 230, 230);
+    doc.line(14, yPos, pageWidth - 14, yPos);
+    yPos += 12;
+
+    // Seção 2: Resumo Estatístico das Atividades Pedagógicas
+    const filtered = formData.alunoNome 
+      ? records.filter(r => r.alunoNome === formData.alunoNome) 
+      : records;
+
+    const total = filtered.length;
     const stats = [
-      { l: 'Total de Registros', v: total },
-      { l: 'Planej. Semanais', v: records.filter(r => r.moduleId === 'planejamento-semanal').length },
-      { l: 'Planej. Mensais', v: records.filter(r => r.moduleId === 'planejamento-mensal').length },
-      { l: 'Relatórios', v: records.filter(r => ['relatorio-individual', 'parecer-pcd'].includes(r.moduleId)).length }
+      { l: 'Total de Registros do Aluno', v: total },
+      { l: 'Planejamentos Diários', v: filtered.filter(r => r.moduleId === 'planejamento-diario').length },
+      { l: 'Planejamentos Semanais', v: filtered.filter(r => r.moduleId === 'planejamento-semanal').length },
+      { l: 'Planejamentos Mensais', v: filtered.filter(r => r.moduleId === 'planejamento-mensal').length },
+      { l: 'Relatórios & Pareceres', v: filtered.filter(r => ['relatorio-individual', 'parecer-pcd'].includes(r.moduleId)).length },
+      { l: 'Reflexões Salvas', v: filtered.filter(r => r.moduleId === 'reflexoes').length }
     ];
 
     doc.setTextColor(0, 168, 89);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("Resumo de Atividades", 14, yPos);
+    doc.text(formData.alunoNome ? `Resumo Pedagógico do Aluno (${formData.alunoNome})` : "Resumo de Atividades", 14, yPos);
     yPos += 10;
 
     stats.forEach(stat => {
       doc.setTextColor(80, 80, 80);
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.text(`${stat.l}:`, 14, yPos);
       doc.setFont("helvetica", "normal");
-      doc.text(`${stat.v}`, 60, yPos);
-      yPos += 7;
+      doc.text(`${stat.v}`, 75, yPos);
+      yPos += 6.5;
     });
 
-    yPos += 10;
+    yPos += 8;
     doc.setDrawColor(230, 230, 230);
     doc.line(14, yPos, pageWidth - 14, yPos);
-    yPos += 15;
+    yPos += 12;
 
-    // Lista de Registros
+    // Seção 3: Histórico de Registros (Linha do Tempo)
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("Histórico de Registros (Linha do Tempo)", 14, yPos);
+    doc.text(formData.alunoNome ? `Linha do Tempo Pedagógica de ${formData.alunoNome}` : "Histórico de Registros (Linha do Tempo)", 14, yPos);
     yPos += 12;
 
-    const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    sorted.forEach((record, index) => {
-      if (yPos > 260) {
-        doc.addPage();
-        yPos = 20;
-      }
-
-      doc.setTextColor(0, 168, 89);
+    if (sorted.length === 0) {
+      doc.setTextColor(140, 140, 140);
       doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text(`${new Date(record.date).toLocaleDateString('pt-BR')} — ${record.title}`, 14, yPos);
-      yPos += 5;
+      doc.setFont("helvetica", "italic");
+      doc.text("Nenhum outro registro vinculado encontrado.", 14, yPos);
+    } else {
+      sorted.forEach((record, index) => {
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 20;
+        }
 
-      doc.setTextColor(100, 100, 100);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      const modLabel = NAV_ITEMS.find(n => n.id === record.moduleId)?.label || record.moduleId;
-      const presencaInfo = record.presenca ? ` (${record.presenca})` : '';
-      doc.text(`Módulo: ${modLabel}${record.alunoNome ? ` | Aluno: ${record.alunoNome}${presencaInfo}` : ''}`, 14, yPos);
-      yPos += 5;
+        doc.setTextColor(0, 168, 89);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${new Date(record.date).toLocaleDateString('pt-BR')} — ${record.title}`, 14, yPos);
+        yPos += 5;
 
-      const desc = record.description || record.content || 'Sem descrição.';
-      const splitDesc = doc.splitTextToSize(desc, pageWidth - 28);
-      doc.text(splitDesc, 14, yPos);
-      yPos += (splitDesc.length * 5) + 8;
-    });
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        const modLabel = NAV_ITEMS.find(n => n.id === record.moduleId)?.label || record.moduleId;
+        const presencaInfo = record.presenca ? ` (${record.presenca})` : '';
+        doc.text(`Módulo: ${modLabel}${record.alunoNome ? ` | Aluno: ${record.alunoNome}${presencaInfo}` : ''}`, 14, yPos);
+        yPos += 5;
 
-    doc.save(`Portfolio_EducTecPro_${new Date().getTime()}.pdf`);
+        const desc = record.description || record.content || 'Sem descrição.';
+        const splitDesc = doc.splitTextToSize(desc, pageWidth - 28);
+        doc.text(splitDesc, 14, yPos);
+        yPos += (splitDesc.length * 5) + 8;
+      });
+    }
+
+    doc.save(`Portfolio_${formData.alunoNome ? formData.alunoNome.replace(/\s+/g, '_') : 'Geral'}_${new Date().getTime()}.pdf`);
   };
 
   const exportarPDFDiarioReflexoes = () => {
@@ -1058,7 +1125,7 @@ export default function Dashboard({
       onGoToPayment={onGoToPayment}
       userDataExpiracao={userDataExpiracao}
       statusPagamento={statusPagamento}
-
+      userName={professorNome}
       robotName={robotName}
       onSaveRobotName={handleSaveRobotName}
       subtitle={headerSubtitle}
@@ -1298,6 +1365,7 @@ export default function Dashboard({
                   <PortfolioView 
                     records={records}
                     professorNome={professorNome}
+                    formData={formData}
                     onOpenRecord={(record) => {
                       setActiveTab(record.moduleId);
                       setFormData({
@@ -1309,7 +1377,7 @@ export default function Dashboard({
                   />
                 ) : activeTab === 'indicadores' ? (
                   <PedagogicalIndicators records={records} />
-                ) : (activeTab === 'planejamento-mensal' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-mensal')) ? (
+                ) : (activeTab === 'planejamento-mensal' || (activeTab === 'planejamentos' && (formData.moduleId || 'planejamento-semanal') === 'planejamento-mensal')) ? (
                   <div className="space-y-6">
                     <div className="bg-white border border-slate-200 shadow-sm p-8 rounded-3xl space-y-6">
                       <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
@@ -1521,17 +1589,17 @@ export default function Dashboard({
                       </div>
                     </div>
                   </div>
-                ) : (activeTab === 'planejamento-diario' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-diario')) ? (
+                ) : (activeTab === 'planejamento-diario' || (activeTab === 'planejamentos' && (formData.moduleId || 'planejamento-semanal') === 'planejamento-diario')) ? (
                   /* Planejamento Diário Specific Fields */
                   <div className="space-y-6">
                     <div className="bg-black/5 p-6 rounded-2xl space-y-6">
                       <h4 className="text-sm font-black uppercase tracking-widest text-black/30">Conteúdo Pedagógico</h4>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Objetivos da Aula *</label>
+                        <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Objetivos de Aprendizagem *</label>
                         <textarea
                           required
                           rows={3}
-                          value={formData.objectives}
+                          value={formData.objectives || ''}
                           onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
                           placeholder="Quais são os objetivos principais desta aula?"
                           className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all resize-none"
@@ -1542,9 +1610,41 @@ export default function Dashboard({
                         <textarea
                           required
                           rows={4}
-                          value={formData.content}
+                          value={formData.content || ''}
                           onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                           placeholder="Descreva as atividades e o conteúdo que será abordado..."
+                          className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all resize-none"
+                        />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Recursos Didáticos</label>
+                          <textarea
+                            rows={3}
+                            value={formData.resources || ''}
+                            onChange={(e) => setFormData({ ...formData, resources: e.target.value })}
+                            placeholder="Livros, vídeos, materiais digitais..."
+                            className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all resize-none"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Avaliação e Acompanhamento</label>
+                          <textarea
+                            rows={3}
+                            value={formData.evaluation || ''}
+                            onChange={(e) => setFormData({ ...formData, evaluation: e.target.value })}
+                            placeholder="Critérios e instrumentos de avaliação..."
+                            className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all resize-none"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-black/60 uppercase tracking-wider">Observações Adicionais</label>
+                        <textarea
+                          rows={2}
+                          value={formData.description || ''}
+                          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                          placeholder="Anotações livres, eventos, datas importantes..."
                           className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] focus:ring-2 focus:ring-[#00A859]/20 outline-none transition-all resize-none"
                         />
                       </div>
@@ -1709,7 +1809,7 @@ export default function Dashboard({
                       </div>
                     </div>
                   </div>
-                ) : (activeTab === 'planejamento-semanal' || (activeTab === 'planejamentos' && formData.moduleId === 'planejamento-semanal')) ? (
+                ) : (activeTab === 'planejamento-semanal' || (activeTab === 'planejamentos' && (formData.moduleId || 'planejamento-semanal') === 'planejamento-semanal')) ? (
                   /* Planejamento Semanal - Vertical Wizard Grid */
                   <div className="space-y-6">
 
@@ -2688,12 +2788,15 @@ export default function Dashboard({
                   key={record.id}
                   className="bg-white p-6 rounded-2xl border border-black/5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:shadow-md transition-all"
                 >
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-[#00A859]/10 rounded-xl flex items-center justify-center text-[#00A859] shrink-0">
+                  <div 
+                    className="flex items-start gap-4 cursor-pointer flex-1 group"
+                    onClick={() => handleOpenForm(record)}
+                  >
+                    <div className="w-12 h-12 bg-[#00A859]/10 rounded-xl flex items-center justify-center text-[#00A859] shrink-0 group-hover:scale-110 transition-transform">
                       {renderIcon(activeItem?.icon || 'FileText')}
                     </div>
                     <div>
-                      <h4 className="font-bold text-lg">{record.title}</h4>
+                      <h4 className="font-bold text-lg group-hover:text-[#00A859] transition-colors">{record.title}</h4>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
                         <p className="text-xs text-black/40 flex items-center gap-1">
                           <Icons.Calendar size={12} />

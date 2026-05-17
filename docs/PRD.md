@@ -24,14 +24,15 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
 
 ## 4. Funcionalidades Detalhadas
 
-### 4.1. Módulo de Planejamento (Wizard Inteligente)
-*   **Planejamento Semanal:** Guia passo a passo para selecionar Etapa, Faixa Etária, Componente e Habilidades.
-*   **Planejamento Diário:** Registro detalhado de objetivos, desenvolvimento metodológico, recursos e avaliação.
-*   **Planejamento Mensal:** Consolidação de carga horária, aulas previstas vs. realizadas e síntese do mês.
+### 4.1. Módulo de Planejamento (Estrutura Unificada)
+*   **Formulário Único e Dinâmico:** Unificação dos planejamentos (Diário, Semanal e Mensal) em uma única tabela de banco de dados e interface centralizada, otimizando o fluxo de preenchimento.
+*   **Seletor de Tipo:** Permite alternar facilmente entre o tipo de registro ("Diário", "Semanal", "Mensal") de forma ágil, sem navegação entre abas.
+*   **Conteúdo Pedagógico Padronizado:** Consolidação dos campos essenciais exigidos: Objetivos de Aprendizagem, Atividades Planejadas, Recursos Didáticos, Avaliação e Acompanhamento, além do módulo unificado de busca de Códigos BNCC.
 
 ### 4.2. Gestão de Alunos e Turmas
 *   **Cadastro Completo:** Registro de nome, data de nascimento, contatos e observações de saúde/PCD.
 *   **Controle de Frequência:** Registro de faltas e presenças com visualização de indicadores de assiduidade.
+*   **Dossiê Integral do Aluno (PDF):** Exportação inteligente de um documento PDF consolidado, contendo todo o histórico de frequência, relatórios individuais e planejamentos pedagógicos diretamente vinculados ao estudante.
 *   **Portfólio Individual:** Acúmulo de registros e evoluções por aluno ao longo do ano.
 
 ### 4.3. Relatórios e IA (EduBot)
@@ -85,5 +86,5 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
 *   [ ] Relatórios Estatísticos Avançados sobre o desenvolvimento da turma.
 
 ---
-**Documento atualizado em:** 04/05/2026
+**Documento atualizado em:** 17/05/2026
 **Responsável:** Antigravity AI (Google DeepMind)

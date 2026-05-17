@@ -31,6 +31,49 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
     const [newAttendanceStatus, setNewAttendanceStatus] = useState<'Presente' | 'Faltou'>('Presente');
     const [isPresenceModalOpen, setIsPresenceModalOpen] = useState(false);
 
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+    const [studentHistoryData, setStudentHistoryData] = useState<{ attendances: any[], planejamentos: any[], relatorios: any[] }>({ attendances: [], planejamentos: [], relatorios: [] });
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+    const [activeHistoryTab, setActiveHistoryTab] = useState<'profile' | 'academic' | 'plans' | 'presences'>('profile');
+
+    const handleViewHistory = async (student: Student) => {
+        setSelectedStudent(student);
+        setIsHistoryModalOpen(true);
+        setIsHistoryLoading(true);
+        setActiveHistoryTab('profile');
+        try {
+            const { data: attendData } = await supabase
+                .from('presenca_alunos')
+                .select('id, data, status')
+                .eq('aluno_id', student.id)
+                .order('data', { ascending: false });
+
+            const { data: planejamentos } = await supabase
+                .from('planejamentos')
+                .select('tipo_planejamento, titulo_registro, data, atividades_planejadas, objetivos_aprendizagem, recursos_didaticos, avaliacao_acompanhamento, observacoes_professor, componente_curricular, ano_serie, bncc_codes')
+                .eq('aluno', student.nome)
+                .order('data', { ascending: false });
+
+            const { data: relatorios } = await supabase
+                .from('relatorios')
+                .select('tipo, titulo_registro, created_at, conteudo, componente_curricular, periodo, tom_texto, ano_serie')
+                .eq('aluno_nome', student.nome)
+                .order('created_at', { ascending: false });
+
+            setStudentHistoryData({
+                attendances: attendData || [],
+                planejamentos: planejamentos || [],
+                relatorios: relatorios || []
+            });
+        } catch (err) {
+            console.error("Erro ao buscar histórico do aluno:", err);
+        } finally {
+            setIsHistoryLoading(false);
+        }
+    };
+
+
 
     useEffect(() => {
         fetchStudents();
@@ -345,6 +388,7 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
         let nextY = (doc as any).lastAutoTable.finalY + 15;
 
         // Histórico de Presença
+        // Histórico de Presença e Registros Vinculados
         if (data.id) {
             const { data: attendData } = await supabase
                 .from('presenca_alunos')
@@ -352,7 +396,22 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
                 .eq('aluno_id', data.id)
                 .order('data', { ascending: false });
 
+            const { data: planejamentos } = await supabase
+                .from('planejamentos')
+                .select('tipo_planejamento, titulo_registro, data, atividades_planejadas')
+                .eq('aluno', data.nome)
+                .order('data', { ascending: false });
+
+            const { data: relatorios } = await supabase
+                .from('relatorios')
+                .select('tipo, titulo_registro, created_at, conteudo')
+                .eq('aluno_nome', data.nome)
+                .order('created_at', { ascending: false });
+
+            // Seção de Presença
+            if (nextY > 270) { doc.addPage(); nextY = 20; }
             doc.setFont("helvetica", "bold");
+            doc.setFontSize(10);
             doc.text("Histórico de Presença Permanente:", 14, nextY);
 
             if (attendData && attendData.length > 0) {
@@ -371,7 +430,61 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
             } else {
                 doc.setFont("helvetica", "normal");
                 doc.setFontSize(9);
-                doc.text("Nenhum registro de presença encontrado para este aluno.", 14, nextY + 7);
+                doc.text("Nenhum registro de presença encontrado.", 14, nextY + 7);
+                nextY += 20;
+            }
+
+            // Seção de Planejamentos
+            if (nextY > 270) { doc.addPage(); nextY = 20; }
+            doc.setFont("helvetica", "bold");
+            doc.text("Planejamentos Pedagógicos Vinculados:", 14, nextY);
+
+            if (planejamentos && planejamentos.length > 0) {
+                autoTable(doc, {
+                    startY: nextY + 5,
+                    head: [['Data', 'Tipo', 'Título', 'Atividades / Conteúdo']],
+                    body: planejamentos.map(r => [
+                        r.data ? new Date(r.data).toLocaleDateString('pt-BR') : '-',
+                        r.tipo_planejamento || '-',
+                        r.titulo_registro || '-',
+                        (r.atividades_planejadas || '').substring(0, 150) + ((r.atividades_planejadas || '').length > 150 ? '...' : '')
+                    ]),
+                    theme: 'striped',
+                    headStyles: { fillColor: [0, 168, 89] },
+                    styles: { fontSize: 8 }
+                });
+                nextY = (doc as any).lastAutoTable.finalY + 15;
+            } else {
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(9);
+                doc.text("Nenhum planejamento vinculado encontrado para este aluno.", 14, nextY + 7);
+                nextY += 20;
+            }
+
+            // Seção de Relatórios
+            if (nextY > 270) { doc.addPage(); nextY = 20; }
+            doc.setFont("helvetica", "bold");
+            doc.text("Relatórios e Pareceres:", 14, nextY);
+
+            if (relatorios && relatorios.length > 0) {
+                autoTable(doc, {
+                    startY: nextY + 5,
+                    head: [['Data', 'Tipo', 'Título', 'Conteúdo']],
+                    body: relatorios.map(r => [
+                        new Date(r.created_at).toLocaleDateString('pt-BR'),
+                        r.tipo === 'relatorio-individual' ? 'Relatório Individual' : (r.tipo || '-'),
+                        r.titulo_registro || '-',
+                        (r.conteudo || '').substring(0, 150) + ((r.conteudo || '').length > 150 ? '...' : '')
+                    ]),
+                    theme: 'striped',
+                    headStyles: { fillColor: [59, 130, 246] },
+                    styles: { fontSize: 8 }
+                });
+                nextY = (doc as any).lastAutoTable.finalY + 15;
+            } else {
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(9);
+                doc.text("Nenhum relatório ou parecer vinculado encontrado.", 14, nextY + 7);
                 nextY += 20;
             }
         }
@@ -408,21 +521,21 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <h2 className="text-2xl font-bold">Meus Alunos</h2>
-                <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+                <h2 className="text-2xl font-bold text-left">Meus Alunos</h2>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
                     <button
                         onClick={gerarPDFAlunos}
-                        className="bg-black text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-black/80 transition-colors shadow-lg active:scale-95"
+                        className="w-full sm:w-auto justify-center bg-black text-white px-4 py-3 rounded-xl flex items-center gap-2 hover:bg-black/80 transition-colors shadow-lg active:scale-95 text-sm font-bold"
                     >
-                        <FileDown size={20} />
+                        <FileDown size={18} />
                         <span>Baixar PDF</span>
                     </button>
                     <button
                         onClick={() => openModal()}
-                        className="bg-[#00A859] text-white px-4 py-2 rounded-xl flex items-center gap-2 hover:bg-[#008F4C] transition-colors"
+                        className="w-full sm:w-auto justify-center bg-[#00A859] text-white px-4 py-3 rounded-xl flex items-center gap-2 hover:bg-[#008F4C] transition-colors text-sm font-bold"
                     >
-                        <Plus size={20} />
+                        <Plus size={18} />
                         <span>Novo Aluno</span>
                     </button>
                 </div>
@@ -440,50 +553,59 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
                     />
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* Tabela Responsiva - Visível Apenas no Desktop */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-black/5">
-                                <th className="text-left font-semibold text-black/60 pb-4 px-4">Nome</th>
-                                <th className="text-left font-semibold text-black/60 pb-4 px-4">Série/Nível</th>
-                                <th className="text-center font-semibold text-black/60 pb-4 px-4">1º Bim</th>
-                                <th className="text-center font-semibold text-black/60 pb-4 px-4">2º Bim</th>
-                                <th className="text-center font-semibold text-black/60 pb-4 px-4">3º Bim</th>
-                                <th className="text-center font-semibold text-black/60 pb-4 px-4">4º Bim</th>
-                                <th className="text-center font-semibold text-black/60 pb-4 px-4">Status</th>
-                                <th className="text-center font-semibold text-black/60 pb-4 px-4">Presença</th>
-                                <th className="text-center font-semibold text-black/60 pb-4 px-4">Recursos</th>
-                                <th className="text-right font-semibold text-black/60 pb-4 px-4">Ações</th>
+                                <th className="text-left font-semibold text-black/60 pb-4 px-4 min-w-[150px]">Nome</th>
+                                <th className="text-left font-semibold text-black/60 pb-4 px-4 min-w-[120px]">Série/Nível</th>
+                                <th className="text-center font-semibold text-black/60 pb-4 px-4 min-w-[70px]">1º Bim</th>
+                                <th className="text-center font-semibold text-black/60 pb-4 px-4 min-w-[70px]">2º Bim</th>
+                                <th className="text-center font-semibold text-black/60 pb-4 px-4 min-w-[70px]">3º Bim</th>
+                                <th className="text-center font-semibold text-black/60 pb-4 px-4 min-w-[70px]">4º Bim</th>
+                                <th className="text-center font-semibold text-black/60 pb-4 px-4 min-w-[85px]">Status</th>
+                                <th className="text-center font-semibold text-black/60 pb-4 px-4 min-w-[95px]">Presença</th>
+                                <th className="text-center font-semibold text-black/60 pb-4 px-4 min-w-[85px]">Recursos</th>
+                                <th className="text-right font-semibold text-black/60 pb-4 px-4 min-w-[110px]">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             {filteredStudents.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-8 text-black/40">
+                                    <td colSpan={10} className="text-center py-8 text-black/40">
                                         Nenhum aluno encontrado.
                                     </td>
                                 </tr>
                             ) : (
                                 filteredStudents.map((student) => (
                                     <tr key={student.id} className="border-b border-black/5 last:border-0 hover:bg-black/5 transition-colors">
-                                        <td className="py-4 px-4 font-medium text-black/80">{student.nome}</td>
-                                        <td className="py-4 px-4 text-black/60">{student.serie || '-'}</td>
+                                        <td className="py-4 px-4 font-semibold text-black/80 min-w-[150px]">
+                                            <button
+                                                onClick={() => handleViewHistory(student)}
+                                                className="text-[#00A859] hover:text-[#008F4C] hover:underline font-bold text-left focus:outline-none transition-colors"
+                                                title="Clique para ver todo o histórico pedagógico e registros do aluno"
+                                            >
+                                                {student.nome}
+                                            </button>
+                                        </td>
+                                        <td className="py-4 px-4 text-black/60 min-w-[120px]">{student.serie || '-'}</td>
                                         {/* Notas bimestrais */}
                                         {(['nota_bimestre1', 'nota_bimestre2', 'nota_bimestre3', 'nota_bimestre4'] as const).map((campo, idx) => {
                                             const nota = (student as any)[campo];
                                             const cor = nota == null ? 'text-black/30' : nota >= 7 ? 'text-emerald-600 font-bold' : nota >= 5 ? 'text-amber-600 font-bold' : 'text-red-500 font-bold';
                                             return (
-                                                <td key={campo} className={`py-4 px-4 text-center text-sm ${cor}`}>
+                                                <td key={campo} className={`py-4 px-4 text-center text-sm ${cor} min-w-[70px]`}>
                                                     {nota != null ? Number(nota).toFixed(1) : <span className="text-black/20">—</span>}
                                                 </td>
                                             );
                                         })}
-                                        <td className="py-4 px-4 text-center">
+                                        <td className="py-4 px-4 text-center min-w-[85px]">
                                             <span className={`inline-flex px-2 !py-1 text-xs font-semibold rounded-full ${student.status === 'ativo' ? 'bg-[#00A859]/10 text-[#00A859]' : 'bg-red-100 text-red-600'}`}>
                                                 {student.status === 'ativo' ? 'Ativo' : 'Inativo'}
                                             </span>
                                         </td>
-                                        <td className="py-4 px-4 text-center">
+                                        <td className="py-4 px-4 text-center min-w-[95px]">
                                             <button
                                                 onClick={() => openPresenceModal(student)}
                                                 className={`inline-flex px-3 py-1 text-xs font-bold rounded-full transition-all hover:scale-110 active:scale-95 cursor-pointer shadow-sm hover:shadow-md ${student.presenca === 'Presente' ? 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
@@ -492,7 +614,7 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
                                                 {student.presenca || 'Presente'}
                                             </button>
                                         </td>
-                                        <td className="py-4 px-4 text-center">
+                                        <td className="py-4 px-4 text-center min-w-[85px]">
                                             {student.necessidades_especiais ? (
                                                 <div className="flex justify-center" title="Educação Inclusiva">
                                                     <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
@@ -503,7 +625,7 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
                                                 <span className="text-black/30">-</span>
                                             )}
                                         </td>
-                                        <td className="py-4 px-4 text-right">
+                                        <td className="py-4 px-4 text-right min-w-[110px]">
                                             <div className="flex justify-end gap-2">
                                                 <button
                                                     onClick={() => exportarPDFAluno(student)}
@@ -533,10 +655,99 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
                     </table>
                 </div>
 
-                <div className="mt-6 flex justify-end border-t border-black/5 pt-6">
+                {/* Visualização em Cards Empilhados - Visível Apenas no Mobile */}
+                <div className="block md:hidden space-y-4">
+                    {filteredStudents.length === 0 ? (
+                        <div className="text-center py-8 text-black/40 bg-black/5 rounded-2xl">
+                            Nenhum aluno encontrado.
+                        </div>
+                    ) : (
+                        filteredStudents.map((student) => (
+                            <div key={student.id} className="p-4 bg-black/[0.02] border border-black/5 rounded-2xl space-y-4">
+                                <div className="flex justify-between items-start gap-2">
+                                    <div className="space-y-1">
+                                        <button
+                                            onClick={() => handleViewHistory(student)}
+                                            className="text-[#00A859] hover:text-[#008F4C] hover:underline font-bold text-left text-base focus:outline-none transition-colors"
+                                            title="Clique para ver todo o histórico pedagógico e registros do aluno"
+                                        >
+                                            {student.nome}
+                                        </button>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className={`inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full ${student.status === 'ativo' ? 'bg-[#00A859]/10 text-[#00A859]' : 'bg-red-100 text-red-600'}`}>
+                                                {student.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                                            </span>
+                                            {student.necessidades_especiais && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-50 text-blue-600">
+                                                    <Accessibility size={10} />
+                                                    PCD
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => exportarPDFAluno(student)}
+                                            className="p-2 hover:bg-black/5 rounded-lg text-black/60 hover:text-black transition-colors"
+                                            title="Baixar Ficha PDF"
+                                        >
+                                            <FileDown size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => openModal(student)}
+                                            className="p-2 hover:bg-black/5 rounded-lg text-black/60 hover:text-black transition-colors"
+                                        >
+                                            <Edit2 size={18} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(student.id)}
+                                            className="p-2 hover:bg-red-50 rounded-lg text-red-400 hover:text-red-600 transition-colors"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 text-sm border-t border-black/5 pt-3">
+                                    <div>
+                                        <span className="block text-xs text-black/40 font-medium">Série/Nível</span>
+                                        <span className="font-semibold text-black/80">{student.serie || '-'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs text-black/40 font-medium">Presença</span>
+                                        <button
+                                            onClick={() => openPresenceModal(student)}
+                                            className={`mt-0.5 inline-flex px-3 py-1 text-xs font-bold rounded-full transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-sm ${student.presenca === 'Presente' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}
+                                        >
+                                            {student.presenca || 'Presente'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-black/5 pt-3">
+                                    <span className="block text-xs text-black/40 font-medium mb-1.5">Notas Bimestrais</span>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {(['nota_bimestre1', 'nota_bimestre2', 'nota_bimestre3', 'nota_bimestre4'] as const).map((campo, idx) => {
+                                            const nota = (student as any)[campo];
+                                            const cor = nota == null ? 'text-black/30 bg-black/5' : nota >= 7 ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : nota >= 5 ? 'text-amber-700 bg-amber-50 border-amber-200' : 'text-red-600 bg-red-50 border-red-200';
+                                            return (
+                                                <div key={campo} className={`py-1.5 text-center rounded-xl border border-transparent text-xs font-bold ${cor}`}>
+                                                    <span className="block text-[8px] text-black/40 uppercase font-medium">{idx + 1}º B</span>
+                                                    {nota != null ? Number(nota).toFixed(1) : '—'}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="mt-6 flex justify-end border-t border-black/5 pt-6 w-full">
                     <button
                         onClick={gerarPDFAlunos}
-                        className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl font-bold hover:bg-black/80 transition-all shadow-lg active:scale-95"
+                        className="w-full sm:w-auto justify-center flex items-center gap-2 px-6 py-3 bg-black text-white rounded-xl font-bold hover:bg-black/80 transition-all shadow-lg active:scale-95"
                     >
                         <FileDown size={20} />
                         Baixar PDF
@@ -999,6 +1210,356 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* NOVO: Modal de Histórico Integral do Aluno */}
+            <AnimatePresence>
+                {isHistoryModalOpen && selectedStudent && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsHistoryModalOpen(false)}
+                            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                        />
+
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            className="bg-[#FDFCFB] w-full max-w-4xl rounded-[40px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[90vh]"
+                        >
+                            {/* Top header with gradient */}
+                            <div className="relative shrink-0 bg-gradient-to-r from-emerald-600 to-[#00A859] p-8 text-white">
+                                <div className="absolute top-4 right-4 flex items-center gap-2">
+                                    <button
+                                        onClick={() => exportarPDFAluno(selectedStudent)}
+                                        className="w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all active:scale-95"
+                                        title="Exportar Dossiê Completo em PDF"
+                                    >
+                                        <FileDown size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => setIsHistoryModalOpen(false)}
+                                        className="w-10 h-10 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition-all"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            <h3 className="text-3xl font-black tracking-tight">{selectedStudent.nome}</h3>
+                                            <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${selectedStudent.status === 'ativo' ? 'bg-white/20 text-white' : 'bg-red-500/20 text-red-100'}`}>
+                                                {selectedStudent.status === 'ativo' ? 'Ativo' : 'Inativo'}
+                                            </span>
+                                            {selectedStudent.necessidades_especiais && (
+                                                <span className="px-3 py-1 bg-blue-500/20 text-blue-100 rounded-full text-xs font-black uppercase tracking-wider flex items-center gap-1">
+                                                    <Accessibility size={12} /> Inclusão PCD
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-sm text-emerald-100/90 font-medium flex items-center gap-2">
+                                            <span>Série: <strong>{selectedStudent.serie || 'Não informada'}</strong></span>
+                                            <span>•</span>
+                                            <span>Nascimento: <strong>{selectedStudent.data_nascimento ? new Date(selectedStudent.data_nascimento).toLocaleDateString('pt-BR') : '-'}</strong></span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tabs Navigation */}
+                            <div className="bg-white border-b border-black/5 flex overflow-x-auto shrink-0 scrollbar-none">
+                                {[
+                                    { id: 'profile', label: 'Cadastro e Responsáveis', icon: Icons.User },
+                                    { id: 'academic', label: 'Notas e Pareceres', icon: Icons.GraduationCap },
+                                    { id: 'plans', label: 'Planejamentos Pedagógicos', icon: Icons.ClipboardList },
+                                    { id: 'presences', label: 'Frequência Recente', icon: Icons.Calendar }
+                                ].map((tab) => {
+                                    const TabIcon = tab.icon;
+                                    const isActive = activeHistoryTab === tab.id;
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            type="button"
+                                            onClick={() => setActiveHistoryTab(tab.id as any)}
+                                            className={cn(
+                                                "flex items-center gap-2 px-6 py-4 text-sm font-bold border-b-2 whitespace-nowrap transition-all outline-none",
+                                                isActive 
+                                                    ? "border-[#00A859] text-[#00A859] bg-[#00A859]/5" 
+                                                    : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
+                                            )}
+                                        >
+                                            <TabIcon size={16} />
+                                            {tab.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Content Area with scroll */}
+                            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                                {isHistoryLoading ? (
+                                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                                        <div className="w-12 h-12 border-4 border-[#00A859] border-t-transparent rounded-full animate-spin"></div>
+                                        <p className="text-sm font-medium text-slate-400">Compilando dossiê do estudante...</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-8">
+                                        {activeHistoryTab === 'profile' && (
+                                            <div className="grid md:grid-cols-2 gap-8">
+                                                {/* Left Column: Responsibles & Info */}
+                                                <div className="space-y-6">
+                                                    <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm space-y-4">
+                                                        <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                                            <Icons.Users size={16} className="text-[#00A859]" />
+                                                            Responsáveis pelo Aluno
+                                                        </h4>
+                                                        <div className="space-y-3 divide-y divide-slate-100">
+                                                            <div className="pt-1">
+                                                                <p className="text-xs text-slate-400 font-bold">Responsável Principal</p>
+                                                                <p className="text-sm font-bold text-slate-700 mt-0.5">{selectedStudent.responsavel1_nome || 'Não cadastrado'}</p>
+                                                                {selectedStudent.responsavel1_telefone && (
+                                                                    <p className="text-xs text-emerald-600 font-semibold mt-0.5">{selectedStudent.responsavel1_telefone}</p>
+                                                                )}
+                                                            </div>
+                                                            <div className="pt-3">
+                                                                <p className="text-xs text-slate-400 font-bold">Responsável Secundário</p>
+                                                                <p className="text-sm font-bold text-slate-700 mt-0.5">{selectedStudent.responsavel2_nome || 'Não cadastrado'}</p>
+                                                                {selectedStudent.responsavel2_telefone && (
+                                                                    <p className="text-xs text-emerald-600 font-semibold mt-0.5">{selectedStudent.responsavel2_telefone}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {selectedStudent.necessidades_especiais && (
+                                                        <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-3xl space-y-3">
+                                                            <h4 className="text-xs font-black uppercase tracking-widest text-blue-600 flex items-center gap-2">
+                                                                <Accessibility size={16} />
+                                                                Educação Especial (Inclusão)
+                                                            </h4>
+                                                            <div>
+                                                                <p className="text-xs text-blue-500 font-bold">Limitações / Acompanhamento Pedagógico PCD</p>
+                                                                <p className="text-sm font-semibold text-blue-900 mt-1 leading-relaxed whitespace-pre-line">
+                                                                    {selectedStudent.limitacoes_pcd || 'Não detalhadas.'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Right Column: Observations */}
+                                                <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm space-y-4">
+                                                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                                        <Icons.MessageSquare size={16} className="text-[#00A859]" />
+                                                        Observações e Notas Gerais do Professor
+                                                    </h4>
+                                                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line bg-slate-50/50 p-4 rounded-2xl border border-slate-100 min-h-[150px]">
+                                                        {selectedStudent.nota || 'Nenhuma observação geral registrada para este aluno.'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {activeHistoryTab === 'academic' && (
+                                            <div className="space-y-8">
+                                                {/* Bimestrais Grade Grid */}
+                                                <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm space-y-6">
+                                                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                                        <Icons.BarChart2 size={16} className="text-[#00A859]" />
+                                                        Aproveitamento Escolar (Notas Bimestrais)
+                                                    </h4>
+                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                                        {[
+                                                            { label: '1º Bimestre', val: selectedStudent.nota_bimestre1 },
+                                                            { label: '2º Bimestre', val: selectedStudent.nota_bimestre2 },
+                                                            { label: '3º Bimestre', val: selectedStudent.nota_bimestre3 },
+                                                            { label: '4º Bimestre', val: selectedStudent.nota_bimestre4 }
+                                                        ].map((item, index) => {
+                                                            const isSet = item.val != null;
+                                                            const colorClass = !isSet ? "bg-slate-50 border-slate-100 text-slate-300" :
+                                                                               item.val! >= 7 ? "bg-emerald-50 border-emerald-100 text-emerald-700" :
+                                                                               item.val! >= 5 ? "bg-amber-50 border-amber-100 text-amber-700" :
+                                                                               "bg-red-50 border-red-100 text-red-700";
+                                                            return (
+                                                                <div key={index} className={cn("p-4 rounded-2xl border text-center space-y-1.5 transition-all shadow-sm", colorClass)}>
+                                                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">{item.label}</p>
+                                                                    <p className="text-2xl font-black">
+                                                                        {isSet ? Number(item.val).toFixed(1) : '—'}
+                                                                    </p>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+
+                                                {/* Relatorios list */}
+                                                <div className="space-y-4">
+                                                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 ml-1">
+                                                        <ClipboardList size={16} className="text-[#00A859]" />
+                                                        Histórico de Relatórios e Pareceres ({studentHistoryData.relatorios.length})
+                                                    </h4>
+                                                    {studentHistoryData.relatorios.length === 0 ? (
+                                                        <div className="text-center py-12 bg-white rounded-3xl border border-black/5 shadow-sm text-slate-400">
+                                                            <Icons.FileText size={40} className="mx-auto mb-3 opacity-20" />
+                                                            <p className="text-sm font-bold">Nenhum parecer ou relatório pedagógico registrado para este aluno.</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="grid gap-4">
+                                                            {studentHistoryData.relatorios.map((r, idx) => (
+                                                                <div key={idx} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:border-[#00A859]/30 transition-all space-y-3">
+                                                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                                                        <div>
+                                                                            <h5 className="font-bold text-slate-800 text-base">{r.titulo_registro}</h5>
+                                                                            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px] font-semibold text-slate-400">
+                                                                                <span className="flex items-center gap-1"><Icons.Calendar size={12} /> {new Date(r.created_at).toLocaleDateString('pt-BR')}</span>
+                                                                                {r.componente_curricular && <span>• Comp. Curricular: <strong>{r.componente_curricular}</strong></span>}
+                                                                                {r.periodo && <span>• Período: <strong>{r.periodo}</strong></span>}
+                                                                            </div>
+                                                                        </div>
+                                                                        <span className="px-2.5 py-1 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-wider">{r.tom_texto || 'Formal'}</span>
+                                                                    </div>
+                                                                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line border-t border-slate-50 pt-3">
+                                                                        {r.conteudo}
+                                                                    </p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {activeHistoryTab === 'plans' && (
+                                            <div className="space-y-4">
+                                                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 ml-1">
+                                                    <Icons.BookOpen size={16} className="text-[#00A859]" />
+                                                    Planejamentos Pedagógicos Vinculados ({studentHistoryData.planejamentos.length})
+                                                </h4>
+                                                {studentHistoryData.planejamentos.length === 0 ? (
+                                                    <div className="text-center py-12 bg-white rounded-3xl border border-black/5 shadow-sm text-slate-400">
+                                                        <Icons.BookOpen size={40} className="mx-auto mb-3 opacity-20" />
+                                                        <p className="text-sm font-bold">Nenhum planejamento vinculado encontrado para este aluno.</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid gap-4">
+                                                        {studentHistoryData.planejamentos.map((p, idx) => (
+                                                            <div key={idx} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:border-[#00A859]/30 transition-all space-y-4">
+                                                                <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-50 pb-3">
+                                                                    <div>
+                                                                        <h5 className="font-bold text-slate-800 text-base">{p.titulo_registro || `Planejamento ${p.tipo_planejamento}`}</h5>
+                                                                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px] font-semibold text-slate-400">
+                                                                            <span className="flex items-center gap-1"><Icons.Calendar size={12} /> {p.data ? new Date(p.data).toLocaleDateString('pt-BR') : '-'}</span>
+                                                                            {p.componente_curricular && <span>• Componente: <strong>{p.componente_curricular}</strong></span>}
+                                                                            {p.ano_serie && <span>• Série: <strong>{p.ano_serie}</strong></span>}
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="px-3 py-1 bg-emerald-50 text-[#00A859] rounded-xl text-[10px] font-black uppercase tracking-wider">{p.tipo_planejamento}</span>
+                                                                </div>
+
+                                                                {/* Plan details */}
+                                                                <div className="grid sm:grid-cols-2 gap-6 text-sm">
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Objetivos de Aprendizagem</p>
+                                                                        <p className="text-slate-700 leading-relaxed bg-slate-50/50 p-3.5 rounded-2xl border border-slate-100/50 font-medium whitespace-pre-line">{p.objetivos_aprendizagem || '-'}</p>
+                                                                    </div>
+                                                                    <div className="space-y-1.5">
+                                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Atividades Planejadas</p>
+                                                                        <p className="text-slate-700 leading-relaxed bg-slate-50/50 p-3.5 rounded-2xl border border-slate-100/50 font-medium whitespace-pre-line">{p.atividades_planejadas || '-'}</p>
+                                                                    </div>
+                                                                </div>
+
+                                                                {(p.recursos_didaticos || p.avaliacao_acompanhamento) && (
+                                                                    <div className="grid sm:grid-cols-2 gap-6 text-sm border-t border-slate-50/50 pt-3">
+                                                                        {p.recursos_didaticos && (
+                                                                            <div className="space-y-1">
+                                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Recursos Didáticos</p>
+                                                                                <p className="text-xs text-slate-600 font-medium">{p.recursos_didaticos}</p>
+                                                                            </div>
+                                                                        )}
+                                                                        {p.avaliacao_acompanhamento && (
+                                                                            <div className="space-y-1">
+                                                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Avaliação e Acompanhamento</p>
+                                                                                <p className="text-xs text-slate-600 font-medium">{p.avaliacao_acompanhamento}</p>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+
+                                                                {p.bncc_codes && Array.isArray(p.bncc_codes) && p.bncc_codes.length > 0 && (
+                                                                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mr-1.5">BNCC:</span>
+                                                                        {p.bncc_codes.map((code: string) => (
+                                                                            <span key={code} className="px-2.5 py-1 bg-slate-800 text-white rounded-lg text-[9px] font-black tracking-wider">{code}</span>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {activeHistoryTab === 'presences' && (
+                                            <div className="space-y-6 bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
+                                                <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                                    <Icons.Calendar size={16} className="text-[#00A859]" />
+                                                    Histórico Consolidado de Presenças
+                                                </h4>
+                                                {studentHistoryData.attendances.length === 0 ? (
+                                                    <div className="text-center py-10 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 text-slate-400">
+                                                        <p className="text-xs font-bold">Nenhum registro de presença encontrado para este aluno.</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                                                        {studentHistoryData.attendances.map((record, index) => (
+                                                            <div key={record.id || index} className="flex items-center gap-3 p-4 bg-slate-50/50 border border-slate-100 rounded-2xl">
+                                                                <div className={cn(
+                                                                    "w-3 h-3 rounded-full shrink-0",
+                                                                    record.status === 'Presente' ? "bg-emerald-500" : "bg-red-500"
+                                                                )} />
+                                                                <div>
+                                                                    <p className="text-sm font-bold text-slate-700">{new Date(record.data).toLocaleDateString('pt-BR')}</p>
+                                                                    <span className={cn(
+                                                                        "text-[9px] font-black uppercase tracking-widest",
+                                                                        record.status === 'Presente' ? "text-emerald-500" : "text-red-500"
+                                                                    )}>
+                                                                        {record.status}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer */}
+                            <div className="px-8 py-5 border-t border-black/5 bg-[#FDFCFB] flex justify-between items-center shrink-0">
+                                <button
+                                    onClick={() => exportarPDFAluno(selectedStudent)}
+                                    className="flex items-center gap-2 px-5 py-3 bg-black hover:bg-black/80 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all active:scale-95 shadow-lg"
+                                >
+                                    <FileDown size={18} />
+                                    Baixar PDF
+                                </button>
+                                <button
+                                    onClick={() => setIsHistoryModalOpen(false)}
+                                    className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-xs uppercase tracking-widest rounded-2xl transition-all active:scale-95"
+                                >
+                                    Fechar Ficha
+                                </button>
                             </div>
                         </motion.div>
                     </div>

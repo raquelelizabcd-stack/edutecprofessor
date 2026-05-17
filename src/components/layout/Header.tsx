@@ -15,6 +15,7 @@ interface HeaderProps {
     onStartTour?: () => void;
     userDataExpiracao?: string | null;
     statusPagamento?: string | null;
+    userName?: string;
     robotName?: string;
     onSaveRobotName?: (name: string) => Promise<void>;
     userEmail?: string;
@@ -22,7 +23,37 @@ interface HeaderProps {
     userWhatsapp?: string;
 }
 
-export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, onStartTour, userDataExpiracao, statusPagamento, robotName, onSaveRobotName, userEmail, userPassword, userWhatsapp }: HeaderProps) {
+const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => (
+    <AnimatePresence>
+        {isOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    onClick={onClose}
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm"
+                />
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                    className="bg-white rounded-[32px] w-full max-w-md p-8 shadow-2xl relative z-10 border border-black/5"
+                >
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-xl font-bold">{title}</h3>
+                        <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full transition-colors">
+                            <Icons.X size={20} />
+                        </button>
+                    </div>
+                    {children}
+                </motion.div>
+            </div>
+        )}
+    </AnimatePresence>
+);
+
+export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, onLogout, onGoToPayment, onStartTour, userDataExpiracao, statusPagamento, userName, robotName, onSaveRobotName, userEmail, userPassword, userWhatsapp }: HeaderProps) {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -30,13 +61,33 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
     const [isCreatingSession, setIsCreatingSession] = useState(false);
     const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-    // Proteção: Nome do professor a partir do email ou padrão
-    const professorDisplayName = userEmail?.split('@')[0] || 'Professor';
+    // Proteção: Nome do professor a partir do userName, email ou padrão
+    const professorDisplayName = userName || userEmail?.split('@')[0] || 'Professor';
     const professorInitials = professorDisplayName.slice(0, 2).toUpperCase() || 'P';
 
     // Estados do formulário de edição de perfil
     const [editName, setEditName] = useState(professorDisplayName);
     const [editWhatsapp, setEditWhatsapp] = useState(userWhatsapp || '');
+    const [editPassword, setEditPassword] = useState(userPassword || '');
+    const [editEmail, setEditEmail] = useState(userEmail || '');
+    const [showPassword, setShowPassword] = useState(false);
+    const [isPasswordDirty, setIsPasswordDirty] = useState(false);
+
+    useEffect(() => {
+        if (userEmail) setEditEmail(userEmail);
+    }, [userEmail]);
+
+    useEffect(() => {
+        if (userName) setEditName(userName);
+    }, [userName]);
+
+    useEffect(() => {
+        if (userWhatsapp) setEditWhatsapp(userWhatsapp);
+    }, [userWhatsapp]);
+
+    useEffect(() => {
+        if (userPassword) setEditPassword(userPassword);
+    }, [userPassword]);
 
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -80,19 +131,53 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
             const updates = {
                 nome: editName,
                 telefone_whatsapp: editWhatsapp,
-                // Nota: Atualização de e-mail e senha exigiria uso de supabase.auth.updateUser()
-                // por segurança, estamos atualizando apenas os dados públicos na tabela users.
+                whatsapp: editWhatsapp,
             };
 
             const { error } = await supabase.from('users').update(updates).eq('id', user.id);
             if (error) throw error;
+
+            // 1. Atualizar e-mail se alterado
+            if (editEmail && editEmail !== userEmail) {
+                const { error: authError } = await supabase.auth.updateUser({
+                    email: editEmail
+                });
+                if (authError) throw authError;
+                alert('Solicitação de alteração de e-mail enviada! Verifique sua caixa de entrada e o novo e-mail para confirmar a alteração.');
+            }
+
+            // 2. Atualizar senha apenas se digitada uma nova senha e modificada
+            if (isPasswordDirty && editPassword && editPassword.trim() !== '') {
+                try {
+                    const { error: authError } = await supabase.auth.updateUser({
+                        password: editPassword
+                    });
+                    if (authError) {
+                        const errMsg = authError.message || '';
+                        if (errMsg.toLowerCase().includes('should be different') || 
+                            errMsg.toLowerCase().includes('same as')) {
+                            console.log('Ignorando erro de senha idêntica');
+                        } else {
+                            throw authError;
+                        }
+                    }
+                } catch (authErr: any) {
+                    const errMsg = authErr.message || '';
+                    if (errMsg.toLowerCase().includes('should be different') || 
+                        errMsg.toLowerCase().includes('same as')) {
+                        console.log('Ignorando erro de senha idêntica na captura');
+                    } else {
+                        throw authErr;
+                    }
+                }
+            }
 
             alert('Dados salvos com sucesso!');
             setIsEditProfileOpen(false);
             window.location.reload(); // Recarrega para atualizar o layout
         } catch (err: any) {
             console.error('Erro ao salvar perfil:', err);
-            alert('Não foi possível salvar os dados. Verifique a configuração do banco.');
+            alert(`Erro ao salvar os dados: ${err.message || JSON.stringify(err)}`);
         } finally {
             setIsSavingProfile(false);
         }
@@ -224,36 +309,6 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
         { id: 'logout', label: 'Sair do Sistema', icon: Icons.LogOut, onClick: onLogout, className: 'text-red-500 hover:bg-red-50' },
     ];
 
-    const Modal = ({ isOpen, onClose, title, children }: { isOpen: boolean, onClose: () => void, title: string, children: React.ReactNode }) => (
-        <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm"
-                    />
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="bg-white rounded-[32px] w-full max-w-md p-8 shadow-2xl relative z-10 border border-black/5"
-                    >
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-xl font-bold">{title}</h3>
-                            <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full transition-colors">
-                                <Icons.X size={20} />
-                            </button>
-                        </div>
-                        {children}
-                    </motion.div>
-                </div>
-            )}
-        </AnimatePresence>
-    );
-
     return (
         <header className="h-20 bg-white border-b border-black/5 px-4 md:px-8 flex items-center justify-between shrink-0 relative z-20">
             <div className="flex items-center gap-4">
@@ -382,14 +437,37 @@ export default function Header({ role, activeItem, subtitle, setIsSidebarOpen, o
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">E-mail (Apenas Leitura)</label>
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">E-mail de Acesso</label>
                         <input 
                             type="email" 
-                            value={userEmail || ""} 
-                            readOnly
-                            className="w-full px-4 py-3 rounded-xl border border-black/5 bg-black/5 outline-none transition-all cursor-not-allowed opacity-70" 
+                            value={editEmail} 
+                            onChange={(e) => setEditEmail(e.target.value)}
+                            placeholder="Digite seu e-mail de acesso"
+                            className="w-full px-4 py-3 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all font-medium" 
                         />
-                        <p className="text-[10px] text-black/40 mt-1">O e-mail é vinculado à sua conta de acesso e não pode ser alterado aqui.</p>
+                        <p className="text-[10px] text-black/40 mt-1">Se você alterar o e-mail, uma confirmação será enviada para o novo endereço.</p>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Senha de Acesso</label>
+                        <div className="relative">
+                            <input 
+                                type={showPassword ? "text" : "password"} 
+                                value={editPassword}
+                                onChange={(e) => {
+                                    setEditPassword(e.target.value);
+                                    setIsPasswordDirty(true);
+                                }}
+                                placeholder="Digite sua senha de acesso" 
+                                className="w-full px-4 py-3 pr-12 rounded-xl border border-black/10 focus:border-[#00A859] outline-none transition-all font-medium" 
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-black/40 hover:text-black transition-colors"
+                            >
+                                {showPassword ? <Icons.EyeOff size={18} /> : <Icons.Eye size={18} />}
+                            </button>
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-black/40 uppercase tracking-wider">Telefone de Contato (WhatsApp)</label>

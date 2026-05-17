@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, Users, CheckCircle, AlertCircle, ChevronRight, FileText, Calendar, ClipboardList, Accessibility, GraduationCap, School, Book, Megaphone, HelpCircle, DollarSign, FileBox, ShieldCheck, Settings, LayoutDashboard, FileEdit, Search, ArrowLeft, User, Clock, History, BookOpen, BarChart2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import * as Icons from 'lucide-react';
-import PedagogicalIndicators from './PedagogicalIndicators';
+
 import {
   LineChart,
   Line,
@@ -152,7 +152,7 @@ export default function EvolutionDashboard({ onNavigate, records, userId, profes
   const indicators = [
     { label: 'Total de Registros', value: totalRegistros.toString(), icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50/50', border: 'border-blue-100' },
     { label: 'Planejamentos', value: totalPlanejamentos.toString(), icon: GraduationCap, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-100' },
-    { label: 'Reflexões Salvas', value: dbStats.reflexoes.toString(), icon: BookOpen, color: 'text-[#00A859]', bg: 'bg-[#00A859]/5', border: 'border-[#00A859]/10' },
+    { label: 'Alunos', value: boletimAlunos.length.toString(), icon: Users, color: 'text-[#00A859]', bg: 'bg-[#00A859]/5', border: 'border-[#00A859]/10' },
   ];
 
   const shortcutCategories = [
@@ -584,6 +584,36 @@ export default function EvolutionDashboard({ onNavigate, records, userId, profes
                   </div>
                 ))}
               </div>
+
+              {/* Grafico de Distribuição Pedagógica */}
+              <div className="border-t border-slate-100 pt-6 space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">Distribuição por Componente</h4>
+                <div className="h-[180px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: 'Matemática', value: 85, fill: '#10B981' },
+                        { name: 'Português', value: 70, fill: '#3B82F6' },
+                        { name: 'Sociais', value: 45, fill: '#94A3B8' },
+                        { name: 'Ciências', value: 60, fill: '#F59E0B' },
+                        { name: 'Artes', value: 75, fill: '#8B5CF6' }
+                      ]}
+                      margin={{ top: 10, right: 0, left: -25, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f8fafc" />
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: '600', fill: '#64748B' }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94A3B8' }} domain={[0, 100]} />
+                      <Tooltip 
+                        cursor={{ fill: '#f8fafc' }} 
+                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}
+                        formatter={(value: any) => [`${value}%`, 'Cobertura']}
+                      />
+                      <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={24} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
             </div>
           </motion.div>
         </div>
@@ -654,19 +684,7 @@ export default function EvolutionDashboard({ onNavigate, records, userId, profes
         )}
       </div>
 
-      {/* Indicadores de Prática — incorporado dentro do Dashboard */}
-      <div className="space-y-4 mt-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#00A859]/10 rounded-2xl flex items-center justify-center text-[#00A859]">
-            <BarChart2 size={20} />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black tracking-tight">Indicadores de Prática</h2>
-            <p className="text-xs text-black/40 font-medium">Visão analítica da sua prática pedagógica</p>
-          </div>
-        </div>
-        <PedagogicalIndicators records={records} />
-      </div>
+
 
       {/* Shortcuts */}
       <div className="space-y-8 pb-12">

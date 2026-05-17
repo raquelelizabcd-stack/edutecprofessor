@@ -12,6 +12,7 @@ interface DashboardLayoutProps {
     onStartTour?: () => void;
     userDataExpiracao?: string | null;
     statusPagamento?: string | null;
+    userName?: string;
     robotName?: string;
     onSaveRobotName?: (name: string) => Promise<void>;
     subtitle?: string;
@@ -30,6 +31,7 @@ export default function DashboardLayout({
     onStartTour,
     userDataExpiracao,
     statusPagamento,
+    userName,
     robotName,
     onSaveRobotName,
     subtitle,
@@ -39,7 +41,17 @@ export default function DashboardLayout({
     children
 }: DashboardLayoutProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const activeItem = NAV_ITEMS.find(item => item.id === activeTab);
+    const activeItem = NAV_ITEMS.find(item => item.id === activeTab) || {
+        id: activeTab,
+        label: activeTab === 'planejamento-diario' ? 'Planejamento Diário' :
+               activeTab === 'planejamento-semanal' ? 'Planejamento Semanal' :
+               activeTab === 'planejamento-mensal' ? 'Planejamento Mensal' :
+               activeTab === 'relatorios-turma' ? 'Relatório de Turma' :
+               activeTab === 'parecer-pcd' ? 'Parecer PCD' : 'Registro Pedagógico',
+        icon: 'FileText',
+        category: 'Registros Pedagógicos',
+        roles: []
+    };
 
     return (
         <div className="flex h-screen bg-[#AFEEEE] text-[#1A1A1A] font-sans overflow-hidden relative">
@@ -64,12 +76,12 @@ export default function DashboardLayout({
                     onStartTour={onStartTour}
                     userDataExpiracao={userDataExpiracao}
                     statusPagamento={statusPagamento}
+                    userName={userName}
                     robotName={robotName}
                     onSaveRobotName={onSaveRobotName}
                     userEmail={userEmail}
                     userPassword={userPassword}
                     userWhatsapp={userWhatsapp}
-
                 />
                 <div className="flex-1 overflow-y-scroll p-4 md:p-8 custom-scrollbar">
                     {children}

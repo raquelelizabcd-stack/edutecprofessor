@@ -10,9 +10,17 @@ interface PortfolioViewProps {
   records: PedagogicalRecord[];
   onOpenRecord: (record: PedagogicalRecord) => void;
   professorNome?: string;
+  formData?: any;
 }
 
-export default function PortfolioView({ records, onOpenRecord, professorNome }: PortfolioViewProps) {
+export default function PortfolioView({ records, onOpenRecord, professorNome, formData }: PortfolioViewProps) {
+  const filteredRecords = useMemo(() => {
+    if (formData?.alunoNome) {
+      return records.filter(r => r.alunoNome === formData.alunoNome);
+    }
+    return records;
+  }, [records, formData?.alunoNome]);
+
   const handleExportAll = () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -23,99 +31,161 @@ export default function PortfolioView({ records, onOpenRecord, professorNome }: 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(26);
     doc.setFont("helvetica", "bold");
-    doc.text("Currículo Pedagógico Consolidado", 14, 25);
+    doc.text(formData?.title ? "Portfólio Pedagógico Consolidado" : "Currículo Pedagógico Consolidado", 14, 25);
     doc.setFontSize(14);
     doc.setFont("helvetica", "normal");
-    doc.text(`EduTecPro — Professor: ${professorNome || 'Docente'}`, 14, 38);
+    doc.text(`EduTecPro — Professor: ${formData?.professorName || professorNome || 'Docente'}`, 14, 38);
     doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 45);
 
     let yPos = 65;
 
-    // Resumo Estatístico
-    const total = records.length;
+    // Se houver formData, renderizar as Informações do Portfólio
+    if (formData) {
+      doc.setTextColor(0, 168, 89);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Dados de Identificação do Portfólio", 14, yPos);
+      yPos += 8;
+
+      const portfolioFields = [
+        { l: "Título do Registro", v: formData.title || "Portfólio" },
+        { l: "Data do Portfólio", v: formData.date ? new Date(formData.date).toLocaleDateString('pt-BR') : new Date().toLocaleDateString('pt-BR') },
+        { l: "Professor Responsável", v: formData.professorName || professorNome || "Docente" },
+        { l: "Aluno Vinculado", v: formData.alunoNome || "Nenhum aluno específico" },
+        { l: "Componente Curricular", v: formData.curricularComponent || "Não especificado" },
+        { l: "Período Pedagógico", v: formData.period || "Não especificado" },
+        { l: "Presença no Registro", v: formData.presenca || "Não registrada" },
+        { l: "Tom do Relatório", v: formData.tone || "Formal" }
+      ];
+
+      portfolioFields.forEach(field => {
+        doc.setTextColor(80, 80, 80);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${field.l}:`, 14, yPos);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${field.v}`, 65, yPos);
+        yPos += 6.5;
+      });
+
+      if (formData.description) {
+        yPos += 4;
+        doc.setTextColor(80, 80, 80);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text("Observações do Professor:", 14, yPos);
+        yPos += 5;
+
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(60, 60, 60);
+        const splitDesc = doc.splitTextToSize(formData.description, pageWidth - 28);
+        const boxHeight = (splitDesc.length * 5) + 6;
+        doc.setFillColor(245, 247, 245);
+        doc.rect(14, yPos - 3, pageWidth - 28, boxHeight, 'F');
+        doc.text(splitDesc, 16, yPos + 2);
+        yPos += boxHeight + 10;
+      } else {
+        yPos += 6;
+      }
+
+      doc.setDrawColor(230, 230, 230);
+      doc.line(14, yPos, pageWidth - 14, yPos);
+      yPos += 12;
+    }
+
+    // Resumo Estatístico das Atividades Pedagógicas
+    const total = filteredRecords.length;
     const stats_summary = [
-      { l: 'Total de Registros', v: total },
-      { l: 'Planej. Semanais', v: records.filter(r => r.moduleId === 'planejamento-semanal').length },
-      { l: 'Planej. Mensais', v: records.filter(r => r.moduleId === 'planejamento-mensal').length },
-      { l: 'Planej. Diários', v: records.filter(r => r.moduleId === 'planejamento-diario').length },
-      { l: 'Relatórios Individuais', v: records.filter(r => r.moduleId === 'relatorio-individual').length },
-      { l: 'Reflexões Pedagógicas', v: records.filter(r => r.moduleId === 'reflexoes').length }
+      { l: formData?.alunoNome ? 'Total de Registros do Aluno' : 'Total de Registros', v: total },
+      { l: 'Planejamentos Diários', v: filteredRecords.filter(r => r.moduleId === 'planejamento-diario').length },
+      { l: 'Planejamentos Semanais', v: filteredRecords.filter(r => r.moduleId === 'planejamento-semanal').length },
+      { l: 'Planejamentos Mensais', v: filteredRecords.filter(r => r.moduleId === 'planejamento-mensal').length },
+      { l: 'Relatórios & Pareceres', v: filteredRecords.filter(r => ['relatorio-individual', 'parecer-pcd'].includes(r.moduleId)).length },
+      { l: 'Reflexões Salvas', v: filteredRecords.filter(r => r.moduleId === 'reflexoes').length }
     ];
 
     doc.setTextColor(0, 168, 89);
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("Resumo de Atividades", 14, yPos);
+    doc.text(formData?.alunoNome ? `Resumo Pedagógico do Aluno (${formData.alunoNome})` : "Resumo de Atividades", 14, yPos);
     yPos += 10;
 
     stats_summary.forEach(stat => {
       doc.setTextColor(80, 80, 80);
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.text(`${stat.l}:`, 14, yPos);
       doc.setFont("helvetica", "normal");
-      doc.text(`${stat.v}`, 70, yPos);
-      yPos += 7;
+      doc.text(`${stat.v}`, 75, yPos);
+      yPos += 6.5;
     });
 
-    yPos += 10;
+    yPos += 8;
     doc.setDrawColor(230, 230, 230);
     doc.line(14, yPos, pageWidth - 14, yPos);
-    yPos += 15;
+    yPos += 12;
 
     // Lista de Registros
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("Histórico de Registros (Linha do Tempo)", 14, yPos);
+    doc.text(formData?.alunoNome ? `Linha do Tempo Pedagógica de ${formData.alunoNome}` : "Histórico de Registros (Linha do Tempo)", 14, yPos);
     yPos += 12;
 
-    const sorted = [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sorted = [...filteredRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    sorted.forEach((record, index) => {
-      if (yPos > 250) {
-        doc.addPage();
-        yPos = 20;
-      }
-
-      doc.setTextColor(0, 168, 89);
-      doc.setFontSize(11);
-      doc.setFont("helvetica", "bold");
-      doc.text(`${new Date(record.date).toLocaleDateString('pt-BR')} — ${record.title}`, 14, yPos);
-      yPos += 6;
-
+    if (sorted.length === 0) {
       doc.setTextColor(140, 140, 140);
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "normal");
-      const modLabel = NAV_ITEMS.find(n => n.id === record.moduleId)?.label || record.moduleId;
-      const presencaInfo = record.presenca ? ` (${record.presenca})` : '';
-      doc.text(`Módulo: ${modLabel}${record.alunoNome ? ` | Aluno: ${record.alunoNome}${presencaInfo}` : ''}`, 14, yPos);
-      yPos += 6;
-
-      doc.setTextColor(60, 60, 60);
       doc.setFontSize(10);
-      const desc = record.description || record.content || 'Sem descrição detalhada.';
-      const splitDesc = doc.splitTextToSize(desc, pageWidth - 28);
-      doc.text(splitDesc, 14, yPos);
-      yPos += (splitDesc.length * 5) + 12;
-    });
+      doc.setFont("helvetica", "italic");
+      doc.text("Nenhum outro registro vinculado encontrado.", 14, yPos);
+    } else {
+      sorted.forEach((record, index) => {
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = 20;
+        }
 
-    doc.save(`Curriculo_Consolidado_${new Date().getTime()}.pdf`);
+        doc.setTextColor(0, 168, 89);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(`${new Date(record.date).toLocaleDateString('pt-BR')} — ${record.title}`, 14, yPos);
+        yPos += 5;
+
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        const modLabel = NAV_ITEMS.find(n => n.id === record.moduleId)?.label || record.moduleId;
+        const presencaInfo = record.presenca ? ` (${record.presenca})` : '';
+        doc.text(`Módulo: ${modLabel}${record.alunoNome ? ` | Aluno: ${record.alunoNome}${presencaInfo}` : ''}`, 14, yPos);
+        yPos += 5;
+
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(10);
+        const desc = record.description || record.content || 'Sem descrição detalhada.';
+        const splitDesc = doc.splitTextToSize(desc, pageWidth - 28);
+        doc.text(splitDesc, 14, yPos);
+        yPos += (splitDesc.length * 5) + 8;
+      });
+    }
+
+    doc.save(`Portfolio_${formData?.alunoNome ? formData.alunoNome.replace(/\s+/g, '_') : 'Geral'}_${new Date().getTime()}.pdf`);
   };
+
   const sortedRecords = useMemo(() => {
-    return [...records].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [records]);
+    return [...filteredRecords].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [filteredRecords]);
 
   const stats = useMemo(() => {
-    const total = records.length;
-    const weekly = records.filter(r => r.moduleId === 'planejamento-semanal').length;
-    const monthly = records.filter(r => r.moduleId === 'planejamento-mensal').length;
-    const daily = records.filter(r => r.moduleId === 'planejamento-diario').length;
-    const reports = records.filter(r => ['relatorio-individual', 'parecer-pcd'].includes(r.moduleId)).length;
-    const reflections = records.filter(r => r.moduleId === 'reflexoes').length;
+    const total = filteredRecords.length;
+    const weekly = filteredRecords.filter(r => r.moduleId === 'planejamento-semanal').length;
+    const monthly = filteredRecords.filter(r => r.moduleId === 'planejamento-mensal').length;
+    const daily = filteredRecords.filter(r => r.moduleId === 'planejamento-diario').length;
+    const reports = filteredRecords.filter(r => ['relatorio-individual', 'parecer-pcd'].includes(r.moduleId)).length;
+    const reflections = filteredRecords.filter(r => r.moduleId === 'reflexoes').length;
 
     return { total, weekly, monthly, daily, reports, reflections };
-  }, [records]);
+  }, [filteredRecords]);
 
   return (
     <div className="space-y-8">
@@ -131,6 +201,7 @@ export default function PortfolioView({ records, onOpenRecord, professorNome }: 
           </div>
         </div>
         <button
+          type="button"
           onClick={handleExportAll}
           className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-2xl font-bold hover:bg-black/80 transition-all shadow-lg active:scale-95"
         >

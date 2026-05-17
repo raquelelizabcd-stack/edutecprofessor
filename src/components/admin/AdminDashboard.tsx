@@ -108,6 +108,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     recentPayments: [] 
   });
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [userSearch, setUserSearch] = useState('');
   const [authUsers, setAuthUsers] = useState<AuthUser[]>([]);
   const [recentStudents, setRecentStudents] = useState<any[]>([]);
   const [recentPlans, setRecentPlans] = useState<any[]>([]);
@@ -160,6 +161,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [pixPayments, setPixPayments] = useState<any[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'stripe' | 'pix'>('all');
+
+  const [revenueStats, setRevenueStats] = useState({
+    monthly: 0,
+    accumulated: 0,
+    history: [] as { label: string, value: number }[]
+  });
   
   const [layoutConfig, setLayoutConfig] = useState({
     theme: 'light',
@@ -290,6 +297,74 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             proProfessors: proCount 
           }));
         }
+
+        // Buscar todos os pagamentos para cálculo de faturamento no Dashboard
+        const [stripeAll, pixAll] = await Promise.all([
+          supabase
+            .from('pagamentos_stripe')
+            .select('valor, status, created_at'),
+          supabase
+            .from('pagamentos_pix')
+            .select('valor, status, created_at')
+        ]);
+
+        const stripeData = stripeAll.data || [];
+        const pixData = pixAll.data || [];
+
+        // Combinar todos os registros de pagamentos pagos/aprovados/ativos/sucedidos
+        const paidRecords = [
+          ...stripeData.map(p => ({ ...p, valor: parseFloat(p.valor) || 0 })),
+          ...pixData.map(p => ({ ...p, valor: parseFloat(p.valor) || 0 }))
+        ].filter(p => 
+          p.status === 'PAID' || 
+          p.status === 'active' || 
+          p.status === 'succeeded' || 
+          p.status === 'aprovado'
+        );
+
+        // Faturamento Acumulado
+        const accumulated = paidRecords.reduce((sum, p) => sum + p.valor, 0);
+
+        // Faturamento Mensal Atual
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        const monthly = paidRecords
+          .filter(p => {
+            const date = new Date(p.created_at);
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+          })
+          .reduce((sum, p) => sum + p.valor, 0);
+
+        // Evolução dos últimos 3 meses
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const history: { label: string, value: number }[] = [];
+        
+        for (let i = 2; i >= 0; i--) {
+          const d = new Date();
+          d.setMonth(now.getMonth() - i);
+          const m = d.getMonth();
+          const y = d.getFullYear();
+          
+          const total = paidRecords
+            .filter(p => {
+              const date = new Date(p.created_at);
+              return date.getMonth() === m && date.getFullYear() === y;
+            })
+            .reduce((sum, p) => sum + p.valor, 0);
+
+          history.push({
+            label: `${monthNames[m]}/${String(y).slice(-2)}`,
+            value: total
+          });
+        }
+
+        setRevenueStats({
+          monthly,
+          accumulated,
+          history
+        });
 
         // Buscar usuários do Schema AUTH via RPC
         const { data: authData, error: authError } = await supabase
@@ -962,7 +1037,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setSelectedUser(user);
     setModalType('userDetails');
     setActiveMenuUserId(null);
-    setUserDetailedActiveTab('resumo');
+    setUserDetailedActiveTab('planejamentos');
     setExpandedItems({});
     setUserDetailedData(prev => ({ ...prev, loading: true }));
 
@@ -1236,6 +1311,63 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <div className="space-y-8">
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Card de Faturamento Total */}
+                <div className="md:col-span-3 bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-all duration-300 animate-in fade-in duration-500">
+                  {/* Left Side: Monthly & Accumulated Stats */}
+                  <div className="flex-1 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-green-50 text-green-600 rounded-xl">
+                        <CreditCard className="w-6 h-6" />
+                      </div>
+                      <h4 className="font-extrabold text-slate-800 text-lg">Faturamento Total</h4>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100/50 hover:bg-slate-100/50 transition-colors">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Faturamento do Mês</p>
+                        <h3 className="text-2xl md:text-3xl font-black text-[#00A859] mt-1">
+                          R$ {revenueStats.monthly.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </h3>
+                      </div>
+                      <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100/50 hover:bg-slate-100/50 transition-colors">
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Faturamento Acumulado</p>
+                        <h3 className="text-2xl md:text-3xl font-black text-slate-900 mt-1">
+                          R$ {revenueStats.accumulated.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </h3>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Side: Graph showing evolution of the last 3 months */}
+                  <div className="w-full md:w-72 bg-slate-50 p-5 rounded-2xl border border-slate-100/50 flex flex-col justify-between min-h-[160px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Evolução da Receita</p>
+                      <span className="text-[9px] bg-green-100 text-green-700 font-extrabold px-1.5 py-0.5 rounded-full uppercase">3 Meses</span>
+                    </div>
+                    <div className="flex items-end justify-around h-24 pt-2 gap-3">
+                      {revenueStats.history.map((h, idx) => {
+                        const maxValue = Math.max(...revenueStats.history.map(item => item.value), 1);
+                        const percentHeight = Math.min(100, Math.max(12, (h.value / maxValue) * 100));
+                        return (
+                          <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 group relative">
+                            {/* Tooltip on hover */}
+                            <div className="absolute bottom-full mb-1 bg-slate-950 text-white text-[9px] font-black px-2 py-0.5 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-10">
+                              R$ {h.value.toFixed(2)}
+                            </div>
+                            {/* Bar Container */}
+                            <div className="w-full bg-slate-200/50 rounded-t-lg h-16 flex items-end">
+                              <div 
+                                className="w-full bg-[#00A859] hover:bg-[#008F4C] transition-all duration-300 rounded-t-lg" 
+                                style={{ height: `${percentHeight}%` }}
+                              />
+                            </div>
+                            <span className="text-[9px] font-extrabold text-slate-500 uppercase">{h.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
@@ -1382,6 +1514,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   <input 
                     type="text" 
                     placeholder="Buscar por nome ou email..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1400,7 +1534,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <table className="min-w-[900px] w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-100">
-                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Professor</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Usuários</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Plano</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Status Pagamento</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Cadastro</th>
@@ -1408,7 +1542,16 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                  {users.map((user) => (
+                  {users
+                    .filter(user => {
+                      if (!userSearch) return true;
+                      const searchLower = userSearch.toLowerCase();
+                      return (
+                        (user.nome || '').toLowerCase().includes(searchLower) ||
+                        (user.email || '').toLowerCase().includes(searchLower)
+                      );
+                    })
+                    .map((user) => (
                     <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
@@ -1529,7 +1672,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                 <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                   <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
                     <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                      <h2 className="text-xl font-bold text-slate-800">Editar Professor</h2>
+                      <h2 className="text-xl font-bold text-slate-800">Editar Usuário</h2>
                       <button onClick={() => setModalType(null)} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X size={20} /></button>
                     </div>
                     <form onSubmit={handleEditUser} className="p-8 space-y-6">
@@ -1641,13 +1784,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                     {/* Tabs / Navegação Interna */}
                     <div className="flex bg-slate-50 border-b border-slate-200 px-8 py-2 gap-2 overflow-x-auto scrollbar-hide shrink-0">
                       {[ 
-                        { id: 'resumo', label: 'Resumo Geral', icon: LayoutDashboard },
                         { id: 'planejamentos', label: 'Planejamentos', icon: Calendar },
-                        { id: 'relatorios', label: 'Relatórios/Pareceres', icon: FileText },
-                        { id: 'pratica-autonoma', label: 'Prática Autônoma', icon: BookOpen },
+                        { id: 'relatorios', label: 'Relatórios Individuais', icon: FileText },
                         { id: 'portfolio', label: 'Portfólio Digital', icon: History },
                         { id: 'reflexoes', label: 'Diário de Reflexões', icon: Book },
-                        { id: 'gestao', label: 'Gestão Pedagógica', icon: BarChart2 },
                         { id: 'alunos', label: 'Alunos', icon: Users },
                         { id: 'presenca', label: 'Presença do Aluno', icon: CheckSquare }
                       ].map(tab => (
@@ -1676,66 +1816,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                       ) : (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
                           
-                          {/* 1. RESUMO GERAL */}
-                          {userDetailedActiveTab === 'resumo' && (
-                            <div className="space-y-8">
-                              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-                                  <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4"><Users size={24} /></div>
-                                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Alunos</h4>
-                                  <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.alunos.length}</p>
-                                </div>
-                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-                                  <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center mb-4"><Calendar size={24} /></div>
-                                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Planejamentos</h4>
-                                  <p className="text-3xl font-black text-slate-900 mt-2">
-                                    {(userDetailedData.planejamentoDiario?.length || 0) + (userDetailedData.planejamentoSemanal?.length || 0) + (userDetailedData.planejamentoMensal?.length || 0)}
-                                  </p>
-                                </div>
-                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-                                  <div className="w-12 h-12 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-4"><FileText size={24} /></div>
-                                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Relatórios</h4>
-                                  <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.relatorios.length}</p>
-                                </div>
-                                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center text-center">
-                                  <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-2xl flex items-center justify-center mb-4"><CheckSquare size={24} /></div>
-                                  <h4 className="text-slate-500 text-xs font-bold uppercase tracking-wider">Chamadas</h4>
-                                  <p className="text-3xl font-black text-slate-900 mt-2">{userDetailedData.presencaAlunos.length}</p>
-                                </div>
-                              </div>
 
-                              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                  <Activity className="text-blue-600" size={20} /> Histórico de Atividades do Professor
-                                </h3>
-                                <div className="space-y-4">
-                                  {[
-                                    ...(userDetailedData.planejamentoDiario || []).map(p => ({ ...p, type: 'Plano Diário', color: 'bg-blue-500', icon: Calendar })),
-                                    ...(userDetailedData.planejamentoSemanal || []).map(p => ({ ...p, type: 'Plano Semanal', color: 'bg-purple-500', icon: Calendar })),
-                                    ...(userDetailedData.relatorios || []).map(p => ({ ...p, type: 'Relatório', color: 'bg-green-500', icon: FileText })),
-                                    ...(userDetailedData.diarioReflexoes || []).map(p => ({ ...p, type: 'Reflexão', color: 'bg-orange-500', icon: BookOpen }))
-                                  ]
-                                  .sort((a, b) => new Date(b.created_at || b.data || b.data_ref).getTime() - new Date(a.created_at || a.data || a.data_ref).getTime())
-                                  .slice(0, 8)
-                                  .map((item, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                      <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 ${item.color} text-white rounded-xl flex items-center justify-center`}><item.icon size={20} /></div>
-                                        <div>
-                                          <p className="text-sm font-bold text-slate-800">{item.titulo_registro || item.titulo || 'Registro sem título'}</p>
-                                          <p className="text-xs text-slate-500 mt-1">{item.type} • {new Date(item.created_at || item.data || item.data_ref).toLocaleDateString('pt-BR')}</p>
-                                        </div>
-                                      </div>
-                                      <span className="text-[10px] font-bold text-slate-400">#{item.id.substring(0, 8)}</span>
-                                    </div>
-                                  ))}
-                                  {(!userDetailedData.planejamentoDiario?.length && !userDetailedData.relatorios?.length) && (
-                                    <div className="py-20 text-center text-slate-400">Sem atividades registradas recentemente.</div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
 
                           {/* 2. PLANEJAMENTOS */}
                           {userDetailedActiveTab === 'planejamentos' && (
@@ -1850,68 +1931,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                             </div>
                           )}
 
-                          {/* 4. PRÁTICA AUTÔNOMA (Dashboard de Indicadores) */}
-                          {userDetailedActiveTab === 'pratica-autonoma' && (
-                            <div className="space-y-8">
-                              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                  <BarChart2 className="text-blue-600" size={20} /> Cobertura Pedagógica (Campos de Experiência / BNCC)
-                                </h3>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                  <div className="space-y-6">
-                                    <div>
-                                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block mb-4">Métricas de Impacto</label>
-                                      <div className="grid grid-cols-2 gap-4">
-                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                          <p className="text-2xl font-black text-blue-600">
-                                            {[...userDetailedData.planejamentoDiario, ...userDetailedData.planejamentoSemanal].reduce((acc, p) => acc + (p.bncc_codes?.length || 0), 0)}
-                                          </p>
-                                          <p className="text-[10px] font-bold text-slate-500 uppercase">Habilidades BNCC</p>
-                                        </div>
-                                        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                                          <p className="text-2xl font-black text-green-600">
-                                            {userDetailedData.diarioReflexoes.length}
-                                          </p>
-                                          <p className="text-[10px] font-bold text-slate-500 uppercase">Reflexões Críticas</p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                    
-                                    <div className="space-y-5">
-                                      <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Consistência de Registro</label>
-                                      {[
-                                        { label: 'O Eu, o Outro...', value: 85, color: 'bg-green-500' },
-                                        { label: 'Corpo, Gestos...', value: 60, color: 'bg-blue-500' },
-                                        { label: 'Traços, Sons...', value: 45, color: 'bg-amber-500' },
-                                        { label: 'Escuta, Fala...', value: 90, color: 'bg-purple-500' }
-                                      ].map((item, idx) => (
-                                        <div key={idx} className="space-y-1.5">
-                                          <div className="flex justify-between text-[10px] font-bold text-slate-600 uppercase">
-                                            <span>{item.label}</span>
-                                            <span>{item.value}%</span>
-                                          </div>
-                                          <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                            <div className={`h-full ${item.color}`} style={{ width: `${item.value}%` }} />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
 
-                                  <div className="bg-blue-50 rounded-3xl p-8 flex flex-col items-center justify-center text-center">
-                                    <div className="w-20 h-20 bg-white rounded-3xl shadow-xl flex items-center justify-center text-blue-600 mb-6"><Target size={40} /></div>
-                                    <h4 className="text-xl font-bold text-blue-900 mb-2">Evolução da Prática</h4>
-                                    <p className="text-blue-700/70 text-sm leading-relaxed mb-6">A professora mantém uma frequência de registro excepcional, com foco em desenvolvimento socioemocional.</p>
-                                    <div className="w-full bg-white/50 h-2 rounded-full overflow-hidden mb-2">
-                                      <div className="bg-blue-600 h-full w-[78%]" />
-                                    </div>
-                                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">78% de Engajamento Pedagógico</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
 
                           {/* 5. PORTFÓLIO DIGITAL */}
                           {userDetailedActiveTab === 'portfolio' && (
@@ -2004,54 +2024,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                             </div>
                           )}
 
-                          {/* 7. GESTÃO PEDAGÓGICA (Performance) */}
-                          {userDetailedActiveTab === 'gestao' && (
-                            <div className="space-y-8">
-                              <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-                                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                                  <BarChart2 className="text-purple-600" size={20} /> Desempenho e Indicadores da Turma
-                                </h3>
-                                
-                                <div className="overflow-x-auto">
-                                  <table className="w-full">
-                                    <thead>
-                                      <tr className="border-b border-slate-100 bg-slate-50/50 rounded-t-xl">
-                                        <th className="text-left font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-6">Aluno</th>
-                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">1º B</th>
-                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">2º B</th>
-                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">3º B</th>
-                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">4º B</th>
-                                        <th className="text-center font-black text-[10px] uppercase tracking-widest text-slate-400 py-4 px-4">Média</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                      {userDetailedData.alunos.map((a) => {
-                                        const notas = [a.nota_bimestre1, a.nota_bimestre2, a.nota_bimestre3, a.nota_bimestre4].filter(n => n != null);
-                                        const media = notas.length > 0 ? notas.reduce((acc, curr) => acc + curr, 0) / notas.length : null;
-                                        return (
-                                          <tr key={a.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="py-4 px-6 font-bold text-slate-800">{a.nome}</td>
-                                            {[a.nota_bimestre1, a.nota_bimestre2, a.nota_bimestre3, a.nota_bimestre4].map((n, i) => (
-                                              <td key={i} className={`py-4 px-4 text-center font-medium ${n >= 7 ? 'text-green-600' : n >= 5 ? 'text-orange-500' : n != null ? 'text-red-500' : 'text-slate-300'}`}>
-                                                {n != null ? n.toFixed(1) : '—'}
-                                              </td>
-                                            ))}
-                                            <td className="py-4 px-4 text-center">
-                                              {media != null ? (
-                                                <span className={`inline-flex items-center justify-center w-9 h-9 rounded-full text-xs font-black ${media >= 7 ? 'bg-green-50 text-green-700' : media >= 5 ? 'bg-orange-50 text-orange-700' : 'bg-red-50 text-red-700'}`}>
-                                                  {media.toFixed(1)}
-                                                </span>
-                                              ) : '—'}
-                                            </td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                            </div>
-                          )}
+
 
                           {/* 8. ALUNOS */}
                           {userDetailedActiveTab === 'alunos' && (
