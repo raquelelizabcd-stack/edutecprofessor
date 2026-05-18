@@ -4066,6 +4066,150 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   </div>
                 </div>
               </div>
+
+              {/* Testar Autenticação Supabase */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 mt-6">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-slate-800">Testar Autenticação Supabase</h2>
+                      <p className="text-xs text-slate-500">Valide o fluxo de cadastro, confirmação de e-mail e login</p>
+                    </div>
+                  </div>
+
+                  {/* Status do Teste */}
+                  <div>
+                    {authTestStatus === 'success' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        ✅ Autenticação funcionando
+                      </span>
+                    ) : authTestStatus === 'failed' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-200 animate-pulse">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                        ⚠️ Falha na autenticação
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-50 text-slate-600 text-xs font-bold rounded-full border border-slate-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+                        Não executado
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  {/* Descrição dos Passos */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-black">1</span>
+                        <h4 className="font-bold text-xs text-slate-700">Cadastro de Teste</h4>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Cria uma conta temporária com o e-mail fictício <strong>teste@edutecprofessor.com</strong>.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-black">2</span>
+                        <h4 className="font-bold text-xs text-slate-700">E-mail de Confirmação</h4>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Verifica se o Supabase dispara corretamente o e-mail de ativação de conta.
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center justify-center w-5 h-5 bg-blue-100 text-blue-700 rounded-full text-xs font-black">3</span>
+                        <h4 className="font-bold text-xs text-slate-700">Login Confirmado</h4>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">
+                        Valida o token do usuário e confirma a autorização de login no banco.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Feedback em Tempo Real */}
+                  {(testingAuth || authTestStatus || lastAuthTestTime) && (
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                      <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">Resultado da Execução</h4>
+                      
+                      {testingAuth && (
+                        <div className="flex items-center gap-2.5 text-xs text-blue-600 font-bold animate-pulse">
+                          <span className="h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></span>
+                          <span>{authTestStep}</span>
+                        </div>
+                      )}
+
+                      {authTestStatus === 'success' && (
+                        <div className="space-y-1 animate-in fade-in duration-300">
+                          <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs">
+                            <span className="h-2 w-2 bg-emerald-500 rounded-full animate-ping"></span>
+                            ✅ Autenticação por e‑mail funcionando corretamente
+                          </div>
+                          {lastAuthTestTime && (
+                            <p className="text-[10px] text-slate-400 font-medium pl-6">
+                              Última verificação: {lastAuthTestTime}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {authTestStatus === 'failed' && (
+                        <div className="space-y-1 animate-in fade-in duration-300">
+                          <div className="flex items-center gap-2 text-red-600 font-bold text-xs">
+                            <span className="h-2 w-2 bg-red-500 rounded-full"></span>
+                            ⚠️ Falha na autenticação — verifique configuração do Supabase
+                          </div>
+                          {lastAuthTestTime && (
+                            <p className="text-[10px] text-slate-400 font-medium pl-6">
+                              Última verificação: {lastAuthTestTime}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {!testingAuth && !authTestStatus && lastAuthTestTime && (
+                        <p className="text-[10px] text-slate-400 font-medium pl-1">
+                          Último teste executado em: {lastAuthTestTime}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Ação */}
+                  <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <p className="text-xs text-slate-400">Verifique se o SMTP ou envio local estão ativos nas configurações do Supabase.</p>
+                    <button
+                      type="button"
+                      onClick={testSupabaseAuth}
+                      disabled={testingAuth}
+                      className={`px-6 py-3 rounded-xl font-bold transition-all text-xs flex items-center justify-center gap-2 active:scale-95 w-full sm:w-auto shadow-md hover:shadow-lg ${
+                        testingAuth
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      {testingAuth ? (
+                        <>
+                          <span className="h-3 w-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+                          Testando...
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck size={14} /> Testar Autenticação Supabase
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
