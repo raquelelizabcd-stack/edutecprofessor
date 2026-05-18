@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CreditCard, ArrowLeft, CheckCircle2, ShieldCheck, Loader2, Star, Zap, Clock, QrCode, Copy, Check } from 'lucide-react';
+import { CreditCard, ArrowLeft, CheckCircle2, ShieldCheck, Loader2, Star, Zap, Clock, QrCode, Copy, Check, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 
@@ -42,6 +42,7 @@ export default function PaymentPage({
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isDowngrading, setIsDowngrading] = useState(false);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     React.useEffect(() => {
         const fetchSettings = async () => {
@@ -115,7 +116,15 @@ export default function PaymentPage({
                 }
 
                 // Tenta Login ou Cadastro
-                let { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+                console.log('[PaymentPage Stripe] Iniciando signUp para:', email);
+                let { data: authData, error: authError } = await supabase.auth.signUp({ 
+                    email, 
+                    password,
+                    options: {
+                        emailRedirectTo: 'https://edutecprofe.vercel.app/login'
+                    }
+                });
+                console.log('[PaymentPage Stripe] Resultado do signUp:', { authData, authError });
                 if (authError) {
                     if (authError.message.includes('User already registered') || authError.status === 400) {
                         const loginResp = await supabase.auth.signInWithPassword({ email, password });
@@ -124,6 +133,13 @@ export default function PaymentPage({
                     } else {
                         throw authError;
                     }
+                } else {
+                    // Sem erro -> Cadastro com Sucesso -> Disparar Toast
+                    setToast({
+                        message: '✅ Sucesso! E-mail de confirmação enviado. Verifique sua caixa de entrada ou spam.',
+                        type: 'success'
+                    });
+                    setTimeout(() => setToast(null), 8000);
                 }
                 if (!authData.user) throw new Error("Não foi possível autenticar a conta.");
                 activeUserId = authData.user.id;
@@ -144,8 +160,15 @@ export default function PaymentPage({
 
         } catch (err: any) {
             console.error('Checkout error:', err);
+            setToast({
+                message: err.message || 'Erro ao processar assinatura.',
+                type: 'error'
+            });
+            setTimeout(() => setToast(null), 6000);
             // Fallback para o link puro em caso de erro crítico
-            window.location.href = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/28E14ngsDg454UtcAn6EU01";
+            setTimeout(() => {
+                window.location.href = (import.meta as any).env.VITE_STRIPE_PAYMENT_LINK || "https://buy.stripe.com/28E14ngsDg454UtcAn6EU01";
+            }, 2000);
         } finally {
             setIsProcessing(false);
         }
@@ -166,13 +189,28 @@ export default function PaymentPage({
                     return;
                 }
                 // Tenta Login ou Cadastro
-                let { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+                console.log('[PaymentPage PIX] Iniciando signUp para:', email);
+                let { data: authData, error: authError } = await supabase.auth.signUp({ 
+                    email, 
+                    password,
+                    options: {
+                        emailRedirectTo: 'https://edutecprofe.vercel.app/login'
+                    }
+                });
+                console.log('[PaymentPage PIX] Resultado do signUp:', { authData, authError });
                 if (authError && (authError.message.includes('User already registered') || authError.status === 400)) {
                     const loginResp = await supabase.auth.signInWithPassword({ email, password });
                     if (loginResp.error) throw loginResp.error;
                     authData = loginResp.data;
                 } else if (authError) {
                     throw authError;
+                } else {
+                    // Sem erro -> Cadastro com Sucesso -> Disparar Toast
+                    setToast({
+                        message: '✅ Sucesso! E-mail de confirmação enviado. Verifique sua caixa de entrada ou spam.',
+                        type: 'success'
+                    });
+                    setTimeout(() => setToast(null), 8000);
                 }
                 activeUserId = authData.user?.id;
                 activeEmail = email;
@@ -204,7 +242,11 @@ export default function PaymentPage({
             setPixData(data);
         } catch (err: any) {
             console.error('Mercado Pago PIX error:', err);
-            alert('Falha ao gerar PIX: ' + err.message);
+            setToast({
+                message: err.message || 'Falha ao gerar PIX.',
+                type: 'error'
+            });
+            setTimeout(() => setToast(null), 6000);
         } finally {
             setIsProcessing(false);
         }
@@ -538,7 +580,35 @@ export default function PaymentPage({
                         </div>
                     </div>
                 </div>
-            </div>
         </div>
-    );
+        <AnimatePresence>
+            {toast && (
+                <motion.div
+                    initial={{ opacity: 0, y: -20, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -20, scale: 0.9 }}
+                    className={`fixed top-6 right-6 z-50 max-w-md p-4 rounded-2xl shadow-xl border flex items-start gap-3 ${
+                        toast.type === 'success' 
+                            ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
+                            : 'bg-red-50 border-red-100 text-red-800'
+                    }`}
+                >
+                    <div className={`p-1.5 rounded-xl shrink-0 ${toast.type === 'success' ? 'bg-[#00A859] text-white' : 'bg-red-500 text-white'}`}>
+                        {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                    </div>
+                    <div className="flex-1 space-y-1 pr-2">
+                        <p className="text-sm font-bold leading-none">{toast.type === 'success' ? 'Sucesso!' : 'Ocorreu um Erro'}</p>
+                        <p className="text-xs opacity-90 leading-relaxed">{toast.message}</p>
+                    </div>
+                    <button 
+                        onClick={() => setToast(null)} 
+                        className="text-black/20 hover:text-black/40 transition-colors p-1"
+                    >
+                        <X size={16} />
+                    </button>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    </div>
+  );
 }

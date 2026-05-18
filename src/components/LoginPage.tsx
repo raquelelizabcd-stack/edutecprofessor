@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, ChevronLeft, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mail, Lock, ArrowRight, ChevronLeft, Eye, EyeOff, AlertCircle, User, CheckCircle2, X } from 'lucide-react';
 import { UserProfile } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -18,11 +18,13 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+    setToast(null);
 
     try {
       if (isLoginMode) {
@@ -53,15 +55,35 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
         onSuccess();
       } else {
         // Sign Up
+        console.log('[LoginPage] Iniciando signUp para:', email);
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: 'https://edutecprofe.vercel.app/login'
+          }
         });
+        console.log('[LoginPage] Resultado do signUp:', { data, error: signUpError });
 
         if (signUpError) throw signUpError;
 
+        // Sucesso no SignUp -> Disparar Toast
+        setToast({
+          message: '✅ Sucesso! E-mail de confirmação enviado. Verifique sua caixa de entrada ou spam.',
+          type: 'success'
+        });
+
+        // Auto fechar toast após 8 segundos para dar tempo do usuário ler
+        setTimeout(() => {
+          setToast(null);
+        }, 8000);
+
         if (data.user?.identities?.length === 0) {
           setError("Este email já está cadastrado. Faça login.");
+          setToast({
+            message: "Este email já está cadastrado. Faça login.",
+            type: "error"
+          });
           setIsLoginMode(true);
         } else if (data.user) {
           const isProIntent = initialIntent === 'pro';
@@ -113,19 +135,25 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
       }
     } catch (err: any) {
       console.error('Auth error:', err);
+      let translatedMessage = 'Ocorreu um erro na autenticação. Tente novamente mais tarde.';
+      
       // Translate common Supabase messages to Portuguese
       if (err.message === 'Invalid login credentials') {
-        setError('E-mail ou senha incorretos.');
+        translatedMessage = 'E-mail ou senha incorretos.';
       } else if (err.message.includes('Password should be at least')) {
-        setError('A senha deve ter pelo menos 6 caracteres.');
+        translatedMessage = 'A senha deve ter pelo menos 6 caracteres.';
       } else if (err.message.includes('User already registered')) {
-        setError('Este e-mail já está cadastrado.');
+        translatedMessage = 'Este e-mail já está cadastrado.';
       } else if (err.message.includes('For security purposes') || err.message.includes('after')) {
         const seconds = err.message.match(/\d+/);
-        setError(`Por segurança, aguarde ${seconds ? seconds[0] : 'alguns'} segundos antes de tentar novamente.`);
-      } else {
-        setError('Ocorreu um erro na autenticação. Tente novamente mais tarde.');
+        translatedMessage = `Por segurança, aguarde ${seconds ? seconds[0] : 'alguns'} segundos antes de tentar novamente.`;
       }
+      
+      setError(translatedMessage);
+      setToast({
+        message: translatedMessage,
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -268,6 +296,35 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
           </div>
         </div>
       </motion.div>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className={`fixed top-6 right-6 z-50 max-w-md p-4 rounded-2xl shadow-xl border flex items-start gap-3 ${
+              toast.type === 'success' 
+                ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
+                : 'bg-red-50 border-red-100 text-red-800'
+            }`}
+          >
+            <div className={`p-1.5 rounded-xl shrink-0 ${toast.type === 'success' ? 'bg-[#00A859] text-white' : 'bg-red-500 text-white'}`}>
+              {toast.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+            </div>
+            <div className="flex-1 space-y-1 pr-2">
+              <p className="text-sm font-bold leading-none">{toast.type === 'success' ? 'Sucesso!' : 'Ocorreu um Erro'}</p>
+              <p className="text-xs opacity-90 leading-relaxed">{toast.message}</p>
+            </div>
+            <button 
+              onClick={() => setToast(null)} 
+              className="text-black/20 hover:text-black/40 transition-colors p-1"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
