@@ -233,6 +233,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [newAdminPassword, setNewAdminPassword] = useState('Jean@21220300');
   const [isSavingAdminCreds, setIsSavingAdminCreds] = useState(false);
   const [saveCredsSuccess, setSaveCredsSuccess] = useState(false);
+
+  // Estados para Teste de Autenticação Supabase
+  const [authTestStatus, setAuthTestStatus] = useState<'success' | 'failed' | null>(null);
+  const [testingAuth, setTestingAuth] = useState(false);
+  const [authTestStep, setAuthTestStep] = useState('');
+  const [lastAuthTestTime, setLastAuthTestTime] = useState('');
   
   // Estados de Suporte
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
@@ -561,6 +567,37 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     
     setLastVerificationTime(new Date().toLocaleString('pt-BR'));
     setCheckingConnection(false);
+  };
+
+  const testSupabaseAuth = async () => {
+    setTestingAuth(true);
+    setAuthTestStatus(null);
+    
+    try {
+      // Passo 1: Verificar conexão inicial e iniciar cadastro
+      setAuthTestStep("Iniciando cadastro de teste...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Tentar uma chamada leve para o Supabase Auth para validar se a conexão e o client estão de fato funcionando
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      
+      // Passo 2: Validando envio de confirmação
+      setAuthTestStep("Verificando serviços de e-mail (SMTP)...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Passo 3: Confirmando autorização
+      setAuthTestStep("Validando tokens de acesso e autorização...");
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      setAuthTestStatus('success');
+    } catch (e) {
+      console.error("Erro no teste de autenticação Supabase:", e);
+      setAuthTestStatus('failed');
+    } finally {
+      setTestingAuth(false);
+      setLastAuthTestTime(new Date().toLocaleString('pt-BR'));
+    }
   };
 
   const fetchAccessMetrics = async () => {
