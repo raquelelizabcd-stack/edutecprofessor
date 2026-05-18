@@ -718,17 +718,17 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         })),
         demographics: {
           age: [
-            { name: '18-24 anos', value: 15 },
-            { name: '25-34 anos', value: 48 },
-            { name: '35-44 anos', value: 25 },
-            { name: '45+ anos', value: 12 }
+            { name: '18-24 anos', value: 0 },
+            { name: '25-34 anos', value: 0 },
+            { name: '35-44 anos', value: 0 },
+            { name: '45+ anos', value: 0 }
           ],
           location: [
-            { name: 'São Paulo', value: 45 },
-            { name: 'Rio de Janeiro', value: 22 },
-            { name: 'Minas Gerais', value: 13 },
-            { name: 'Paraná', value: 8 },
-            { name: 'Outros', value: 12 }
+            { name: 'São Paulo', value: 0 },
+            { name: 'Rio de Janeiro', value: 0 },
+            { name: 'Minas Gerais', value: 0 },
+            { name: 'Paraná', value: 0 },
+            { name: 'Outros', value: 0 }
           ],
           devices: [
             { name: 'Desktop', value: Math.round((desktopCount / totalLogs) * 100) },
@@ -814,17 +814,17 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         })),
         demographics: {
           age: [
-            { name: '18-24 anos', value: 18 },
-            { name: '25-34 anos', value: 45 },
-            { name: '35-44 anos', value: 22 },
-            { name: '45+ anos', value: 15 }
+            { name: '18-24 anos', value: 0 },
+            { name: '25-34 anos', value: 0 },
+            { name: '35-44 anos', value: 0 },
+            { name: '45+ anos', value: 0 }
           ],
           location: [
-            { name: 'São Paulo', value: 42 },
-            { name: 'Rio de Janeiro', value: 24 },
-            { name: 'Minas Gerais', value: 14 },
-            { name: 'Paraná', value: 10 },
-            { name: 'Outros', value: 10 }
+            { name: 'São Paulo', value: 0 },
+            { name: 'Rio de Janeiro', value: 0 },
+            { name: 'Minas Gerais', value: 0 },
+            { name: 'Paraná', value: 0 },
+            { name: 'Outros', value: 0 }
           ],
           devices: devices.map(item => ({ ...item, value: item.value }))
         }
