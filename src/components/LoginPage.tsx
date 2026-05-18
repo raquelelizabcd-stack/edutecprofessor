@@ -19,6 +19,7 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +28,29 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
     setToast(null);
 
     try {
-      if (isLoginMode) {
+      if (isForgotPasswordMode) {
+        // Reset Password
+        console.log('[LoginPage] Iniciando resetPasswordForEmail para:', email);
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: 'https://edutecprofe.vercel.app/login'
+        });
+        console.log('[LoginPage] Resultado do resetPasswordForEmail:', { error: resetError });
+
+        if (resetError) throw resetError;
+
+        // Sucesso no envio -> Disparar Toast
+        setToast({
+          message: '✅ Sucesso! E-mail de redefinição de senha enviado. Verifique sua caixa de entrada ou spam.',
+          type: 'success'
+        });
+
+        // Auto fechar toast após 8 segundos
+        setTimeout(() => {
+          setToast(null);
+        }, 8000);
+
+        setIsForgotPasswordMode(false); // Volta ao modo login
+      } else if (isLoginMode) {
         // Sign In
         const { data, error: authError } = await supabase.auth.signInWithPassword({
           email,
@@ -162,7 +185,7 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
   return (
     <div className="min-h-screen bg-[#FDFCFB] flex flex-col items-center justify-center p-6">
       <motion.div
-        key={isLoginMode ? 'login' : 'signup'}
+        key={isForgotPasswordMode ? 'forgot' : isLoginMode ? 'login' : 'signup'}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
@@ -181,10 +204,10 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
               E
             </div>
             <h1 className="text-3xl font-bold tracking-tight mb-2">
-              {isLoginMode ? 'Bem-vindo de volta' : 'Crie sua conta'}
+              {isForgotPasswordMode ? 'Recuperar senha' : isLoginMode ? 'Bem-vindo de volta' : 'Crie sua conta'}
             </h1>
             <p className="text-black/40">
-              {isLoginMode ? 'Acesse sua conta para gerenciar suas turmas.' : 'Comece a transformar sua rotina pedagógica.'}
+              {isForgotPasswordMode ? 'Digite seu e-mail para recuperar seu acesso.' : isLoginMode ? 'Acesse sua conta para gerenciar suas turmas.' : 'Comece a transformar sua rotina pedagógica.'}
             </p>
           </div>
 
@@ -196,14 +219,14 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {!isLoginMode && (
+            {!isLoginMode && !isForgotPasswordMode && (
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-black/40 ml-1">Nome Completo</label>
                 <div className="relative">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" size={20} />
                   <input
                     type="text"
-                    required={!isLoginMode}
+                    required={!isLoginMode && !isForgotPasswordMode}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Seu nome"
@@ -228,39 +251,50 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-black/40 ml-1">Senha</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" size={20} />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  minLength={6}
-                  className="w-full pl-12 pr-12 py-4 bg-[#FDFCFB] border border-black/5 rounded-2xl focus:outline-none focus:border-[#00A859] transition-colors"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-black/20 hover:text-black/40 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
+            {!isForgotPasswordMode && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-black/40 ml-1">Senha</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-black/20" size={20} />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required={!isForgotPasswordMode}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    minLength={6}
+                    className="w-full pl-12 pr-12 py-4 bg-[#FDFCFB] border border-black/5 rounded-2xl focus:outline-none focus:border-[#00A859] transition-colors"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-black/20 hover:text-black/40 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {!isLoginMode && (
+                  <p className="text-[10px] text-black/40 ml-1 mt-1 font-medium">Sua senha deve ter no mínimo 6 caracteres</p>
+                )}
               </div>
-              {!isLoginMode && (
-                <p className="text-[10px] text-black/40 ml-1 mt-1 font-medium">Sua senha deve ter no mínimo 6 caracteres</p>
-              )}
-            </div>
+            )}
 
-            {isLoginMode && (
+            {isLoginMode && !isForgotPasswordMode && (
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 cursor-pointer group">
                   <input type="checkbox" className="w-4 h-4 rounded border-black/10 text-[#00A859] focus:ring-[#00A859]" />
                   <span className="text-black/60 group-hover:text-black transition-colors">Lembrar de mim</span>
                 </label>
-                <a href="#" className="text-[#00A859] font-semibold hover:underline">Esqueceu a senha?</a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPasswordMode(true);
+                    setError(null);
+                  }}
+                  className="text-[#00A859] font-semibold hover:underline cursor-pointer"
+                >
+                  Esqueceu a senha?
+                </button>
               </div>
             )}
 
@@ -273,7 +307,7 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <>
-                  {isLoginMode ? 'Entrar no Sistema' : 'Criar Conta Gratuita'}
+                  {isForgotPasswordMode ? 'Recuperar Senha' : isLoginMode ? 'Entrar no Sistema' : 'Criar Conta Gratuita'}
                   <ArrowRight size={20} />
                 </>
               )}
@@ -281,18 +315,35 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
           </form>
 
           <div className="mt-10 pt-8 border-t border-black/5 text-center">
-            <p className="text-black/40 text-sm">
-              {isLoginMode ? 'Ainda não tem uma conta?' : 'Já possui uma conta?'} <br className="sm:hidden" />
-              <button
-                onClick={() => {
-                  setIsLoginMode(!isLoginMode);
-                  setError(null);
-                }}
-                className="text-[#00A859] font-bold hover:underline ml-1 cursor-pointer"
-              >
-                {isLoginMode ? 'Criar conta gratuita' : 'Fazer login agora'}
-              </button>
-            </p>
+            {isForgotPasswordMode ? (
+              <p className="text-black/40 text-sm">
+                Lembrou de sua senha?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPasswordMode(false);
+                    setError(null);
+                  }}
+                  className="text-[#00A859] font-bold hover:underline ml-1 cursor-pointer"
+                >
+                  Voltar para o login
+                </button>
+              </p>
+            ) : (
+              <p className="text-black/40 text-sm">
+                {isLoginMode ? 'Ainda não tem uma conta?' : 'Já possui uma conta?'} <br className="sm:hidden" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsLoginMode(!isLoginMode);
+                    setError(null);
+                  }}
+                  className="text-[#00A859] font-bold hover:underline ml-1 cursor-pointer"
+                >
+                  {isLoginMode ? 'Criar conta gratuita' : 'Fazer login agora'}
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </motion.div>
