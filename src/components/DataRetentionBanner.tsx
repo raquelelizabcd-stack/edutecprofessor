@@ -43,14 +43,14 @@ export default function DataRetentionBanner({
 
         const diffTime = Math.abs(today.getTime() - createdDate.getTime());
         daysPassed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        daysLeft = Math.max(0, 3 - daysPassed); // Novo limite: 3 dias
+        daysLeft = Math.max(0, 7 - daysPassed); // Novo limite: 7 dias
 
         const expDate = new Date(createdDate);
-        expDate.setDate(expDate.getDate() + 3);
+        expDate.setDate(expDate.getDate() + 7);
         expirationDateStr = expDate.toLocaleDateString('pt-BR');
 
         title = 'Aviso de Retenção de Dados (Plano Free)';
-        const baseMsg = 'No Plano Free seus dados ficam armazenados por apenas 3 dias para fins de teste rápido. Após esse período os dados são excluídos permanentemente.';
+        const baseMsg = 'No Plano Free seus dados ficam armazenados por apenas 7 dias para fins de teste rápido. Após esse período os dados são excluídos permanentemente.';
         message = `${baseMsg} Faltam ${daysLeft} dias para expirar.`;
 
         if (daysLeft <= 1) { 
@@ -61,9 +61,9 @@ export default function DataRetentionBanner({
         // Botão sempre disponível para o Plano Free conforme solicitado
         showExportButton = true;
 
-        // Se a pessoa passou os 15 dias, a conta será deletada, mas enquanto a session ta ativa mostramos:
+        // Se a pessoa passou os 7 dias, a conta será deletada, mas enquanto a session ta ativa mostramos:
         if (daysLeft === 0) {
-            message = `O tempo limite de retenção de 3 dias foi atingido. Seus dados podem ser excluídos a qualquer momento.`;
+            message = `O tempo limite de retenção de 7 dias foi atingido. Seus dados podem ser excluídos a qualquer momento.`;
             showWarningUI = true;
         }
 

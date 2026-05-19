@@ -20,6 +20,7 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
+  const [isSignUpSuccess, setIsSignUpSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +84,7 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
           email,
           password,
           options: {
-            emailRedirectTo: 'https://edutecprofe.vercel.app/login'
+            emailRedirectTo: window.location.origin + '/login'
           }
         });
         console.log('[LoginPage] Resultado do signUp:', { data, error: signUpError });
@@ -109,6 +110,9 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
           });
           setIsLoginMode(true);
         } else if (data.user) {
+          if (!data.session) {
+            setIsSignUpSuccess(true);
+          }
           const isProIntent = initialIntent === 'pro';
           
           let trialDaysConfig = 7;
@@ -199,26 +203,52 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
         </button>
 
         <div className="bg-white rounded-[40px] border border-black/5 p-8 md:p-12 shadow-xl shadow-black/5">
-          <div className="text-center mb-10">
-            <div className="w-16 h-16 bg-[#00A859] rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-6 shadow-lg shadow-[#00A859]/20">
-              E
+          {isSignUpSuccess ? (
+            <div className="text-center py-6">
+              <div className="w-16 h-16 bg-emerald-50 text-[#00A859] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-500/10 border border-emerald-100/50 animate-bounce">
+                <CheckCircle2 size={32} />
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight mb-4 text-slate-800">
+                Confirme seu E-mail!
+              </h1>
+              <p className="text-sm text-slate-500 mb-8 leading-relaxed">
+                Enviamos um link de confirmação para o e-mail <strong className="text-slate-800">{email}</strong>. 
+                Acesse sua caixa de entrada ou verifique a pasta de <strong>Spam/Lixo Eletrônico</strong> para ativar sua conta e começar a usar o EduTecProfessor.
+              </p>
+              <button
+                onClick={() => {
+                  setIsSignUpSuccess(false);
+                  setIsLoginMode(true);
+                  setError(null);
+                }}
+                className="w-full py-4 bg-[#00A859] hover:bg-[#008A49] text-white rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-[0.99]"
+              >
+                Ir para o Login
+                <ArrowRight size={20} />
+              </button>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight mb-2">
-              {isForgotPasswordMode ? 'Recuperar senha' : isLoginMode ? 'Bem-vindo de volta' : 'Crie sua conta'}
-            </h1>
-            <p className="text-black/40">
-              {isForgotPasswordMode ? 'Digite seu e-mail para recuperar seu acesso.' : isLoginMode ? 'Acesse sua conta para gerenciar suas turmas.' : 'Comece a transformar sua rotina pedagógica.'}
-            </p>
-          </div>
+          ) : (
+            <>
+              <div className="text-center mb-10">
+                <div className="w-16 h-16 bg-[#00A859] rounded-2xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-6 shadow-lg shadow-[#00A859]/20">
+                  E
+                </div>
+                <h1 className="text-3xl font-bold tracking-tight mb-2">
+                  {isForgotPasswordMode ? 'Recuperar senha' : isLoginMode ? 'Bem-vindo de volta' : 'Crie sua conta'}
+                </h1>
+                <p className="text-black/40">
+                  {isForgotPasswordMode ? 'Digite seu e-mail para recuperar seu acesso.' : isLoginMode ? 'Acesse sua conta para gerenciar suas turmas.' : 'Comece a transformar sua rotina pedagógica.'}
+                </p>
+              </div>
 
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl flex items-start gap-3 border border-red-100">
-              <AlertCircle size={20} className="shrink-0 mt-0.5" />
-              <p className="text-sm font-medium">{error}</p>
-            </div>
-          )}
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-2xl flex items-start gap-3 border border-red-100">
+                  <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium">{error}</p>
+                </div>
+              )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
             {!isLoginMode && !isForgotPasswordMode && (
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-black/40 ml-1">Nome Completo</label>
@@ -345,8 +375,10 @@ export default function LoginPage({ onSuccess, onBack, initialIntent = 'free' }:
               </p>
             )}
           </div>
-        </div>
-      </motion.div>
+        </>
+      )}
+    </div>
+  </motion.div>
 
       <AnimatePresence>
         {toast && (

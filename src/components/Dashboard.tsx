@@ -19,6 +19,7 @@ import DataRetentionBanner from './DataRetentionBanner';
 import { useBncc } from '../hooks/useBncc';
 import { getSuggestionByCode } from '../lib/bnccSuggestions';
 import EduBot from './EduBot';
+import { BUTTON_TEXT_GRADE } from '../constants/labels';
 
 interface DashboardProps {
   userId: string;
@@ -2074,7 +2075,7 @@ export default function Dashboard({
                         className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 active:scale-[0.99] transition-all shadow-lg shadow-emerald-600/20"
                       >
                         <Icons.LayoutDashboard size={20} />
-                        Finalizar Configuração e Ver Grade Semanal
+                        {BUTTON_TEXT_GRADE}
                       </button>
                     </div>
                     {/* ── fim Botão ────────────────────────────────────────── */}

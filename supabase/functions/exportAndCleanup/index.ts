@@ -15,15 +15,15 @@ serve(async (req) => {
     // 1. Encontrar professores expirados
     console.log("Iniciando varredura de professores expirados...");
 
-    // Professores FREE: dados com mais de 15 dias (conta criada há mais de 15 dias)
-    const fifteenDaysAgo = new Date();
-    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+    // Professores FREE: dados com mais de 7 dias (conta criada há mais de 7 dias)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const { data: freeUsers, error: freeError } = await supabase
       .from('users')
       .select('id, email, nome')
       .eq('plano', 'free')
-      .lt('created_at', fifteenDaysAgo.toISOString());
+      .lt('created_at', sevenDaysAgo.toISOString());
 
     if (freeError) {
       console.error("Erro ao buscar usuários Free:", freeError);
@@ -131,7 +131,7 @@ serve(async (req) => {
             from: `"EduTecProfessor" <${EMAIL_USER}>`,
             to: user.email,
             subject: 'EduTecProfessor: Exportação Final de seus Dados Pedagógicos',
-            text: `Olá ${user.nome || 'Professor(a)'},\n\nO período de retenção de 15 dias do seu Plano Free expirou.\n\nConforme nossa política de retenção, estamos enviando em anexo todos os seus registros (planejamentos diários, semanais, mensais, relatórios e reflexões) em formato CSV.\n\nIMPORTANTE: Seus dados foram removidos permanentemente do nosso sistema ativo neste momento. Você pode voltar a utilizar a plataforma a qualquer momento iniciando um novo ciclo.\n\nAtenciosamente,\nEquipe EduTecProfessor`,
+            text: `Olá ${user.nome || 'Professor(a)'},\n\nO período de retenção de 7 dias do seu Plano Free expirou.\n\nConforme nossa política de retenção, estamos enviando em anexo todos os seus registros (planejamentos diários, semanais, mensais, relatórios e reflexões) em formato CSV.\n\nIMPORTANTE: Seus dados foram removidos permanentemente do nosso sistema ativo neste momento. Você pode voltar a utilizar a plataforma a qualquer momento iniciando um novo ciclo.\n\nAtenciosamente,\nEquipe EduTecProfessor`,
             attachments: attachments,
           };
 
@@ -148,7 +148,7 @@ serve(async (req) => {
           // O documentos_bncc deve ter cascade delete ou ser apagado via trigger/manual, 
           // mas as tabelas principais cobertas garantem a limpeza.
 
-          console.log(`Todos os dados do professor ${user.id} foram apagados conforme regra de 15 dias.`);
+          console.log(`Todos os dados do professor ${user.id} foram apagados conforme regra de 7 dias.`);
 
         } catch (mailErr) {
           console.error(`Erro ao enviar e-mail para ${user.email}:`, mailErr);

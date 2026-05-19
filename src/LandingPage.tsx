@@ -162,7 +162,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
       { label: 'Planejamento Diário (1/dia)', icon: BookOpen },
       { label: 'Relatório Individual (1/dia)', icon: FileText },
       { label: 'Exportação PDF bloqueada', icon: X },
-      { label: 'Dados apagados após 3 dias', icon: Zap },
+      { label: 'Dados apagados após 7 dias', icon: Zap },
     ] : [
       { label: 'Todos os recursos Pro (limite: 3 cada)', icon: Star },
       { label: 'Exportação de até 3 PDFs', icon: FileDown },
@@ -439,7 +439,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                   'Planejamento Diário (1/dia)',
                   'Relatório Individual (1/dia)',
                   '❌ Exportação em PDF bloqueada',
-                  '⚠️ Dados apagados após 3 dias',
+                  '⚠️ Dados apagados após 7 dias',
                   'Ads discretos no sistema'
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-3 text-sm text-black/70">

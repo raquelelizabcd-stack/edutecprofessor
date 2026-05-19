@@ -47,7 +47,7 @@ export default function HelpGuide({ onNavigate }: HelpGuideProps) {
       faqs: [
         { q: 'Como exportar meus dados?', a: 'Dentro de cada módulo, existe um ícone de "Download" ou "Exportar" no topo da lista de registros.' },
         { q: 'O sistema salva automaticamente?', a: 'Sim, sempre que você clica em "Salvar", os dados são sincronizados com segurança na nuvem.' },
-        { q: 'Quais os limites do Plano Free?', a: 'O Plano Free permite 1 registro por período (dia/semana) e os dados são mantidos por 3 dias.' },
+        { q: 'Quais os limites do Plano Free?', a: 'O Plano Free permite 1 registro por período (dia/semana) e os dados são mantidos por 7 dias.' },
         { q: 'Posso usar no celular?', a: 'Sim! O sistema é totalmente responsivo e funciona perfeitamente em tablets e smartphones.' },
         { q: 'Como funciona o teste gratuito?', a: 'Ao se cadastrar, você ganha 7 dias de Plano Pro com todos os recursos liberados para testar.' },
       ]

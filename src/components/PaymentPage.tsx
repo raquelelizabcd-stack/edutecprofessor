@@ -121,7 +121,7 @@ export default function PaymentPage({
                     email, 
                     password,
                     options: {
-                        emailRedirectTo: 'https://edutecprofe.vercel.app/login'
+                        emailRedirectTo: window.location.origin + '/login'
                     }
                 });
                 console.log('[PaymentPage Stripe] Resultado do signUp:', { authData, authError });
@@ -194,7 +194,7 @@ export default function PaymentPage({
                     email, 
                     password,
                     options: {
-                        emailRedirectTo: 'https://edutecprofe.vercel.app/login'
+                        emailRedirectTo: window.location.origin + '/login'
                     }
                 });
                 console.log('[PaymentPage PIX] Resultado do signUp:', { authData, authError });
