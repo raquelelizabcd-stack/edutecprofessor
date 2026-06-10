@@ -25,6 +25,29 @@ if (supabaseKey && supabaseKey.includes('anon')) {
 
 const supabase = createClient(supabaseUrl || "", supabaseKey || "");
 
+// Rotina de limpeza automática de registros pedagógicos com mais de 30 dias
+async function runAutoCleanup() {
+    console.log('[Auto-Cleanup] Iniciando limpeza de registros com mais de 30 dias...');
+    const limitDate = new Date();
+    limitDate.setDate(limitDate.getDate() - 30);
+    const limitIso = limitDate.toISOString();
+
+    try {
+        const [planRes, relRes, refRes] = await Promise.all([
+            supabase.from('planejamentos').delete().lt('created_at', limitIso),
+            supabase.from('relatorios_individuais').delete().lt('created_at', limitIso),
+            supabase.from('reflexoes_diarias').delete().lt('created_at', limitIso)
+        ]);
+        console.log('[Auto-Cleanup] Limpeza de registros concluída com sucesso.');
+    } catch (err) {
+        console.error('[Auto-Cleanup Error] Falha na limpeza automática:', err.message);
+    }
+}
+
+// Executar na inicialização do servidor e a cada 24 horas
+runAutoCleanup();
+setInterval(runAutoCleanup, 24 * 60 * 60 * 1000);
+
 // Configuração Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2023-10-16',

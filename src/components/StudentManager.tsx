@@ -7,6 +7,7 @@ import * as Icons from 'lucide-react';
 import { cn } from '../lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { checkAndRegisterPdfDownload } from '../lib/limits';
 
 interface StudentManagerProps {
     professorId: string;
@@ -283,7 +284,10 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
     };
 
     const gerarPDFAlunos = () => {
-        const doc = new jsPDF();
+        const canDownload = checkAndRegisterPdfDownload();
+        if (!canDownload) return;
+
+        const doc = new jsPDF({ compress: true });
         const pageWidth = doc.internal.pageSize.width;
 
         // Header do PDF
@@ -333,7 +337,10 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
     };
 
     const exportarPDFAluno = async (student?: Student) => {
-        const doc = new jsPDF();
+        const canDownload = checkAndRegisterPdfDownload();
+        if (!canDownload) return;
+
+        const doc = new jsPDF({ compress: true });
         const pageWidth = doc.internal.pageSize.width;
 
         const data = student || formData;

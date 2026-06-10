@@ -5,6 +5,7 @@ import { PedagogicalRecord, NAV_ITEMS } from '../types';
 import { cn } from '../lib/utils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { checkAndRegisterPdfDownload } from '../lib/limits';
 
 interface PortfolioViewProps {
   records: PedagogicalRecord[];
@@ -22,7 +23,10 @@ export default function PortfolioView({ records, onOpenRecord, professorNome, fo
   }, [records, formData?.alunoNome]);
 
   const handleExportAll = () => {
-    const doc = new jsPDF();
+    const canDownload = checkAndRegisterPdfDownload();
+    if (!canDownload) return;
+
+    const doc = new jsPDF({ compress: true });
     const pageWidth = doc.internal.pageSize.width;
 
     // Cabeçalho Principal (Verde EduTec)

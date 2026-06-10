@@ -6,6 +6,7 @@ import { Student } from '../types';
 import * as Icons from 'lucide-react';
 import { cn } from '../lib/utils';
 import jsPDF from 'jspdf';
+import { checkAndRegisterPdfDownload } from '../lib/limits';
 
 interface AttendanceManagerProps {
     professorId: string;
@@ -110,7 +111,10 @@ export default function AttendanceManager({ professorId, professorNome }: Attend
     };
 
     const handleExportPDF = () => {
-        const doc = new jsPDF();
+        const canDownload = checkAndRegisterPdfDownload();
+        if (!canDownload) return;
+
+        const doc = new jsPDF({ compress: true });
         const pageWidth = doc.internal.pageSize.width;
 
         doc.setFillColor(0, 168, 89);

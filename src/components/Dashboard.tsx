@@ -14,6 +14,7 @@ import PedagogicalIndicators from './PedagogicalIndicators';
 import HelpGuide from './HelpGuide';
 import SystemTour from './SystemTour';
 import { supabase } from '../lib/supabase';
+import { checkAndRegisterPdfDownload, canCreatePedagogicalRecord } from '../lib/limits';
 import { bnccCodesList } from '../lib/bnccCodes';
 import DataRetentionBanner from './DataRetentionBanner';
 import { useBncc } from '../hooks/useBncc';
@@ -592,6 +593,11 @@ export default function Dashboard({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!editingRecord) {
+      const canSave = await canCreatePedagogicalRecord(userId);
+      if (!canSave) return;
+    }
+
     // 1. Validação de obrigatoriedade — Ignorar módulos que geram títulos automáticos (Reflexões, Portfólio, Relatórios)
     const canSkipTitle = ['reflexoes', 'portfolio', 'relatorio-individual'].includes(activeTab);
     if ((!formData.title || !formData.date) && !canSkipTitle) {
@@ -792,6 +798,9 @@ export default function Dashboard({
   };
 
   const handleExport = async (recordToExport?: PedagogicalRecord) => {
+    const canDownload = checkAndRegisterPdfDownload();
+    if (!canDownload) return;
+
     // --- LIMITES DE EXPORTAÇÃO PDF ---
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -878,6 +887,9 @@ export default function Dashboard({
   };
 
   const exportarPDFPortfolio = () => {
+    const canDownload = checkAndRegisterPdfDownload();
+    if (!canDownload) return;
+
     // --- LIMITES DE EXPORTAÇÃO PDF PORTFÓLIO ---
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -910,7 +922,7 @@ export default function Dashboard({
         localStorage.setItem(`pro_exports_${new Date().toDateString()}`, (dailyExports + 1).toString());
     }
 
-    const doc = new jsPDF();
+    const doc = new jsPDF({ compress: true });
     const pageWidth = doc.internal.pageSize.width;
 
     // Cabeçalho Principal (Verde EduTec)
@@ -1061,7 +1073,10 @@ export default function Dashboard({
   };
 
   const exportarPDFDiarioReflexoes = () => {
-    const doc = new jsPDF();
+    const canDownload = checkAndRegisterPdfDownload();
+    if (!canDownload) return;
+
+    const doc = new jsPDF({ compress: true });
     const pageWidth = doc.internal.pageSize.width;
     
     // Header com tom púrpura (identidade do Diário)
