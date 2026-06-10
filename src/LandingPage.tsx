@@ -474,7 +474,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 <p className="text-black/60 text-sm">Poder total para o professor.</p>
               </div>
               <div className="mb-6 md:mb-8">
-                <span className="text-3xl md:text-4xl font-bold">R$ 9,90</span>
+                <span className="text-3xl md:text-4xl font-bold">R$ 29,90</span>
                 <span className="text-black/40">/mês</span>
               </div>
               <div className="mb-4">
