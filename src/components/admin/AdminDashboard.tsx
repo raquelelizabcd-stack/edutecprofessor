@@ -95,6 +95,8 @@ interface AdminUser {
   created_at: string;
   role: string;
   is_blocked?: boolean;
+  whatsapp?: string;
+  telefone_whatsapp?: string;
 }
 
 interface AuthUser {
@@ -2425,6 +2427,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                   <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-100">
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Usuários</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">WhatsApp</th>
+                      <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">E-mail</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Plano</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Status Pagamento</th>
                       <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Cadastro</th>
@@ -2453,6 +2457,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                             <p className="text-xs text-slate-500">{user.email}</p>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {user.telefone_whatsapp || user.whatsapp || 'Não informado'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-600">
+                        {user.email || 'Não informado'}
                       </td>
                       <td className="px-6 py-4">
                         <select 
