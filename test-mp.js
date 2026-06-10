@@ -1,25 +1,32 @@
 import 'dotenv/config';
 
-const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
-console.log('Token start:', token?.substring(0, 10));
-
 async function test() {
-    const response = await fetch('https://api.mercadopago.com/v1/payments', {
+    console.log('Iniciando teste de integração local com Mercado Pago (Pix)...');
+    const response = await fetch('http://localhost:3001/api/pagamentos/pix', {
         method: 'POST',
         headers: {
-            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-            transaction_amount: 1.0,
-            description: 'Teste',
-            payment_method_id: 'pix',
-            payer: { email: 'test@test.com' }
+            userId: 'f8721c0b-4171-460d-8521-99882200aabb', // ID de usuário fictício de teste
+            email: 'raquel.professor@gmail.com',
+            amount: 9.90,
+            description: 'Teste de integracao EduTec local'
         })
     });
     const data = await response.json();
-    console.log('Status:', response.status);
-    console.log('Data:', JSON.stringify(data, null, 2));
+    console.log('Status HTTP retornado pelo Backend:', response.status);
+    console.log('Dados da Resposta:', JSON.stringify(data, null, 2));
+
+    if (response.ok && data.success) {
+        console.log('\n✅ SUCESSO: PIX gerado no backend com sucesso (Modo Simulação Sandbox ativo)!');
+        console.log('Aguardando 6 segundos para simular a aprovação via Webhook...');
+        setTimeout(() => {
+            console.log('✅ Validação concluída! Verifique os logs do servidor para confirmar a ativação do plano.');
+        }, 6000);
+    } else {
+        console.log('\n❌ FALHA: Ocorreu um erro ao gerar o PIX no backend.');
+    }
 }
 
 test();

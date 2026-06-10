@@ -58,22 +58,7 @@ export default function PaymentPage({
                     const now = new Date();
                     
                     if (paymentMethod === 'mercadopago') {
-                        // Pix Promo Check
-                        const pixPromoStatus = parsed.pix_promo_status || 'standard';
-                        const pixPromoStart = parsed.pix_promo_start;
-                        const pixPromoEnd = parsed.pix_promo_end;
-
-                        let isPixPromoActive = false;
-                        if (pixPromoStatus === 'promo') {
-                            isPixPromoActive = true;
-                        } else if (pixPromoStatus === 'auto' && pixPromoStart && pixPromoEnd) {
-                            const start = new Date(pixPromoStart);
-                            const end = new Date(pixPromoEnd);
-                            end.setHours(23, 59, 59, 999);
-                            isPixPromoActive = now >= start && now <= end;
-                        }
-
-                        setPrice(isPixPromoActive ? 19.90 : 29.90);
+                        setPrice(9.90);
                     } else {
                         // Stripe Promo Check
                         const promoStatus = parsed.promo_status || 'standard';

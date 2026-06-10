@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight,
@@ -550,8 +551,14 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
       </section>
 
       {/* Footer */}
-      <footer className="py-12 border-t border-black/5 text-center text-black/40 text-sm">
-        <p>© 2024 EduTecProfessor - Professores Avulsos. Todos os direitos reservados.</p>
+      <footer className="py-12 border-t border-black/5 text-black/40 text-sm">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2024 EduTecProfessor - Professores Avulsos. Todos os direitos reservados.</p>
+          <div className="flex gap-6">
+            <Link to="/termos" className="hover:text-black transition-colors font-medium">Termos de Uso</Link>
+            <Link to="/privacidade" className="hover:text-black transition-colors font-medium">Política de Privacidade</Link>
+          </div>
+        </div>
       </footer>
     </div>
   );

@@ -7,6 +7,8 @@ import PaymentPage from './components/PaymentPage';
 import TermsAndRules from './components/auth/TermsAndRules';
 import AdminDashboard from './components/admin/AdminDashboard';
 import ProtectedRoute from './components/auth/ProtectedRoute';
+import TermsOfUsePage from './components/TermsOfUsePage';
+import PrivacyPolicyPage from './components/PrivacyPolicyPage';
 import { UserProfile } from './types';
 import { supabase } from './lib/supabase';
 import { Session } from '@supabase/supabase-js';
@@ -366,6 +368,9 @@ export default function App() {
           <AdminDashboard onLogout={handleLogout} />
         </ProtectedRoute>
       } />
+
+      <Route path="/termos" element={<TermsOfUsePage />} />
+      <Route path="/privacidade" element={<PrivacyPolicyPage />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
