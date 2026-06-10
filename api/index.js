@@ -752,7 +752,7 @@ app.post('/api/webhook/pagbank', async (req, res) => {
             await supabase
                 .from('users')
                 .update({ 
-                    plano: 'pro', 
+                    plano: 'lancamento', 
                     status_pagamento: 'aprovado',
                     data_expiracao: dataExpiracao.toISOString().split('T')[0]
                 })
@@ -784,8 +784,26 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
     }
 
     try {
-        let finalAmount = 9.90;
-        console.log('[MercadoPago] Utilizando o valor de produção para assinatura Pix: R$ 9.90');
+        let finalAmount = 29.90; // Preço padrão
+        const now = new Date();
+        const promoStartEnv = process.env.PIX_PROMO_START;
+        const promoEndEnv = process.env.PIX_PROMO_END;
+
+        if (promoStartEnv && promoEndEnv) {
+            const start = new Date(promoStartEnv);
+            const end = new Date(promoEndEnv);
+            end.setHours(23, 59, 59, 999);
+            if (now >= start && now <= end) {
+                finalAmount = 9.90;
+                console.log(`[MercadoPago] Promoção Pix ativa por data (${promoStartEnv} até ${promoEndEnv}): R$ 9.90`);
+            } else {
+                console.log(`[MercadoPago] Fora do período promocional Pix (${promoStartEnv} até ${promoEndEnv}). Preço regular: R$ 29.90`);
+            }
+        } else {
+            // Se as variáveis de data do .env não estiverem setadas, usa o valor de fallback R$ 9.90 por garantia
+            finalAmount = 9.90;
+            console.log('[MercadoPago] Variáveis de data promocional ausentes. Usando valor promocional padrão: R$ 9.90');
+        }
 
         console.log(`[MercadoPago] Geração de PIX para ${userId} no valor final calculado de ${finalAmount}`);
         
@@ -862,7 +880,7 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
                         await supabase
                             .from('users')
                             .update({ 
-                                plano: 'pro', 
+                                plano: 'lancamento', 
                                 status_pagamento: 'aprovado',
                                 data_expiracao: dataExpiracao.toISOString().split('T')[0]
                             })
@@ -998,7 +1016,7 @@ app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) 
                 const { error: userUpdateError } = await supabase
                     .from('users')
                     .update({ 
-                        plano: 'pro', 
+                        plano: 'lancamento', 
                         status_pagamento: 'aprovado',
                         data_expiracao: dataExpiracao.toISOString().split('T')[0]
                     })

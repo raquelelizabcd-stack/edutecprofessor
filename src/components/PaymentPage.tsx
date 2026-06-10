@@ -290,6 +290,12 @@ export default function PaymentPage({
                         <div className="mb-10">
                             <h2 className="text-2xl font-bold tracking-tight mb-2">Configure sua Assinatura</h2>
                             <p className="text-black/40 text-sm">Escolha o melhor método para você e ative sua conta Pro.</p>
+                            <div className="mt-4 p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-center gap-3 text-teal-800">
+                                <Zap className="text-teal-600 shrink-0" size={20} />
+                                <p className="text-xs font-semibold leading-normal">
+                                    Oferta de Lançamento — Assine por apenas R$ 9,90/mês via Pix. Valor válido por tempo limitado.
+                                </p>
+                            </div>
                         </div>
 
                         {/* Seleção de Método de Pagamento */}

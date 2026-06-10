@@ -1,12 +1,12 @@
 export type UserRole = 'admin' | 'professor';
-export type UserProfile = 'diretor' | 'professor' | 'free' | 'pro' | 'teste_pro' | 'public' | 'admin';
+export type UserProfile = 'diretor' | 'professor' | 'free' | 'pro' | 'teste_pro' | 'public' | 'admin' | 'lancamento';
 
 export interface NavItem {
   id: string;
   label: string;
   icon: string;
   category: '' | 'Registros Pedagógicos' | 'Relatórios' | 'Gestão Pedagógica' | 'Prática Autônoma' | 'Suporte';
-  roles: ('diretor' | 'professor' | 'free' | 'pro' | 'teste_pro')[];
+  roles: ('diretor' | 'professor' | 'free' | 'pro' | 'teste_pro' | 'lancamento')[];
 }
 
 export interface Student {
@@ -105,23 +105,23 @@ export interface PedagogicalRecord {
 
 export const NAV_ITEMS: NavItem[] = [
   // Dashboard isolated
-  { id: 'dashboard-evolucao', label: 'Dashboard de Evolução', icon: 'LayoutDashboard', category: '', roles: ['diretor', 'professor', 'pro', 'teste_pro'] },
+  { id: 'dashboard-evolucao', label: 'Dashboard de Evolução', icon: 'LayoutDashboard', category: '', roles: ['diretor', 'professor', 'pro', 'teste_pro', 'lancamento'] },
 
   // Registros Pedagógicos
-  { id: 'planejamentos', label: 'Planejamento Pedagógico', icon: 'Calendar', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro'] },
+  { id: 'planejamentos', label: 'Planejamento Pedagógico', icon: 'Calendar', category: 'Registros Pedagógicos', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro', 'lancamento'] },
 
   // Relatórios
-  { id: 'relatorio-individual', label: 'Relatório Individual', icon: 'FileText', category: 'Relatórios', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro'] },
+  { id: 'relatorio-individual', label: 'Relatório Individual', icon: 'FileText', category: 'Relatórios', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro', 'lancamento'] },
 
 
   // Prática Autônoma
-  { id: 'portfolio', label: 'Portfólio Digital', icon: 'History', category: 'Prática Autônoma', roles: ['professor', 'pro', 'teste_pro'] },
-  { id: 'reflexoes', label: 'Diário de Reflexões', icon: 'BookOpen', category: 'Prática Autônoma', roles: ['professor', 'pro', 'teste_pro'] },
+  { id: 'portfolio', label: 'Portfólio Digital', icon: 'History', category: 'Prática Autônoma', roles: ['professor', 'pro', 'teste_pro', 'lancamento'] },
+  { id: 'reflexoes', label: 'Diário de Reflexões', icon: 'BookOpen', category: 'Prática Autônoma', roles: ['professor', 'pro', 'teste_pro', 'lancamento'] },
 
   // Gestão (Teacher centric)
-  { id: 'alunos', label: 'Alunos', icon: 'Users', category: 'Gestão Pedagógica', roles: ['diretor', 'professor', 'pro', 'teste_pro'] },
-  { id: 'presenca', label: 'Presença do Aluno', icon: 'CheckSquare', category: 'Gestão Pedagógica', roles: ['diretor', 'professor', 'pro', 'teste_pro'] },
+  { id: 'alunos', label: 'Alunos', icon: 'Users', category: 'Gestão Pedagógica', roles: ['diretor', 'professor', 'pro', 'teste_pro', 'lancamento'] },
+  { id: 'presenca', label: 'Presença do Aluno', icon: 'CheckSquare', category: 'Gestão Pedagógica', roles: ['diretor', 'professor', 'pro', 'teste_pro', 'lancamento'] },
 
   // Suporte
-  { id: 'ajuda', label: 'Como usar o sistema', icon: 'HelpCircle', category: 'Suporte', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro'] },
+  { id: 'ajuda', label: 'Como usar o sistema', icon: 'HelpCircle', category: 'Suporte', roles: ['diretor', 'professor', 'free', 'pro', 'teste_pro', 'lancamento'] },
 ];

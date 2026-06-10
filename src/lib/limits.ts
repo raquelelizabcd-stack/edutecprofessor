@@ -7,12 +7,35 @@ interface UsageLimits {
   uploadMaxMonth: number; // in bytes
 }
 
+// Limites padrão do Plano Free
 export const LIMITS: UsageLimits = {
   recordsMax: 50,
   pdfMax: 3,
   uploadMaxFile: 5 * 1024 * 1024, // 5 MB
   uploadMaxMonth: 20 * 1024 * 1024, // 20 MB
 };
+
+// Retorna os limites dinamicamente dependendo do plano (role)
+export function getPlanLimits(role: string): UsageLimits {
+  if (role === 'pro' || role === 'admin') {
+    return {
+      recordsMax: Infinity,
+      pdfMax: Infinity,
+      uploadMaxFile: 100 * 1024 * 1024, // 100 MB
+      uploadMaxMonth: Infinity
+    };
+  }
+  if (role === 'lancamento') {
+    return {
+      recordsMax: 150,
+      pdfMax: 10,
+      uploadMaxFile: 5 * 1024 * 1024, // 5 MB
+      uploadMaxMonth: 100 * 1024 * 1024 // 100 MB
+    };
+  }
+  // Fallback para Free
+  return LIMITS;
+}
 
 // Simple local cache for repeated database queries
 const queryCache: Record<string, { data: any; expiry: number }> = {};
@@ -75,11 +98,14 @@ function saveUsage(usage: UserUsage) {
 /**
  * Tracks a PDF download and enforces limits
  */
-export function checkAndRegisterPdfDownload(): boolean {
+export function checkAndRegisterPdfDownload(role: string = 'free'): boolean {
+  const limits = getPlanLimits(role);
+  if (limits.pdfMax === Infinity) return true;
+
   const usage = getUsage();
   
-  if (usage.pdfsDownloaded >= LIMITS.pdfMax) {
-    alert("Limite mensal atingido — aguarde o próximo ciclo ou atualize para o plano Pro.");
+  if (usage.pdfsDownloaded >= limits.pdfMax) {
+    alert(`Limite mensal atingido — você usou seus ${limits.pdfMax} PDFs permitidos. Aguarde o próximo ciclo ou atualize para o plano Pro.`);
     console.warn("[Limites] Usuário atingiu o limite máximo de downloads de PDF do mês.");
     return false;
   }
@@ -88,9 +114,9 @@ export function checkAndRegisterPdfDownload(): boolean {
   saveUsage(usage);
 
   // Check 80% limit warning
-  const limit80Percent = LIMITS.pdfMax * 0.8;
+  const limit80Percent = limits.pdfMax * 0.8;
   if (usage.pdfsDownloaded >= limit80Percent) {
-    console.warn(`[Limites] ALERTA: Consumo de downloads de PDF atingiu ${Math.round((usage.pdfsDownloaded / LIMITS.pdfMax) * 100)}% do limite mensal.`);
+    console.warn(`[Limites] ALERTA: Consumo de downloads de PDF atingiu ${Math.round((usage.pdfsDownloaded / limits.pdfMax) * 100)}% do limite mensal.`);
   }
 
   return true;
@@ -99,15 +125,18 @@ export function checkAndRegisterPdfDownload(): boolean {
 /**
  * Tracks file upload and enforces limits
  */
-export function checkAndRegisterUpload(fileSize: number): boolean {
-  if (fileSize > LIMITS.uploadMaxFile) {
+export function checkAndRegisterUpload(fileSize: number, role: string = 'free'): boolean {
+  const limits = getPlanLimits(role);
+  if (fileSize > limits.uploadMaxFile) {
     alert("O tamanho do arquivo excede o limite permitido de 5 MB.");
     return false;
   }
 
+  if (limits.uploadMaxMonth === Infinity) return true;
+
   const usage = getUsage();
-  if (usage.uploadsBytes + fileSize > LIMITS.uploadMaxMonth) {
-    alert("Limite mensal atingido — aguarde o próximo ciclo ou atualize para o plano Pro.");
+  if (usage.uploadsBytes + fileSize > limits.uploadMaxMonth) {
+    alert(`Limite mensal atingido — este upload ultrapassa o limite de ${limits.uploadMaxMonth / (1024 * 1024)} MB do seu plano.`);
     console.warn("[Limites] Usuário atingiu o limite máximo de uploads do mês.");
     return false;
   }
@@ -115,9 +144,9 @@ export function checkAndRegisterUpload(fileSize: number): boolean {
   usage.uploadsBytes += fileSize;
   saveUsage(usage);
 
-  const limit80Percent = LIMITS.uploadMaxMonth * 0.8;
+  const limit80Percent = limits.uploadMaxMonth * 0.8;
   if (usage.uploadsBytes >= limit80Percent) {
-    console.warn(`[Limites] ALERTA: Consumo de uploads atingiu ${Math.round((usage.uploadsBytes / LIMITS.uploadMaxMonth) * 100)}% do limite mensal.`);
+    console.warn(`[Limites] ALERTA: Consumo de uploads atingiu ${Math.round((usage.uploadsBytes / limits.uploadMaxMonth) * 100)}% do limite mensal.`);
   }
 
   return true;
@@ -126,7 +155,9 @@ export function checkAndRegisterUpload(fileSize: number): boolean {
 /**
  * Checks if the user can create a new pedagogical record
  */
-export async function canCreatePedagogicalRecord(userId: string): Promise<boolean> {
+export async function canCreatePedagogicalRecord(userId: string, role: string = 'free'): Promise<boolean> {
+  const limits = getPlanLimits(role);
+  if (limits.recordsMax === Infinity) return true;
   if (!userId) return true;
 
   try {
@@ -155,15 +186,15 @@ export async function canCreatePedagogicalRecord(userId: string): Promise<boolea
       setCachedQuery(cacheKey, totalCount, 60000); // cache for 1 minute
     }
 
-    if (totalCount >= LIMITS.recordsMax) {
-      alert("Limite mensal atingido — aguarde o próximo ciclo ou atualize para o plano Pro.");
-      console.warn("[Limites] Usuário atingiu o limite máximo de 50 registros pedagógicos no mês.");
+    if (totalCount >= limits.recordsMax) {
+      alert(`Limite mensal de registros atingido (${limits.recordsMax} registros/mês). Faça upgrade para continuar planejando!`);
+      console.warn(`[Limites] Usuário atingiu o limite máximo de ${limits.recordsMax} registros pedagógicos no mês.`);
       return false;
     }
 
-    const limit80Percent = LIMITS.recordsMax * 0.8;
+    const limit80Percent = limits.recordsMax * 0.8;
     if (totalCount >= limit80Percent) {
-      console.warn(`[Limites] ALERTA: Consumo de registros pedagógicos atingiu ${Math.round((totalCount / LIMITS.recordsMax) * 100)}% do limite mensal.`);
+      console.warn(`[Limites] ALERTA: Consumo de registros pedagógicos atingiu ${Math.round((totalCount / limits.recordsMax) * 100)}% do limite mensal.`);
     }
 
     return true;

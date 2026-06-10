@@ -3661,14 +3661,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
                         : 'bg-white border-slate-200 opacity-60'
                     }`}>
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Preço Promocional</span>
+                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Preço de Lançamento (Pix)</span>
                         {isPixPromoActive && (
                           <span className="text-[9px] bg-green-200 text-green-800 font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
                             Selecionado
                           </span>
                         )}
                       </div>
-                      <h4 className="text-sm font-black text-teal-600 mt-2">R$ 19,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
+                      <h4 className="text-sm font-black text-teal-600 mt-2">R$ 9,90 <span className="text-xs font-normal text-slate-400">/ mês</span></h4>
                     </div>
                   </div>
 

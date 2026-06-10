@@ -12,9 +12,10 @@ interface PortfolioViewProps {
   onOpenRecord: (record: PedagogicalRecord) => void;
   professorNome?: string;
   formData?: any;
+  role?: string;
 }
 
-export default function PortfolioView({ records, onOpenRecord, professorNome, formData }: PortfolioViewProps) {
+export default function PortfolioView({ records, onOpenRecord, professorNome, formData, role = 'free' }: PortfolioViewProps) {
   const filteredRecords = useMemo(() => {
     if (formData?.alunoNome) {
       return records.filter(r => r.alunoNome === formData.alunoNome);
@@ -23,7 +24,7 @@ export default function PortfolioView({ records, onOpenRecord, professorNome, fo
   }, [records, formData?.alunoNome]);
 
   const handleExportAll = () => {
-    const canDownload = checkAndRegisterPdfDownload();
+    const canDownload = checkAndRegisterPdfDownload(role);
     if (!canDownload) return;
 
     const doc = new jsPDF({ compress: true });

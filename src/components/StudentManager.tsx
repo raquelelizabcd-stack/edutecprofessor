@@ -284,7 +284,7 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
     };
 
     const gerarPDFAlunos = () => {
-        const canDownload = checkAndRegisterPdfDownload();
+        const canDownload = checkAndRegisterPdfDownload(role);
         if (!canDownload) return;
 
         const doc = new jsPDF({ compress: true });
@@ -337,7 +337,7 @@ export default function StudentManager({ professorId, role, statusPagamento }: S
     };
 
     const exportarPDFAluno = async (student?: Student) => {
-        const canDownload = checkAndRegisterPdfDownload();
+        const canDownload = checkAndRegisterPdfDownload(role);
         if (!canDownload) return;
 
         const doc = new jsPDF({ compress: true });

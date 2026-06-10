@@ -594,7 +594,7 @@ export default function Dashboard({
     e.preventDefault();
 
     if (!editingRecord) {
-      const canSave = await canCreatePedagogicalRecord(userId);
+      const canSave = await canCreatePedagogicalRecord(userId, role);
       if (!canSave) return;
     }
 
@@ -798,7 +798,7 @@ export default function Dashboard({
   };
 
   const handleExport = async (recordToExport?: PedagogicalRecord) => {
-    const canDownload = checkAndRegisterPdfDownload();
+    const canDownload = checkAndRegisterPdfDownload(role);
     if (!canDownload) return;
 
     // --- LIMITES DE EXPORTAÇÃO PDF ---
@@ -887,7 +887,7 @@ export default function Dashboard({
   };
 
   const exportarPDFPortfolio = () => {
-    const canDownload = checkAndRegisterPdfDownload();
+    const canDownload = checkAndRegisterPdfDownload(role);
     if (!canDownload) return;
 
     // --- LIMITES DE EXPORTAÇÃO PDF PORTFÓLIO ---
@@ -1073,7 +1073,7 @@ export default function Dashboard({
   };
 
   const exportarPDFDiarioReflexoes = () => {
-    const canDownload = checkAndRegisterPdfDownload();
+    const canDownload = checkAndRegisterPdfDownload(role);
     if (!canDownload) return;
 
     const doc = new jsPDF({ compress: true });
@@ -1210,7 +1210,7 @@ export default function Dashboard({
         {activeTab === 'alunos' ? (
           <StudentManager professorId={userId} role={role} statusPagamento={statusPagamento} />
         ) : activeTab === 'presenca' ? (
-          <AttendanceManager professorId={userId} professorNome={professorNome} />
+          <AttendanceManager professorId={userId} professorNome={professorNome} role={role} />
         ) : activeTab === 'ajuda' ? (
           <HelpGuide onNavigate={setActiveTab} />
         ) : isFormOpen ? (
@@ -1385,6 +1385,7 @@ export default function Dashboard({
                     records={records}
                     professorNome={professorNome}
                     formData={formData}
+                    role={role}
                     onOpenRecord={(record) => {
                       setActiveTab(record.moduleId);
                       setFormData({

@@ -11,9 +11,10 @@ import { checkAndRegisterPdfDownload } from '../lib/limits';
 interface AttendanceManagerProps {
     professorId: string;
     professorNome: string;
+    role?: string;
 }
 
-export default function AttendanceManager({ professorId, professorNome }: AttendanceManagerProps) {
+export default function AttendanceManager({ professorId, professorNome, role = 'free' }: AttendanceManagerProps) {
     const [students, setStudents] = useState<Student[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -111,7 +112,7 @@ export default function AttendanceManager({ professorId, professorNome }: Attend
     };
 
     const handleExportPDF = () => {
-        const canDownload = checkAndRegisterPdfDownload();
+        const canDownload = checkAndRegisterPdfDownload(role);
         if (!canDownload) return;
 
         const doc = new jsPDF({ compress: true });
