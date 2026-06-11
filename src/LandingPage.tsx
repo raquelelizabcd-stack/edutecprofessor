@@ -420,7 +420,13 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-16 md:mb-20">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Escolha seu plano</h2>
-            <p className="text-black/60">Comece grátis ou experimente o Pro por 7 dias.</p>
+            <p className="text-black/60 mb-6">Comece grátis ou experimente o Pro por 7 dias.</p>
+            <div className="max-w-md mx-auto mb-10 p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-center gap-3 text-teal-800 shadow-sm animate-pulse">
+              <Zap className="text-teal-600 shrink-0" size={20} />
+              <p className="text-xs font-bold leading-normal text-left">
+                Oferta de Lançamento — Assine por apenas R$ 9,90/mês via Pix. Valor válido por tempo limitado.
+              </p>
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
             {/* Plano Free */}
