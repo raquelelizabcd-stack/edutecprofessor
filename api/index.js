@@ -966,51 +966,56 @@ app.post(['/api/webhook', '/webhook'], async (req, res) => {
     console.log('Headers:', JSON.stringify(req.headers));
     console.log('Body:', JSON.stringify(req.body));
 
-    const xSignature = req.headers['x-signature'];
-    const xRequestId = req.headers['x-request-id'];
+    const xSignature = req.headers['x-signature'] || req.headers['x-mercadopago-signature'];
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET || 'cb509dc556205b9082e4a09a56c25870c6621ccfe1e15154bb5203570c3dffce';
 
     if (!xSignature) {
-        console.warn('⚠️ [Webhook Validation] Assinatura x-signature ausente.');
+        console.warn('⚠️ [Webhook Validation] Assinatura ausente nos cabeçalhos.');
         return res.status(401).json({ error: 'unauthorized' });
     }
 
-    // Validação da assinatura do Mercado Pago
-    // Formato da assinatura: t=TIMESTAMP,v1=HASH
-    try {
-        const parts = xSignature.split(',');
-        let ts = '';
-        let hash = '';
-        parts.forEach(part => {
-            const [key, val] = part.split('=');
-            if (key.trim() === 't') ts = val.trim();
-            if (key.trim() === 'v1') hash = val.trim();
-        });
+    // Validação da assinatura simples do Mercado Pago
+    // Caso 1: Comparação direta simples (conforme regras solicitadas)
+    // Caso 2: Validação HMAC caso o simulador ou IPN envie no formato complexo
+    let isValid = false;
+    if (xSignature === webhookSecret) {
+        isValid = true;
+        console.log('✅ [Webhook Validation] Assinatura validada com sucesso via comparação direta!');
+    } else {
+        // Validação complexa HMAC (fallback)
+        try {
+            const parts = xSignature.split(',');
+            let ts = '';
+            let hash = '';
+            parts.forEach(part => {
+                const [key, val] = part.split('=');
+                if (key && val) {
+                    if (key.trim() === 't') ts = val.trim();
+                    if (key.trim() === 'v1') hash = val.trim();
+                }
+            });
 
-        // Tentar obter o ID do pagamento de várias fontes no body/query
-        const paymentId = req.body?.data?.id || req.body?.id || req.query?.id;
+            const paymentId = req.body?.data?.id || req.body?.id || req.query?.id;
+            const xRequestId = req.headers['x-request-id'];
 
-        if (ts && hash && paymentId) {
-            const manifest = `id:${paymentId};request-id:${xRequestId || ''};ts:${ts};`;
-            const hmac = crypto.createHmac('sha256', webhookSecret);
-            hmac.update(manifest);
-            const calculatedSignature = hmac.digest('hex');
+            if (ts && hash && paymentId) {
+                const manifest = `id:${paymentId};request-id:${xRequestId || ''};ts:${ts};`;
+                const hmac = crypto.createHmac('sha256', webhookSecret);
+                hmac.update(manifest);
+                const calculatedSignature = hmac.digest('hex');
 
-            if (calculatedSignature !== hash) {
-                console.warn(`❌ [Webhook Validation] Assinatura inválida. Calculada: ${calculatedSignature}, Recebida: ${hash}`);
-                return res.status(401).json({ error: 'unauthorized' });
+                if (calculatedSignature === hash) {
+                    isValid = true;
+                    console.log('✅ [Webhook Validation] Assinatura validada com sucesso via HMAC-SHA256!');
+                }
             }
-            console.log('✅ [Webhook Validation] Assinatura validada com sucesso via HMAC-SHA256!');
-        } else {
-            console.warn('⚠️ [Webhook Validation] Dados insuficientes para validar a assinatura.');
-            // Permitimos passar se estiver rodando em ambiente local sem dados completos para facilitar simulação,
-            // mas em produção com Vercel ou com o segredo exigido retornamos 401.
-            if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
-                return res.status(401).json({ error: 'unauthorized' });
-            }
+        } catch (err) {
+            console.error('💥 [Webhook Validation Error] Falha ao tentar processar assinatura HMAC:', err.message);
         }
-    } catch (err) {
-        console.error('💥 [Webhook Validation Error] Falha ao processar assinatura:', err.message);
+    }
+
+    if (!isValid) {
+        console.warn(`❌ [Webhook Validation] Assinatura inválida: ${xSignature}`);
         return res.status(401).json({ error: 'unauthorized' });
     }
 
