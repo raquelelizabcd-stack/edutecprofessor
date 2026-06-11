@@ -971,8 +971,8 @@ app.post(['/api/webhook', '/webhook'], async (req, res) => {
     const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET || 'cb509dc556205b9082e4a09a56c25870c6621ccfe1e15154bb5203570c3dffce';
 
     if (!xSignature) {
-        console.warn('⚠️ [Webhook Validation] Assinatura ausente nos cabeçalhos.');
-        return res.status(401).json({ error: 'unauthorized' });
+        console.log('💡 [Webhook Validation] Teste sem assinatura aceito.');
+        return res.status(200).json({ status: 'ok', message: 'Teste sem assinatura aceito' });
     }
 
     let isValid = false;
