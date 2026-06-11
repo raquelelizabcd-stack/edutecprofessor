@@ -10,7 +10,7 @@
       "destination": "/api/index.js"
     },
     {
-      "source": "/((?!api|assets|static|favicon.ico|manifest.json).*)/?",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
