@@ -6,6 +6,7 @@ import Stripe from 'stripe';
 import nodemailer from 'nodemailer';
 import imaps from 'imap-simple';
 import { simpleParser } from 'mailparser';
+import crypto from 'crypto';
 
 const app = express();
 
@@ -79,10 +80,10 @@ const imapConfig = {
 // Middleware para habilitar CORS e JSON (com exceção para o webhook que precisa do raw body)
 app.use(cors());
 
-// Parser especial para capturar o raw body necessário para a assinatura do Webhook do Stripe
+// Parser especial para capturar o raw body necessário para a assinatura do Webhook do Stripe e Mercado Pago
 app.use(express.json({
     verify: (req, res, buf) => {
-        if (req.originalUrl.includes('/webhook/stripe') || req.originalUrl.includes('/webhook/pagbank')) {
+        if (req.originalUrl.includes('/webhook/stripe') || req.originalUrl.includes('/webhook/pagbank') || req.originalUrl.includes('/webhook')) {
             req.rawBody = buf;
         }
     }
@@ -954,6 +955,133 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
     } catch (error) {
         console.error('💥 [CRITICAL ERROR] Falha ao gerar PIX Mercado Pago:', error);
         res.status(500).json({ error: 'Erro interno ao processar cobrança PIX. Tente novamente em instantes.' });
+    }
+});
+
+/**
+ * Endpoint genérico do Webhook do Mercado Pago com validação de assinatura
+ */
+app.post(['/api/webhook', '/webhook'], async (req, res) => {
+    console.log('📬 [MercadoPago Webhook Genérico] Recebido POST em /api/webhook');
+    console.log('Headers:', JSON.stringify(req.headers));
+    console.log('Body:', JSON.stringify(req.body));
+
+    const xSignature = req.headers['x-signature'];
+    const xRequestId = req.headers['x-request-id'];
+    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET || 'cb509dc556205b9082e4a09a56c25870c6621ccfe1e15154bb5203570c3dffce';
+
+    if (!xSignature) {
+        console.warn('⚠️ [Webhook Validation] Assinatura x-signature ausente.');
+        return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    // Validação da assinatura do Mercado Pago
+    // Formato da assinatura: t=TIMESTAMP,v1=HASH
+    try {
+        const parts = xSignature.split(',');
+        let ts = '';
+        let hash = '';
+        parts.forEach(part => {
+            const [key, val] = part.split('=');
+            if (key.trim() === 't') ts = val.trim();
+            if (key.trim() === 'v1') hash = val.trim();
+        });
+
+        // Tentar obter o ID do pagamento de várias fontes no body/query
+        const paymentId = req.body?.data?.id || req.body?.id || req.query?.id;
+
+        if (ts && hash && paymentId) {
+            const manifest = `id:${paymentId};request-id:${xRequestId || ''};ts:${ts};`;
+            const hmac = crypto.createHmac('sha256', webhookSecret);
+            hmac.update(manifest);
+            const calculatedSignature = hmac.digest('hex');
+
+            if (calculatedSignature !== hash) {
+                console.warn(`❌ [Webhook Validation] Assinatura inválida. Calculada: ${calculatedSignature}, Recebida: ${hash}`);
+                return res.status(401).json({ error: 'unauthorized' });
+            }
+            console.log('✅ [Webhook Validation] Assinatura validada com sucesso via HMAC-SHA256!');
+        } else {
+            console.warn('⚠️ [Webhook Validation] Dados insuficientes para validar a assinatura.');
+            // Permitimos passar se estiver rodando em ambiente local sem dados completos para facilitar simulação,
+            // mas em produção com Vercel ou com o segredo exigido retornamos 401.
+            if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+                return res.status(401).json({ error: 'unauthorized' });
+            }
+        }
+    } catch (err) {
+        console.error('💥 [Webhook Validation Error] Falha ao processar assinatura:', err.message);
+        return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    // Se a assinatura for válida, processamos o evento
+    try {
+        const { action, data, type } = req.body;
+        const paymentId = data?.id || req.body?.id;
+
+        if (paymentId && (type === 'payment' || action?.includes('payment'))) {
+            // Busca detalhes do pagamento no Mercado Pago
+            const response = await fetch(`${MERCADOPAGO_URL}/payments/${paymentId}`, {
+                headers: { 'Authorization': `Bearer ${MERCADOPAGO_ACCESS_TOKEN}` }
+            });
+            
+            if (response.ok) {
+                const payment = await response.json();
+                console.log(`[MercadoPago Webhook Genérico] Payment ${paymentId} -> ${payment.status}`);
+
+                let dbStatus = 'Aguardando';
+                if (payment.status === 'approved') dbStatus = 'approved';
+                if (payment.status === 'pending') dbStatus = 'pending';
+                if (payment.status === 'rejected' || payment.status === 'cancelled') dbStatus = 'rejected';
+
+                // 1. Atualiza a tabela pagamentos_pix
+                let updateResult = await supabase
+                    .from('pagamentos_pix')
+                    .update({ status: dbStatus })
+                    .eq('charge_id', paymentId.toString())
+                    .select('user_id')
+                    .maybeSingle();
+
+                if (updateResult.error && updateResult.error.message.includes('column "charge_id" does not exist')) {
+                    updateResult = await supabase
+                        .from('pagamentos_pix')
+                        .update({ status: dbStatus })
+                        .eq('pagbank_charge_id', paymentId.toString())
+                        .select('user_id')
+                        .maybeSingle();
+                }
+
+                const { data: pixData } = updateResult;
+
+                // 2. Se approved, ativa o plano Lançamento
+                if (dbStatus === 'approved' && pixData?.user_id) {
+                    const dataExpiracao = new Date();
+                    dataExpiracao.setMonth(dataExpiracao.getMonth() + 1);
+
+                    const { error: userUpdateError } = await supabase
+                        .from('users')
+                        .update({ 
+                            plano: 'lancamento', 
+                            status_pagamento: 'aprovado',
+                            data_expiracao: dataExpiracao.toISOString().split('T')[0]
+                        })
+                        .eq('id', pixData.user_id);
+                    
+                    if (userUpdateError) {
+                        console.error(`❌ [Webhook User Update Error] Falha ao ativar Plano Lançamento para usuário ${pixData.user_id}:`, userUpdateError.message);
+                    } else {
+                        console.log(`🚀 [MercadoPago Webhook Genérico] Usuário ${pixData.user_id} ativado via PIX MP com sucesso!`);
+                    }
+                }
+            } else {
+                console.warn(`[MercadoPago Webhook Genérico] Não foi possível consultar o pagamento ${paymentId}. Status: ${response.status}`);
+            }
+        }
+
+        return res.status(200).json({ status: "ok" });
+    } catch (error) {
+        console.error('[MercadoPago Webhook Genérico Error]', error);
+        return res.status(200).json({ status: "ok" }); // Respondemos 200 mesmo em erro interno para evitar que o MP continue reenviando
     }
 });
 
