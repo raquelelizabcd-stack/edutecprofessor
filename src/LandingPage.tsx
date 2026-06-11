@@ -418,15 +418,41 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
       {/* Plans */}
       <section id="planos" className="py-16 md:py-24 bg-[#FDFCFB]">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center max-w-2xl mx-auto mb-16 md:mb-20">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">Escolha seu plano</h2>
-            <p className="text-black/60 mb-6">Comece grátis ou experimente o Pro por 7 dias.</p>
-            <div className="max-w-md mx-auto mb-10 p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-center justify-center gap-3 text-teal-800 shadow-sm animate-pulse">
-              <Zap className="text-teal-600 shrink-0" size={20} />
-              <p className="text-xs font-bold leading-normal text-left">
-                Oferta de Lançamento — Assine por apenas R$ 9,90/mês via Pix. Valor válido por tempo limitado.
-              </p>
+            <p className="text-black/60 mb-10">Comece grátis ou experimente o Pro por 7 dias.</p>
+
+            {/* Destaque Plano Lançamento Pix */}
+            <div className="max-w-4xl mx-auto mb-12 p-8 md:p-10 rounded-[24px] md:rounded-[32px] bg-white border-2 border-[#00A86B] flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg shadow-[#00A86B]/5 relative overflow-hidden">
+              <div className="absolute -top-4 left-6 bg-[#00A86B] text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+                Exclusivo Pix
+              </div>
+              <div className="flex-1 text-left space-y-4">
+                <div className="flex items-center gap-2 text-[#00A86B]">
+                  <Zap size={20} className="fill-[#00A86B]" />
+                  <span className="text-sm font-black uppercase tracking-widest">Oferta de Lançamento</span>
+                </div>
+                <h3 className="text-2xl md:text-3xl font-black text-black">Plano Lançamento</h3>
+                <p className="text-black/60 text-sm leading-relaxed max-w-lg">
+                  Tenha acesso a um limite intermediário perfeito para quem quer recursos profissionais com o melhor custo-benefício. 150 registros/mês, 10 PDFs/mês e 100 MB de upload total.
+                </p>
+              </div>
+              <div className="text-center md:text-right flex flex-col items-center md:items-end justify-center gap-3 shrink-0 min-w-[200px]">
+                <div>
+                  <span className="text-4xl md:text-5xl font-black text-black">R$ 9,90</span>
+                  <span className="text-black/40 text-sm">/mês</span>
+                </div>
+                <p className="text-[11px] font-bold text-red-500 uppercase tracking-wider">
+                  Valor válido por tempo limitado
+                </p>
+                <button
+                  onClick={handleUpgradeClick}
+                  className="w-full py-4 px-6 bg-[#00A86B] hover:bg-[#008F5A] text-white font-extrabold rounded-full transition-all shadow-md shadow-[#00A86B]/20 text-center text-sm"
+                >
+                  Assinar via Pix
+                </button>
+              </div>
             </div>
+
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
             {/* Plano Free */}
