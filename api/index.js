@@ -966,9 +966,8 @@ app.post(['/api/webhook', '/webhook'], async (req, res) => {
     console.log('Headers:', JSON.stringify(req.headers));
     console.log('Body:', JSON.stringify(req.body));
 
-    // O simulador e os webhooks de produção enviam a assinatura no cabeçalho x-signature ou x-mercadopago-signature
     const xSignature = req.headers['x-signature'] || req.headers['x-mercadopago-signature'];
-    const webhookSecret = process.env.MERCADOPAGO_WEBHOOK_SECRET || 'cb509dc556205b9082e4a09a56c25870c6621ccfe1e15154bb5203570c3dffce';
+    const webhookSecret = (process.env.MERCADOPAGO_WEBHOOK_SECRET || 'cb509dc556205b9082e4a09a56c25870c6621ccfe1e15154bb5203570c3dffce').trim();
 
     if (!xSignature) {
         console.log('💡 [Webhook Validation] Teste sem assinatura aceito.');
@@ -995,22 +994,36 @@ app.post(['/api/webhook', '/webhook'], async (req, res) => {
                 }
             });
 
-            // Tentar obter o ID do pagamento de várias fontes no body/query/headers
-            const paymentId = req.body?.data?.id || req.body?.id || req.query?.id;
+            // Tentar obter o ID do pagamento de várias fontes no body/query/headers (incluindo data.id)
+            const paymentId = req.body?.data?.id || req.body?.id || req.query?.id || req.query['data.id'];
             const xRequestId = req.headers['x-request-id'];
 
             if (ts && hash && paymentId) {
+                const paymentIdStr = paymentId.toString().toLowerCase();
+                
                 // Montar o manifesto conforme especificação oficial do Mercado Pago
-                const manifest = `id:${paymentId};request-id:${xRequestId || ''};ts:${ts};`;
-                const hmac = crypto.createHmac('sha256', webhookSecret);
-                hmac.update(manifest);
-                const calculatedSignature = hmac.digest('hex');
+                // Tentativa 1: Utilizando o x-request-id recebido no cabeçalho (que pode ter sido alterado pelo Vercel)
+                const manifestWithHeader = `id:${paymentIdStr};request-id:${xRequestId || ''};ts:${ts};`;
+                const hmac1 = crypto.createHmac('sha256', webhookSecret);
+                hmac1.update(manifestWithHeader);
+                const calculatedSignature1 = hmac1.digest('hex');
 
-                if (calculatedSignature === hash) {
+                if (calculatedSignature1 === hash) {
                     isValid = true;
-                    console.log('✅ [Webhook Validation] Assinatura validada com sucesso via HMAC-SHA256!');
+                    console.log('✅ [Webhook Validation] Assinatura validada com sucesso via HMAC-SHA256 (com x-request-id)!');
                 } else {
-                    console.warn(`❌ [Webhook Validation] Assinatura HMAC incorreta. Calculado: ${calculatedSignature}, Recebido: ${hash}`);
+                    // Tentativa 2: Ignorando o x-request-id (caso a Vercel/proxy tenha injetado/sobrescrito o cabeçalho)
+                    const manifestEmpty = `id:${paymentIdStr};request-id:;ts:${ts};`;
+                    const hmac2 = crypto.createHmac('sha256', webhookSecret);
+                    hmac2.update(manifestEmpty);
+                    const calculatedSignature2 = hmac2.digest('hex');
+
+                    if (calculatedSignature2 === hash) {
+                        isValid = true;
+                        console.log('✅ [Webhook Validation] Assinatura validada com sucesso via HMAC-SHA256 (ignorando x-request-id do proxy)!');
+                    } else {
+                        console.warn(`❌ [Webhook Validation] Assinatura HMAC incorreta.\nCalculado (com header): ${calculatedSignature1}\nCalculado (sem header): ${calculatedSignature2}\nRecebido: ${hash}`);
+                    }
                 }
             } else {
                 console.warn(`⚠️ [Webhook Validation] Parâmetros insuficientes para validar o HMAC. ts: ${ts}, hash: ${hash}, paymentId: ${paymentId}`);
