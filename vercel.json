@@ -6,6 +6,10 @@
       "destination": "/api/webhook.js"
     },
     {
+      "source": "/ipn",
+      "destination": "/api/index.js"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.js"
     },

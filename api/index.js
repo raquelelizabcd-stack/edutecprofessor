@@ -1529,6 +1529,21 @@ app.get('/api/admin/mp-financials', async (req, res) => {
     }
 });
 
+/**
+ * Endpoint para receber notificações IPN (Mercado Pago formato antigo)
+ */
+app.get(['/api/ipn', '/ipn'], (req, res) => {
+    const { topic, id } = req.query;
+    console.log(`📬 [MercadoPago IPN] Recebido GET. Topic: ${topic}, ID: ${id}`);
+    
+    if (!topic || !id) {
+        return res.status(400).send("Parâmetros ausentes");
+    }
+
+    console.log(`✅ [MercadoPago IPN] Evento processado com sucesso. Topic: ${topic}, ID: ${id}`);
+    return res.status(200).json({ status: "ok", message: "IPN recebido com sucesso" });
+});
+
 // Inicialização Local
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
     const PORT = process.env.PORT || 3001;
