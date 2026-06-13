@@ -162,10 +162,26 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Registrar logs de acesso reais na tabela access_logs
+  // Registrar logs de acesso reais na tabela access_logs via backend
   useEffect(() => {
     const recordAccessLog = async () => {
       try {
+        const queryParams = new URLSearchParams(window.location.search);
+        const isInternalQuery = queryParams.get('internal') === 'true';
+        const isAdmin = userRole === 'admin';
+
+        // Configuração do Google Analytics (GA4) para tráfego interno
+        if (typeof window !== 'undefined') {
+          if (isInternalQuery || isAdmin) {
+            const win = window as any;
+            if (win.gtag) {
+              win.gtag('set', 'user_properties', { traffic_type: 'internal' });
+              // Tenta configurar a propriedade de tráfego interno
+              win.gtag('config', win.gaMeasurementId || 'G-XXXXXXXXXX', { 'traffic_type': 'internal' });
+            }
+          }
+        }
+
         const ua = navigator.userAgent;
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
         const deviceType = isMobile ? 'mobile' : 'desktop';
@@ -191,20 +207,35 @@ export default function App() {
 
         const userId = session?.user.id || null;
 
-        // Fazer insert resiliente (com try/catch silenciado caso o usuário não tenha rodado a migration ainda)
-        await supabase.from('access_logs').insert({
-          user_id: userId,
-          device_type: deviceType,
-          source: source,
-          page: pageName
+        // Fazer requisição para o backend para gravação resiliente de logs de acesso
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const apiBase = isLocal 
+          ? 'http://localhost:3001' 
+          : ((import.meta as any).env.VITE_API_URL || window.location.origin);
+        
+        const recordUrl = `${apiBase.replace(/\/$/, '')}/api/record-access${isInternalQuery ? '?internal=true' : ''}`;
+
+        await fetch(recordUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId,
+            deviceType,
+            source,
+            page: pageName,
+            role: userRole,
+            internal: isInternalQuery
+          })
         });
       } catch (err) {
-        console.warn('Erro ao gravar log de acesso:', err);
+        console.warn('Erro ao gravar log de acesso via backend:', err);
       }
     };
 
     recordAccessLog();
-  }, [location.pathname, session]);
+  }, [location.pathname, session, userRole]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

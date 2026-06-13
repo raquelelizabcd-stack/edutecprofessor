@@ -146,6 +146,63 @@ app.get('/api/status', (req, res) => {
     res.json({ status: 'online', service: 'EduTec-API', timestamp: new Date() });
 });
 
+app.post('/api/record-access', async (req, res) => {
+    try {
+        const { userId, deviceType, source, page, role, internal } = req.body;
+
+        // 1. Verificar parâmetro internal (query string ou body)
+        const isInternalParam = req.query.internal === 'true' || internal === true;
+        if (isInternalParam) {
+            console.log(`[Metrics Ignore] Acesso ignorado via parâmetro internal=true`);
+            return res.json({ success: true, ignored: true, reason: 'internal_param' });
+        }
+
+        // 2. Verificar se o usuário é admin
+        let userRole = role;
+        if (userId && !userRole) {
+            const { data: userData } = await supabase
+                .from('users')
+                .select('role')
+                .eq('id', userId)
+                .maybeSingle();
+            userRole = userData?.role;
+        }
+        if (userRole === 'admin' || userRole === 'admin_geral') {
+            console.log(`[Metrics Ignore] Acesso ignorado para usuário admin: ${userId || 'N/A'}`);
+            return res.json({ success: true, ignored: true, reason: 'admin_role' });
+        }
+
+        // 3. Verificar IP interno
+        const rawIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const clientIp = (typeof rawIp === 'string' ? rawIp.split(',')[0] : '').trim();
+        const internalIpsEnv = process.env.INTERNAL_IPS || '';
+        const internalIpsList = internalIpsEnv.split(',').map(ip => ip.trim());
+
+        if ((clientIp && internalIpsList.includes(clientIp)) || (req.ip && internalIpsList.includes(req.ip))) {
+            console.log(`[Metrics Ignore] Acesso ignorado para IP interno: ${clientIp || req.ip}`);
+            return res.json({ success: true, ignored: true, reason: 'internal_ip' });
+        }
+
+        // Registrar o acesso no banco de dados
+        const { error } = await supabase.from('access_logs').insert({
+            user_id: userId || null,
+            device_type: deviceType || 'desktop',
+            source: source || 'direto',
+            page: page || 'Desconhecida'
+        });
+
+        if (error) {
+            console.error('[Record Access Error] Falha ao registrar log no Supabase:', error.message);
+            return res.status(500).json({ error: 'Erro ao registrar acesso.' });
+        }
+
+        res.json({ success: true, registered: true });
+    } catch (err) {
+        console.error('[Record Access Error] Erro crítico no endpoint:', err.message);
+        res.status(500).json({ error: 'Erro interno do servidor.' });
+    }
+});
+
 /**
  * Funções Auxiliares de Sincronização
  */
