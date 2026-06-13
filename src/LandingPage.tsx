@@ -450,9 +450,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 >
                   Assinar via Pix
                 </button>
-              </div>
             </div>
-
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
             {/* Plano Free */}
