@@ -422,7 +422,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
             <p className="text-black/60 mb-10">Comece grátis ou experimente o Pro por 7 dias.</p>
 
             {/* Destaque Plano Lançamento Pix */}
-            <div className="max-w-4xl mx-auto mb-12 p-8 md:p-10 rounded-[24px] md:rounded-[32px] bg-white border-2 border-[#00A86B] flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg shadow-[#00A86B]/5 relative overflow-hidden">
+            <div className="max-w-4xl mx-auto mb-12 p-8 md:p-10 rounded-[24px] md:rounded-[32px] bg-white border-2 border-[#00A86B] flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg shadow-[#00A86B]/5 relative">
               <div className="absolute -top-4 left-6 bg-[#00A86B] text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
                 Exclusivo Pix
               </div>
