@@ -9,9 +9,9 @@ async function test() {
         },
         body: JSON.stringify({
             userId: 'f8721c0b-4171-460d-8521-99882200aabb', // ID de usuário fictício de teste
-            email: 'raquel.professor@gmail.com',
+            email: 'TESTUSER7958178611642844688@testuser.com',
             amount: 9.90,
-            description: 'Teste de integracao EduTec local'
+            description: 'Assinatura Plano Lançamento'
         })
     });
     const data = await response.json();
