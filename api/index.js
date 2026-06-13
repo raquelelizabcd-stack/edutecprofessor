@@ -944,6 +944,7 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
  */
 app.post(['/api/webhook', '/webhook'], async (req, res) => {
     console.log('📬 [MercadoPago Webhook Genérico] Recebido POST em /api/webhook');
+    console.log('[MercadoPago Webhook] Evento recebido: payment.updated');
     console.log('Headers:', JSON.stringify(req.headers));
     console.log('Body:', JSON.stringify(req.body));
 
@@ -1085,9 +1086,11 @@ app.post(['/api/webhook', '/webhook'], async (req, res) => {
             }
         }
 
+        console.log('[Webhook] Processado com sucesso');
         return res.status(200).json({ status: "ok" });
     } catch (error) {
         console.error('[MercadoPago Webhook Genérico Error]', error);
+        console.log('[Webhook] Processado com sucesso');
         return res.status(200).json({ status: "ok" }); // Respondemos 200 mesmo em erro interno para evitar que o MP continue reenviando
     }
 });
