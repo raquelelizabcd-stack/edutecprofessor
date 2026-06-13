@@ -423,7 +423,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
 
             {/* Destaque Plano Lançamento Pix */}
             <div className="max-w-4xl mx-auto mb-12 p-8 md:p-10 rounded-[24px] md:rounded-[32px] bg-white border-2 border-[#00A86B] flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg shadow-[#00A86B]/5 relative">
-              <div className="absolute -top-4 left-6 bg-[#00A86B] text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
+              <div className="absolute -top-3 left-6 bg-[#00A86B] text-white px-4 h-6 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center justify-center leading-none shadow-sm">
                 Exclusivo Pix
               </div>
               <div className="flex-1 text-left space-y-4">
@@ -496,7 +496,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
 
             {/* Plano Pro */}
             <div className="p-8 md:p-10 rounded-[24px] md:rounded-[32px] bg-white border-2 border-[#00A859] flex flex-col relative shadow-xl shadow-[#00A859]/5">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#00A859] text-white px-4 py-1 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#00A859] text-white px-4 h-6 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest flex items-center justify-center leading-none shadow-sm">
                 Recomendado
               </div>
               <div className="mb-6 md:mb-8">
