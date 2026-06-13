@@ -703,6 +703,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         pageViewsMap[log.page] = (pageViewsMap[log.page] || 0) + 1;
       });
 
+      // Garantir que as páginas de teste zeradas apareçam no ranking com 0 views
+      if (pageViewsMap['Pagamento'] === undefined) {
+        pageViewsMap['Pagamento'] = 0;
+      }
+      if (pageViewsMap['Pagamento Pix'] === undefined) {
+        pageViewsMap['Pagamento Pix'] = 0;
+      }
+
       const totalLogs = logs?.length || 1;
       const devices = [
         { name: 'Desktop', value: Math.round((desktopCount / totalLogs) * 100), count: desktopCount },
