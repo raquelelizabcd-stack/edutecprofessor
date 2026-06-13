@@ -4,6 +4,8 @@ import LandingPage from './LandingPage';
 import Dashboard from './components/Dashboard';
 import LoginPage from './components/LoginPage';
 import PaymentPage from './components/PaymentPage';
+import PaymentPixPage from './components/PaymentPixPage';
+import SuccessPixPage from './components/SuccessPixPage';
 import TermsAndRules from './components/auth/TermsAndRules';
 import AdminDashboard from './components/admin/AdminDashboard';
 import ProtectedRoute from './components/auth/ProtectedRoute';
@@ -181,7 +183,9 @@ export default function App() {
         const path = location.pathname;
         let pageName = 'Landing Page';
         if (path.includes('/login')) pageName = 'Login';
+        else if (path.includes('/payment-pix')) pageName = 'Pagamento Pix';
         else if (path.includes('/payment')) pageName = 'Pagamento';
+        else if (path.includes('/success-pix')) pageName = 'Sucesso Pix';
         else if (path.includes('/dashboard')) pageName = 'Painel do Professor';
         else if (path.includes('/admin')) pageName = 'Painel Admin';
 
@@ -296,6 +300,7 @@ export default function App() {
           onLogin={() => {}} 
           onGoToLogin={handleGoToLogin}
           onGoToPayment={() => navigate('/payment')}
+          onGoToPaymentPix={() => navigate('/payment-pix')}
           onGoToDashboard={() => navigate('/dashboard')}
           role={currentProfile}
           statusPagamento={userStatusPagamento}
@@ -334,6 +339,21 @@ export default function App() {
           userEmail={session?.user.email || ''}
           statusPagamento={userStatusPagamento}
           role={currentProfile}
+        />
+      } />
+
+      <Route path="/payment-pix" element={
+        <PaymentPixPage
+          onBack={() => navigate('/')}
+          onSuccess={() => navigate('/success-pix')}
+          onUnauthenticated={() => handleGoToLogin('pro')}
+          userEmail={session?.user.email || ''}
+        />
+      } />
+
+      <Route path="/success-pix" element={
+        <SuccessPixPage
+          onGoToDashboard={() => navigate('/dashboard')}
         />
       } />
 

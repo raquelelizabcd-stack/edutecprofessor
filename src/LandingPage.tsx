@@ -31,6 +31,7 @@ interface LandingPageProps {
   onLogin: (role: UserProfile) => void;
   onGoToLogin: (planIntent?: 'free' | 'pro') => void;
   onGoToPayment: () => void;
+  onGoToPaymentPix?: () => void;
   onGoToDashboard: () => void;
   role?: string;
   statusPagamento?: string | null;
@@ -38,7 +39,7 @@ interface LandingPageProps {
   userId?: string;
 }
 
-export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoToDashboard, role, statusPagamento, userEmail, userId }: LandingPageProps) {
+export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoToPaymentPix, onGoToDashboard, role, statusPagamento, userEmail, userId }: LandingPageProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [selectedPlanView, setSelectedPlanView] = useState<'none' | 'free' | 'pro'>('none');
   const [isCreatingPortalSession, setIsCreatingPortalSession] = useState(false);
@@ -147,6 +148,33 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
         onGoToPayment();
       } else {
         // Active -> let it flow to dashboard
+        onGoToDashboard();
+      }
+    } catch (err) {
+      console.error(err);
+      onGoToLogin();
+    }
+  };
+
+  const handleUpgradePixClick = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        onGoToPaymentPix?.();
+        return;
+      }
+
+      const { data: userRecord, error } = await supabase
+        .from('users')
+        .select('status_pagamento')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (userRecord?.status_pagamento !== 'ativo' && userRecord?.status_pagamento !== 'aprovado') {
+        onGoToPaymentPix?.();
+      } else {
         onGoToDashboard();
       }
     } catch (err) {
@@ -445,7 +473,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                   Valor válido por tempo limitado
                 </p>
                 <button
-                  onClick={handleUpgradeClick}
+                  onClick={handleUpgradePixClick}
                   className="w-full py-4 px-6 bg-[#00A86B] hover:bg-[#008F5A] text-white font-extrabold rounded-full transition-all shadow-md shadow-[#00A86B]/20 text-center text-sm"
                 >
                   Assinar via Pix
