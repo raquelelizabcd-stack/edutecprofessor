@@ -50,8 +50,14 @@ export default function PaymentPixPage({
                     },
                     (payload: any) => {
                         const newStatus = payload.new?.status_pagamento;
+                        console.log(`[Pagamento Pix Channel] Novo status_pagamento em users: ${newStatus}`);
                         if (newStatus === 'aprovado' || newStatus === 'ativo') {
+                            console.log('[Pagamento Pix Channel] Status: approved');
                             onSuccess();
+                        } else if (newStatus === 'rejeitado' || newStatus === 'rejected') {
+                            console.log('[Pagamento Pix Channel] Status: rejected');
+                        } else {
+                            console.log(`[Pagamento Pix Channel] Status: ${newStatus}`);
                         }
                     }
                 )
@@ -66,15 +72,31 @@ export default function PaymentPixPage({
             const activeUserId = session?.user?.id;
             if (!activeUserId) return;
 
-            const { data } = await supabase
+            const { data: userData } = await supabase
                 .from('users')
                 .select('status_pagamento')
                 .eq('id', activeUserId)
                 .maybeSingle();
 
-            if (data?.status_pagamento === 'aprovado' || data?.status_pagamento === 'ativo') {
+            const { data: pixDataDb } = await supabase
+                .from('pagamentos_pix')
+                .select('status')
+                .eq('user_id', activeUserId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            const statusLog = pixDataDb?.status || userData?.status_pagamento;
+            console.log(`[Pagamento Pix Polling] Status do pagamento: ${statusLog}`);
+
+            if (pixDataDb?.status === 'approved' || userData?.status_pagamento === 'aprovado' || userData?.status_pagamento === 'ativo') {
+                console.log('[Pagamento Pix Polling] Status final: approved');
                 clearInterval(interval);
                 onSuccess();
+            } else if (pixDataDb?.status === 'rejected' || userData?.status_pagamento === 'rejeitado' || userData?.status_pagamento === 'rejected') {
+                console.log('[Pagamento Pix Polling] Status final: rejected');
+            } else {
+                console.log('[Pagamento Pix Polling] Status atual: pending');
             }
         }, 3000);
 
@@ -148,6 +170,7 @@ export default function PaymentPixPage({
             }
             
             setPixData(data);
+            console.log(`[MercadoPago PIX Criado] Status inicial do pagamento: ${data.status || 'pending'}`);
         } catch (err: any) {
             console.error('Mercado Pago PIX error:', err);
             setToast({
@@ -301,7 +324,7 @@ export default function PaymentPixPage({
                                                 ) : (
                                                     <>
                                                         <QrCode size={24} />
-                                                        <span>Pagar com Pix</span>
+                                                        <span>Gerar QR Code Pix</span>
                                                     </>
                                                 )}
                                             </button>
@@ -310,7 +333,7 @@ export default function PaymentPixPage({
                                 </div>
                                 <div className="flex items-center justify-center gap-2 text-black/40 text-xs">
                                     <ShieldCheck size={16} className="text-[#00A86B]" />
-                                    <span>Pagamento 100% seguro via Mercado Pago</span>
+                                    <span>Pagamento 100 % seguro via Mercado Pago</span>
                                 </div>
                             </section>
                         </div>

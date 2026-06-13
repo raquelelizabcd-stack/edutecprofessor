@@ -790,13 +790,14 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
 
         const paymentData = {
             transaction_amount: Number(finalAmount),
-            description: description || 'Assinatura EduTec Pro',
+            description: 'Assinatura Plano Lançamento',
             payment_method_id: 'pix',
             payer: {
                 email: email || 'usuario@edutecpro.com',
             },
             notification_url: process.env.MERCADOPAGO_WEBHOOK_URL || 'https://edutechprofe.vercel.app/api/webhook/mercadopago'
         };
+        console.log(`[MercadoPago] Criando pagamento PIX: ${paymentData.description} - R$ ${paymentData.transaction_amount}`);
 
         const mpResponse = await fetch(`${MERCADOPAGO_URL}/payments`, {
             method: 'POST',
@@ -1038,6 +1039,8 @@ app.post(['/api/webhook', '/webhook'], async (req, res) => {
                 if (payment.status === 'pending') dbStatus = 'pending';
                 if (payment.status === 'rejected' || payment.status === 'cancelled') dbStatus = 'rejected';
 
+                console.log(`[MercadoPago Webhook Genérico Status] O status do pagamento ${paymentId} é: ${dbStatus}`);
+
                 // 1. Atualiza a tabela pagamentos_pix
                 let updateResult = await supabase
                     .from('pagamentos_pix')
@@ -1114,6 +1117,8 @@ app.post(['/api/webhook/mercadopago', '/webhook/mercadopago'], async (req, res) 
             if (payment.status === 'approved') dbStatus = 'approved';
             if (payment.status === 'pending') dbStatus = 'pending';
             if (payment.status === 'rejected' || payment.status === 'cancelled') dbStatus = 'rejected';
+
+            console.log(`[MercadoPago Webhook Status] O status do pagamento ${paymentId} é: ${dbStatus}`);
 
             // 1. Atualiza a tabela pagamentos_pix com resiliência
             let updateResult = await supabase
