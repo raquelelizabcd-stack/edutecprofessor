@@ -433,7 +433,7 @@ export default function LandingPage({ onLogin, onGoToLogin, onGoToPayment, onGoT
                 </div>
                 <h3 className="text-2xl md:text-3xl font-black text-black">Plano Lançamento</h3>
                 <p className="text-black/60 text-sm leading-relaxed max-w-lg">
-                  Tenha acesso a um limite intermediário perfeito para quem quer recursos profissionais com o melhor custo-benefício. 150 registros/mês, 10 PDFs/mês e 100 MB de upload total.
+                  Aproveite o valor especial de lançamento: apenas R$ 9,90/mês pagando via Pix! Oferta exclusiva e limitada para quem quer começar com todos os recursos do plano Pro por um preço promocional.
                 </p>
               </div>
               <div className="text-center md:text-right flex flex-col items-center md:items-end justify-center gap-3 shrink-0 min-w-[200px]">
