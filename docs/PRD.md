@@ -87,4 +87,5 @@ O **EduTecPro** é um Micro-SaaS desenvolvido para transformar a rotina burocrá
 
 ---
 **Documento atualizado em:** 17/05/2026
-**Responsável:** Antigravity AI (Google DeepMind)
+**Responsável:** Antigravity AI (Google DeepMind) lala
+
