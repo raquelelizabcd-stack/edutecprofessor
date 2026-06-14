@@ -1000,7 +1000,12 @@ app.post(['/api/pagamentos/pix', '/pagamentos/pix'], async (req, res) => {
 /**
  * Endpoint genérico do Webhook do Mercado Pago com validação de assinatura
  */
-app.post(['/api/webhook', '/webhook'], async (req, res) => {
+app.all(['/api/webhook', '/webhook'], async (req, res) => {
+    if (req.method === 'GET') {
+        console.log('[MercadoPago Webhook] Teste IPN recebido via GET');
+        return res.status(200).send('OK');
+    }
+
     // 1. Registrar no log interno as mensagens requeridas
     console.log('[MercadoPago Webhook] Evento recebido: payment.updated');
     console.log('[Webhook] Processado com sucesso');
