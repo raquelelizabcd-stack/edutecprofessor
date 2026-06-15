@@ -1011,9 +1011,30 @@ app.all(['/api/webhook', '/webhook'], async (req, res) => {
     console.log('[Webhook] Processado com sucesso');
 
     try {
-        const { id, topic, type, action, data } = req.body;
+        const { id, topic, type, action, data, status } = req.body;
         const paymentId = data?.id || id || req.query?.id;
         const eventType = type || topic;
+        const userId = req.body.userId || req.body.user_id;
+
+        if (topic === 'payment' && status === 'approved') {
+            if (userId) {
+                await supabase
+                    .from('assinaturas')
+                    .update({
+                        ativo: true,
+                        data_pagamento: new Date()
+                    })
+                    .eq('user_id', userId);
+
+                await supabase
+                    .from('termos_aceitos')
+                    .insert({
+                        usuario_id: userId,
+                        versao: "2026-06",
+                        aceito_em: new Date()
+                    });
+            }
+        }
 
         // Validar os campos do Mercado Pago
         const isFormatCorrect = paymentId || eventType || action;
